@@ -46,18 +46,45 @@ Every tool wrapper emits a WebSocket event when invoked, so the UI streams the a
 
 When **user B** drives the same route and hits the same dead zone, their agent finds the pack **user A's agent** already built — and *buys it* instead of rebuilding it.
 
-- Real Coinbase CDP wallet on Base Sepolia testnet (you'll see the address on screen).
-- Simulated x402 settlement (fake tx hash) so the demo never blocks on faucets.
+- Simulated x402-style settlement — fake tx hash, no on-chain dependencies, demo never blocks.
+- Each agent has a stable demo wallet address shown in the payment event.
 - The dashboard ticks up: `1 sold · $0.02 paid`.
 
 This is the pitch: agents transacting with each other for already-done work, with the LLM deciding when to buy vs. when to build.
+
+## Observability via Datadog LLM Observability
+
+Every run of the agent shows up in [Datadog LLM Observability](https://docs.datadoghq.com/llm_observability/) as a single trace with the full waterfall:
+
+```
+workflow: deadzone_signal
+  └── agent: pack_builder
+        ├── llm: openai.chat.completions.create   (auto-instrumented)
+        ├── tool: clickhouse_find_recent_pack
+        ├── llm: openai.chat.completions.create
+        ├── tool: nimble_search × 4               (parallel)
+        ├── tool: senso_publish
+        ├── tool: x402_pay                        (cache-hit path)
+        └── llm: openai.chat.completions.create
+```
+
+We use the official `ddtrace` SDK with:
+- `LLMObs.enable(agentless_enabled=True)` at process startup — no Datadog Agent process needed.
+- `@workflow / @agent / @tool` decorators from `ddtrace.llmobs.decorators` on `orchestrator.run`, `_run_with_llm`, and each tool wrapper.
+- Auto-instrumentation of the OpenAI SDK — every `chat.completions.create` becomes an LLM span with prompt, response, token counts, latency.
+- `LLMObs.annotate(input_data=, output_data=, metadata=, tags=)` inside each tool so spans carry meaningful context (query, source counts, settlement type, etc.).
+
+If `DD_API_KEY` isn't set, all decorators no-op and the rest of the demo runs identically.
+
+Where to look in Datadog: **LLM Observability → Applications → `deadzone-agent`** — every signal becomes one trace.
 
 ## Tech stack
 
 - **Backend:** Python 3.11 · FastAPI · OpenAI SDK (function calling) · `clickhouse-connect` · `httpx` · WebSockets
 - **Frontend:** Next.js 14 (App Router) · TypeScript · Tailwind · `react-leaflet`
-- **Storage:** ClickHouse Cloud (free tier)
-- **Sponsors:** Nimble (web search) · Senso (publish to cited.md) · Coinbase CDP + x402 (payments)
+- **Storage:** ClickHouse Cloud (free tier) with in-memory fallback
+- **Observability:** Datadog (metrics + logs via HTTP intake)
+- **Sponsors:** Nimble (web search) · Senso (publish to cited.md) · Datadog (observability)
 
 ## Repo layout
 
@@ -85,7 +112,7 @@ deadzone/
 # 1. Backend
 cd backend
 cp .env.example .env       # fill in OPENAI_API_KEY, NIMBLE_API_KEY, SENSO_API_KEY,
-                           # CLICKHOUSE_*, CDP_API_KEY, CDP_API_SECRET
+                           # CLICKHOUSE_*, DD_API_KEY (all optional — fallbacks exist)
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 
