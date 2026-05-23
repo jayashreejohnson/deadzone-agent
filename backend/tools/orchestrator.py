@@ -1,4 +1,4 @@
-"""LLM-driven orchestrator using OpenAI function calling.
+﻿"""LLM-driven orchestrator using OpenAI function calling.
 
 The LLM decides which tools to invoke and in what order. Each tool wrapper emits a
 WebSocket event when called, so the UI streams the agent's reasoning live.
@@ -20,8 +20,8 @@ from tools import nimble, senso, payments, clickhouse_db as db
 from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import workflow, agent
 
-_OPENAI_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+_OPENAI_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
+_MODEL = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001")
 
 PRICE_USD = 0.02
 
@@ -143,7 +143,7 @@ TOOLS = [
             "name": "payments_pay",
             "description": (
                 "Agent-to-agent x402 payment. Call this when the user is BUYING an existing "
-                "cached pack — pay the original owner."
+                "cached pack â€” pay the original owner."
             ),
             "parameters": {
                 "type": "object",
@@ -281,7 +281,7 @@ async def run(signal: dict) -> None:
     """Orchestrate one dead-zone signal end-to-end."""
     eta = signal.get("eta_seconds", 240)
     await emit({"type": "status",
-                "msg": f"Dead zone in {eta // 60} min — preparing pack",
+                "msg": f"Dead zone in {eta // 60} min â€” preparing pack",
                 "user_id": signal["user_id"]})
     LLMObs.annotate(
         input_data=signal,
@@ -301,37 +301,37 @@ async def run(signal: dict) -> None:
 
 
 # ---------- LLM-driven path ----------
-SYSTEM_PROMPT = """You are an offline-pack-building agent. A user is approaching a connectivity dead zone and needs an offline content pack delivered BEFORE they lose signal — time matters.
+SYSTEM_PROMPT = """You are an offline-pack-building agent. A user is approaching a connectivity dead zone and needs an offline content pack delivered BEFORE they lose signal â€” time matters.
 
 Workflow (follow exactly):
 
 1. Call `clickhouse_find_recent_pack` first with the route_id and deadzone_id from the signal.
 
 2A. IF a pack is found (cache hit):
-    - Call `payments_pay` from the user's agent to the cached pack's owner_user_id (use "agent_<last_letter_of_user_id>" naming — e.g. user_a → agent_a, user_b → agent_b). Amount: 0.02 USD. Memo: "buy cached pack".
+    - Call `payments_pay` from the user's agent to the cached pack's owner_user_id (use "agent_<last_letter_of_user_id>" naming â€” e.g. user_a â†’ agent_a, user_b â†’ agent_b). Amount: 0.02 USD. Memo: "buy cached pack".
     - Call `clickhouse_log_event` with action="bought", the found pack_id, build_ms=0.
     - Call `deliver_pack` with the cached URL, cached=true, the pack_id.
     - Reply with one short sentence and stop.
 
 2B. IF no pack is found (cache miss):
-    - Call `nimble_search` FOUR TIMES IN PARALLEL — one for each topic:
+    - Call `nimble_search` FOUR TIMES IN PARALLEL â€” one for each topic:
         * topic="weather", query about weather near the lat/lng
         * topic="road",    query about road conditions on this route
         * topic="poi",     query about points of interest near the lat/lng
         * topic="news",    query about local news near the lat/lng
-    - Call `senso_publish` with title like "Offline pack: <route>", route_id, and a `sections` array — one section per search result with heading ("Weather", "Road conditions", "Points of interest", "Local news"), summary (the search summary), and sources (the search sources).
-    - Call `clickhouse_save_pack` with the returned URL, owner_user_id from the signal, source_count = total sources across all sections. THIS RETURNS a pack_id — you MUST use the EXACT pack_id string it returns (looks like "pk_xxxxxxx") in all subsequent calls. Do not invent or substitute a placeholder.
+    - Call `senso_publish` with title like "Offline pack: <route>", route_id, and a `sections` array â€” one section per search result with heading ("Weather", "Road conditions", "Points of interest", "Local news"), summary (the search summary), and sources (the search sources).
+    - Call `clickhouse_save_pack` with the returned URL, owner_user_id from the signal, source_count = total sources across all sections. THIS RETURNS a pack_id â€” you MUST use the EXACT pack_id string it returns (looks like "pk_xxxxxxx") in all subsequent calls. Do not invent or substitute a placeholder.
     - Call `clickhouse_log_event` with action="built", pack_id = the EXACT pack_id returned by clickhouse_save_pack, build_ms=0.
     - Call `deliver_pack` with the new URL, cached=false, pack_id = the EXACT pack_id returned by clickhouse_save_pack.
     - Reply with one short sentence and stop.
 
-Be fast. Issue parallel tool calls whenever possible. Do not invent data — use the tools."""
+Be fast. Issue parallel tool calls whenever possible. Do not invent data â€” use the tools."""
 
 
 @agent(name="pack_builder")
 async def _run_with_llm(signal: dict) -> None:
     from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=_OPENAI_KEY)
+    client = AsyncOpenAI(api_key=_OPENAI_KEY, base_url="https://openrouter.ai/api/v1")
     ctx = _Ctx(signal)
     LLMObs.annotate(
         input_data=signal,
@@ -360,7 +360,7 @@ async def _run_with_llm(signal: dict) -> None:
 
         tool_calls = msg.tool_calls or []
         if not tool_calls:
-            break  # LLM returned plain text — done
+            break  # LLM returned plain text â€” done
 
         # Run tool calls (in parallel where the LLM requested it).
         async def _exec(tc):
@@ -401,7 +401,7 @@ async def _run_scripted(signal: dict) -> None:
     cached = db.find_recent_pack(route_id, deadzone_id)
     if cached:
         seller_agent = "agent_" + cached["owner_user_id"].split("_")[-1]
-        await emit({"type": "log", "level": "info", "msg": "cache hit — buying pack"})
+        await emit({"type": "log", "level": "info", "msg": "cache hit â€” buying pack"})
         result = await payments.pay(buyer_agent, seller_agent, PRICE_USD, "buy cached pack")
         db.log_payment(result["tx_id"], buyer_agent, seller_agent, PRICE_USD, cached["pack_id"])
         db.log_event(user_id, route_id, deadzone_id, "bought", cached["pack_id"], 0)
@@ -430,3 +430,4 @@ async def _run_scripted(signal: dict) -> None:
     build_ms = int((time.time() - ctx.t0) * 1000)
     db.log_event(user_id, route_id, deadzone_id, "built", pack_id, build_ms)
     await emit({"type": "pack_ready", "url": url, "cached": False, "pack_id": pack_id})
+
