@@ -1,8 +1,5 @@
 openai
 fastapi
 uvicorn
-streamlit
-clickhouse-connect
-python-dotenv
 requests
 polyline
