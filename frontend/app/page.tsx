@@ -17,10 +17,10 @@ import {
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
-const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const API    = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 const WS_URL = API.replace(/^https:\/\//, "wss://").replace(/^http:\/\//, "ws://") + "/ws";
 
-type User = "user_a" | "user_b";
+type User    = "user_a" | "user_b";
 type Overlay =
   | { kind: "none" }
   | { kind: "alert"; deadzoneName: string; etaSeconds: number; confidence: number }
@@ -41,19 +41,18 @@ type TripState = {
 
 type PlanState = "idle" | "planning" | "ready" | "tripping";
 
-const STEP_MS = 350;
+const STEP_MS       = 350;
 const STEP_PROGRESS = 0.07;
 
 function buildRoutePolyline(zones: DeadZone[]): LatLng[] {
   if (zones.length === 0) return DEFAULT_ROUTE_POLYLINE;
   const first = zones[0];
-  const last = zones[zones.length - 1];
-  const points: LatLng[] = [
-    { lat: first.lat - 0.05, lng: first.lng - 0.05 }, // start
+  const last  = zones[zones.length - 1];
+  return [
+    { lat: first.lat - 0.05, lng: first.lng - 0.05 },
     ...zones.map((z) => ({ lat: z.lat, lng: z.lng })),
-    { lat: last.lat + 0.03, lng: last.lng + 0.05 },   // end
+    { lat: last.lat + 0.03, lng: last.lng + 0.05 },
   ];
-  return points;
 }
 
 let _toastSeq = 1;
@@ -62,17 +61,20 @@ export default function Page() {
   const [activeUser, setActiveUser] = useState<User>("user_a");
 
   // Plan / trip state
-  const [planState, setPlanState] = useState<PlanState>("idle");
-  const [plannedZones, setPlannedZones] = useState<DeadZone[]>(DEFAULT_DEAD_ZONES);
+  const [planState, setPlanState]         = useState<PlanState>("idle");
+  const [plannedZones, setPlannedZones]   = useState<DeadZone[]>(DEFAULT_DEAD_ZONES);
   const [routePolyline, setRoutePolyline] = useState<LatLng[]>(DEFAULT_ROUTE_POLYLINE);
-  const [routeId, setRouteId] = useState<string>(ROUTE_ID);
-  const [routeName, setRouteName] = useState<string>("");
-  const [nextZone, setNextZone] = useState<DeadZone | null>(null);
+  const [routeId, setRouteId]             = useState<string>(ROUTE_ID);
+  const [routeName, setRouteName]         = useState<string>("");
+  const [nextZone, setNextZone]           = useState<DeadZone | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
-  const [zonePackStatus, setZonePackStatus] = useState<Record<string, "preparing" | "ready" | "cached">>({});
-  const [offlineZone, setOfflineZone] = useState<DeadZone | null>(null);
+  const [zonePackStatus, setZonePackStatus]     = useState<Record<string, "preparing" | "ready" | "cached">>({});
+  const [offlineZone, setOfflineZone]           = useState<DeadZone | null>(null);
   const [offlineSimDuration, setOfflineSimDuration] = useState<number>(0);
   const [showOfflineOverlay, setShowOfflineOverlay] = useState(false);
+
+  // UI panels
+  const [logOpen, setLogOpen] = useState(true);
 
   const initialTrip = useCallback(
     (): TripState => ({
@@ -87,22 +89,25 @@ export default function Page() {
     user_b: { pos: DEFAULT_ROUTE_POLYLINE[0], segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
   });
 
-  const [events, setEvents] = useState<AgentEvent[]>([]);
-  const [overlay, setOverlay] = useState<Overlay>({ kind: "none" });
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [events, setEvents]           = useState<AgentEvent[]>([]);
+  const [overlay, setOverlay]         = useState<Overlay>({ kind: "none" });
+  const [toasts, setToasts]           = useState<ToastItem[]>([]);
   const [offlineActive, setOfflineActive] = useState(false);
   const [packModalOpen, setPackModalOpen] = useState(false);
-  const [lastPack, setLastPack] = useState<{ url: string; cached: boolean; paidAmount?: number; html?: string | null } | null>(null);
+  const [lastPack, setLastPack]           = useState<{
+    url: string; cached: boolean; paidAmount?: number; html?: string | null
+  } | null>(null);
 
-  // ---- Countdown timer ----
+  void initialTrip; // suppress unused warning
+
+  // ── Countdown timer ───────────────────────────────────────────
   useEffect(() => {
     if (planState !== "tripping" || countdownSeconds === null) return;
     if (countdownSeconds <= 0) {
-      // Enter offline mode
       const zone = nextZone || plannedZones[0];
       if (zone) {
         setOfflineZone(zone);
-        const simDuration = Math.round((zone.duration_minutes || 4) * 60 * 0.3); // compressed
+        const simDuration = Math.round((zone.duration_minutes || 4) * 60 * 0.3);
         setOfflineSimDuration(Math.max(simDuration, 5));
         setShowOfflineOverlay(true);
         setOfflineActive(true);
@@ -113,7 +118,7 @@ export default function Page() {
     return () => clearTimeout(id);
   }, [planState, countdownSeconds, nextZone, plannedZones]);
 
-  // ---- WebSocket ----
+  // ── WebSocket ─────────────────────────────────────────────────
   useEffect(() => {
     let ws: WebSocket | null = null;
     let reconnect: ReturnType<typeof setTimeout> | undefined;
@@ -128,13 +133,13 @@ export default function Page() {
 
           if (ev.type === "zones_ready" && Array.isArray(ev.zones)) {
             const zones: DeadZone[] = (ev.zones as Record<string, unknown>[]).map((z) => ({
-              id: String(z.id || "zone"),
-              name: String(z.description || z.name || z.id || "Dead zone"),
-              lat: Number(z.lat),
-              lng: Number(z.lng),
-              radius_km: Number(z.radius_km || 0.6),
+              id:               String(z.id || "zone"),
+              name:             String(z.description || z.name || z.id || "Dead zone"),
+              lat:              Number(z.lat),
+              lng:              Number(z.lng),
+              radius_km:        Number(z.radius_km || 0.6),
               duration_minutes: z.duration_minutes ? Number(z.duration_minutes) : undefined,
-              severity: (z.severity as DeadZone["severity"]) || "medium",
+              severity:         (z.severity as DeadZone["severity"]) || "medium",
             }));
             setPlannedZones(zones);
             setRoutePolyline(buildRoutePolyline(zones));
@@ -144,55 +149,38 @@ export default function Page() {
             const payment = { amount: Number(ev.amount), from: String(ev.from), to: String(ev.to) };
             lastPaymentRef.current = payment;
             setOverlay((cur) =>
-              cur.kind === "alert" || cur.kind === "preparing"
-                ? { kind: "cached_found" }
-                : cur
+              cur.kind === "alert" || cur.kind === "preparing" ? { kind: "cached_found" } : cur
             );
             pushToast({
               id: _toastSeq++, variant: "payment",
               detail: `${ev.from} → ${ev.to}  $${Number(ev.amount).toFixed(2)}`,
             });
           } else if (ev.type === "pack_ready") {
-            const paidAmount = ev.cached ? (lastPaymentRef.current?.amount) : undefined;
-            const deadzoneId = String(ev.deadzone_id || routeId);
-            const pack = {
-              url: String(ev.url), cached: !!ev.cached,
-              paidAmount,
-              html: null as string | null,
-            };
+            const paidAmount  = ev.cached ? lastPaymentRef.current?.amount : undefined;
+            const deadzoneId  = String(ev.deadzone_id || routeId);
+            const pack = { url: String(ev.url), cached: !!ev.cached, paidAmount, html: null as string | null };
             setLastPack(pack);
-            setOverlay({
-              kind: "ready", url: String(ev.url), cached: !!ev.cached,
-              paidAmount,
-            });
-            setZonePackStatus((prev) => ({
-              ...prev,
-              [deadzoneId]: ev.cached ? "cached" : "ready",
-            }));
+            setOverlay({ kind: "ready", url: String(ev.url), cached: !!ev.cached, paidAmount });
+            setZonePackStatus((prev) => ({ ...prev, [deadzoneId]: ev.cached ? "cached" : "ready" }));
             fetch(String(ev.url))
               .then((r) => r.text())
-              .then((html) =>
-                setLastPack((p) => (p && p.url === ev.url ? { ...p, html } : p))
-              )
+              .then((html) => setLastPack((p) => (p && p.url === ev.url ? { ...p, html } : p)))
               .catch(() => {});
           }
-        } catch {
-          // Ignore malformed WebSocket messages
-        }
+        } catch { /* Ignore malformed messages */ }
       };
-      ws.onerror = () => { ws?.close(); };
-      ws.onclose = () => { reconnect = setTimeout(connect, 1500); };
+      ws.onerror  = () => { ws?.close(); };
+      ws.onclose  = () => { reconnect = setTimeout(connect, 1500); };
     };
     connect();
     return () => { clearTimeout(reconnect); ws?.close(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pending zone-enter side effects
+  // ── Zone entry handling ───────────────────────────────────────
   type ZoneEntry = { user: User; pos: LatLng; dzId: string; dzName: string; zone: DeadZone };
   const pendingZoneEntries = useRef<ZoneEntry[]>([]);
 
-  // ---- Zone enter handler ----
   const handleZoneEnter = useCallback((user: User, pos: LatLng, dzId: string, dzName: string, zone: DeadZone) => {
     setOverlay({ kind: "alert", deadzoneName: dzName, etaSeconds: (zone.duration_minutes || 4) * 60, confidence: 92 });
     setTimeout(() => {
@@ -201,24 +189,24 @@ export default function Page() {
     setZonePackStatus((prev) => ({ ...prev, [dzId]: "preparing" }));
 
     fetch(`${API}/signal`, {
-      method: "POST",
+      method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body:    JSON.stringify({
         user_id: user, lat: pos.lat, lng: pos.lng,
-        eta_seconds: (zone.duration_minutes || 4) * 60,
-        route_id: routeId,
-        deadzone_id: dzId,
+        eta_seconds:      (zone.duration_minutes || 4) * 60,
+        route_id:         routeId,
+        deadzone_id:      dzId,
         duration_minutes: zone.duration_minutes || 4,
-        severity: zone.severity || "medium",
+        severity:         zone.severity || "medium",
         zone_description: zone.name,
-        route: routeName,
+        route:            routeName,
       }),
     }).catch(() => {});
     setOfflineActive(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeId, routeName]);
 
-  // ---- Animation loop ----
+  // ── Animation loop ────────────────────────────────────────────
   const routePolylineRef = useRef(routePolyline);
   useEffect(() => { routePolylineRef.current = routePolyline; }, [routePolyline]);
   const plannedZonesRef = useRef(plannedZones);
@@ -233,22 +221,18 @@ export default function Page() {
           if (!t.running) return;
           const poly = routePolylineRef.current;
           let segIdx = t.segIdx, segT = t.segT + STEP_PROGRESS;
-          while (segT >= 1 && segIdx < poly.length - 2) {
-            segT -= 1; segIdx += 1;
-          }
+          while (segT >= 1 && segIdx < poly.length - 2) { segT -= 1; segIdx += 1; }
           const atEnd = segIdx >= poly.length - 2 && segT >= 1;
-          const pos = atEnd
-            ? poly[poly.length - 1]
-            : lerp(poly[segIdx], poly[segIdx + 1], segT);
+          const pos   = atEnd ? poly[poly.length - 1] : lerp(poly[segIdx], poly[segIdx + 1], segT);
 
-          const zones = plannedZonesRef.current;
+          const zones    = plannedZonesRef.current;
           const triggered = new Set(t.triggered);
           let insideZone: string | null = null;
           let justEntered = false;
           let enteredZone: DeadZone | null = null;
+
           for (const dz of zones) {
-            const d = distanceKm(pos, { lat: dz.lat, lng: dz.lng });
-            if (d <= dz.radius_km) {
+            if (distanceKm(pos, { lat: dz.lat, lng: dz.lng }) <= dz.radius_km) {
               insideZone = dz.id;
               if (!triggered.has(dz.id)) {
                 triggered.add(dz.id);
@@ -259,12 +243,8 @@ export default function Page() {
               break;
             }
           }
-          next[u] = {
-            ...t, segIdx, segT: atEnd ? 1 : segT,
-            pos, insideZone, triggered,
-            running: !atEnd && !justEntered,
-          };
-          void enteredZone; // suppress unused warning
+          next[u] = { ...t, segIdx, segT: atEnd ? 1 : segT, pos, insideZone, triggered, running: !atEnd && !justEntered };
+          void enteredZone;
         });
         return next;
       });
@@ -272,7 +252,7 @@ export default function Page() {
     return () => clearInterval(id);
   }, []);
 
-  // Drain pending zone entries and fire side effects
+  // Drain pending zone entries
   useEffect(() => {
     const entries = pendingZoneEntries.current.splice(0);
     entries.forEach(({ user, pos, dzId, dzName, zone }) =>
@@ -280,29 +260,23 @@ export default function Page() {
     );
   });
 
-  function pushToast(t: ToastItem) {
-    setToasts((arr) => [...arr, t]);
-  }
-  function dropToast(id: number) {
-    setToasts((arr) => arr.filter((t) => t.id !== id));
-  }
+  function pushToast(t: ToastItem) { setToasts((arr) => [...arr, t]); }
+  function dropToast(id: number)   { setToasts((arr) => arr.filter((t) => t.id !== id)); }
 
-  // ---- Plan complete callback from TripPlanner ----
+  // ── Plan complete ─────────────────────────────────────────────
   function handlePlanComplete(zones: DeadZone[], rid: string, route: string) {
     setPlannedZones(zones.length > 0 ? zones : DEFAULT_DEAD_ZONES);
     setRouteId(rid);
     setRouteName(route);
     setPlanState("ready");
-    const poly = buildRoutePolyline(zones.length > 0 ? zones : DEFAULT_DEAD_ZONES);
-    setRoutePolyline(poly);
-    const first = zones[0] || null;
-    setNextZone(first);
+    setRoutePolyline(buildRoutePolyline(zones.length > 0 ? zones : DEFAULT_DEAD_ZONES));
+    setNextZone(zones[0] || null);
   }
 
-  // ---- Start trip ----
+  // ── Start trip ────────────────────────────────────────────────
   function handleStartTrip() {
     const zones = plannedZones.length > 0 ? plannedZones : DEFAULT_DEAD_ZONES;
-    const poly = buildRoutePolyline(zones);
+    const poly  = buildRoutePolyline(zones);
     setRoutePolyline(poly);
     setPlanState("tripping");
     setOverlay({ kind: "none" });
@@ -311,19 +285,18 @@ export default function Page() {
     setEvents([]);
     setShowOfflineOverlay(false);
     setOfflineZone(null);
-    setCountdownSeconds(45); // demo countdown
+    setCountdownSeconds(45);
     setNextZone(zones[0] || null);
     setZonePackStatus({});
-    // Reset trips with new route start
     const startPos = poly[0];
     setTrips({
-      user_a: { pos: startPos, segIdx: 0, segT: 0, running: true, insideZone: null, triggered: new Set() },
+      user_a: { pos: startPos, segIdx: 0, segT: 0, running: true,  insideZone: null, triggered: new Set() },
       user_b: { pos: startPos, segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
     });
     setActiveUser("user_a");
   }
 
-  // ---- Legacy start/reset (user_b cache demo) ----
+  // ── Legacy per-user controls ──────────────────────────────────
   function startTrip(u: User) {
     setOverlay({ kind: "none" });
     setOfflineActive(false);
@@ -342,14 +315,16 @@ export default function Page() {
     }
   }
   function resetTrip(u: User) {
-    const poly = routePolyline;
-    setTrips((p) => ({ ...p, [u]: { pos: poly[0], segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() } }));
+    setTrips((p) => ({
+      ...p,
+      [u]: { pos: routePolyline[0], segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
+    }));
     setOverlay({ kind: "none" });
     setOfflineActive(false);
     setToasts([]);
   }
 
-  // ---- Offline simulation done ----
+  // ── Offline sim done ──────────────────────────────────────────
   function handleOfflineDone() {
     setShowOfflineOverlay(false);
     setOfflineActive(false);
@@ -362,42 +337,115 @@ export default function Page() {
     [trips]
   );
 
-  const showPlanner = planState === "idle" || planState === "planning" || planState === "ready";
-  const showCountdown = planState === "tripping" && nextZone !== null && countdownSeconds !== null;
+  const showPlanner    = planState === "idle" || planState === "planning" || planState === "ready";
+  const showCountdown  = planState === "tripping" && nextZone !== null && countdownSeconds !== null;
   const currentPackStatus: "preparing" | "ready" | "cached" =
     nextZone ? (zonePackStatus[nextZone.id] || "preparing") : "preparing";
 
-  // ----------- Render -----------
+  // ── LOG_DRAWER_WIDTH ─────────────────────────────────────────
+  const LOG_W = 300;
+
+  // ── Render ────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-screen">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 shrink-0">
+    <div className="relative h-screen overflow-hidden" style={{ background: "#050810" }}>
+
+      {/* ── Ambient glow orbs ─────────────────────────────────── */}
+      <div
+        className="pointer-events-none absolute -top-40 -left-40 w-[700px] h-[700px] rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 65%)" }}
+      />
+      <div
+        className="pointer-events-none absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 65%)" }}
+      />
+
+      {/* ── Full-bleed map ────────────────────────────────────── */}
+      <div className="absolute inset-0">
+        <Map
+          dots={dots}
+          activeUser={activeUser}
+          deadZones={plannedZones}
+          routePolyline={routePolyline}
+          nextZone={nextZone}
+        />
+      </div>
+
+      {/* ── Top navigation bar ────────────────────────────────── */}
+      <div
+        className="absolute top-0 left-0 right-0 z-[100] px-4 py-2.5 flex items-center justify-between"
+        style={{
+          background:    "rgba(5, 8, 16, 0.88)",
+          backdropFilter:"blur(18px)",
+          borderBottom:  "1px solid rgba(0, 212, 255, 0.12)",
+          boxShadow:     "0 1px 40px rgba(0,0,0,0.4)",
+        }}
+      >
+        {/* Left — logo */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-semibold text-slate-100">DeadZone Agent</span>
+            <div className="relative">
+              <span
+                className="inline-block w-2 h-2 rounded-full"
+                style={{ background: "#00d4ff", boxShadow: "0 0 8px #00d4ff" }}
+              />
+              <span
+                className="absolute inset-0 inline-block w-2 h-2 rounded-full animate-ping"
+                style={{ background: "#00d4ff", opacity: 0.4 }}
+              />
+            </div>
+            <span
+              className="font-bold text-sm tracking-tight"
+              style={{ color: "#e2e8f0", letterSpacing: "-0.01em" }}
+            >
+              DeadZone
+            </span>
+            <span
+              className="text-[10px] tracking-widest uppercase px-1.5 py-0.5 rounded"
+              style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.2)" }}
+            >
+              Neural
+            </span>
           </div>
-          <span className="text-xs text-slate-500">intelligent navigation · live</span>
+          <span className="text-xs text-slate-600 hidden md:block tracking-wide">
+            live · autonomous
+          </span>
         </div>
-        <div className="flex items-center gap-1">
+
+        {/* Right — controls */}
+        <div className="flex items-center gap-1.5">
+          {/* User switcher */}
           {(["user_a", "user_b"] as User[]).map((u) => (
-            <button key={u} onClick={() => setActiveUser(u)}
-              className={`px-3 py-1 text-sm rounded ${
+            <button
+              key={u}
+              onClick={() => setActiveUser(u)}
+              className="px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
+              style={
                 activeUser === u
-                  ? (u === "user_a" ? "bg-emerald-500 text-white" : "bg-violet-500 text-white")
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-              }`}>
+                  ? u === "user_a"
+                    ? { background: "rgba(0,212,255,0.15)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.3)" }
+                    : { background: "rgba(139,92,246,0.15)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.3)" }
+                  : { background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }
+              }
+            >
               {u}
             </button>
           ))}
+
+          {/* Trip controls */}
           {planState === "tripping" && (
             <>
-              <button onClick={() => startTrip(activeUser)}
-                className="ml-3 px-3 py-1 text-sm rounded bg-sky-500 text-white hover:bg-sky-400">
-                ▶ Start trip ({activeUser})
+              <button
+                onClick={() => startTrip(activeUser)}
+                className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
+                style={{ background: "rgba(0,212,255,0.12)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.25)" }}
+              >
+                ▶ restart
               </button>
-              <button onClick={() => resetTrip(activeUser)}
-                className="px-3 py-1 text-sm rounded bg-slate-800 text-slate-300 hover:bg-slate-700">
+              <button
+                onClick={() => resetTrip(activeUser)}
+                className="px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
+                style={{ background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }}
+              >
                 reset
               </button>
             </>
@@ -405,108 +453,144 @@ export default function Page() {
           {planState !== "tripping" && (
             <button
               onClick={() => { setPlanState("idle"); setPlannedZones(DEFAULT_DEAD_ZONES); setRoutePolyline(DEFAULT_ROUTE_POLYLINE); }}
-              className="ml-3 px-3 py-1 text-sm rounded bg-slate-800 text-slate-300 hover:bg-slate-700"
+              className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
+              style={{ background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }}
             >
               new trip
             </button>
           )}
+
+          {/* Log toggle */}
+          <button
+            onClick={() => setLogOpen((v) => !v)}
+            className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200 flex items-center gap-1.5"
+            style={
+              logOpen
+                ? { background: "rgba(0,212,255,0.12)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.25)" }
+                : { background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }
+            }
+          >
+            <span>⚡</span>
+            <span className="hidden sm:inline">Log</span>
+            <span>{logOpen ? "›" : "‹"}</span>
+          </button>
         </div>
       </div>
 
-      {/* Main */}
-      <div className="flex flex-1 min-h-0 relative">
-        <div className="flex-[3] min-h-0 relative">
-          <Map
-            dots={dots}
-            activeUser={activeUser}
-            deadZones={plannedZones}
-            routePolyline={routePolyline}
-            nextZone={nextZone}
+      {/* ── Trip planner modal ────────────────────────────────── */}
+      {showPlanner && (
+        <div
+          className="absolute inset-0 z-[80] flex items-center justify-center p-6"
+          style={{ background: "rgba(5,8,16,0.7)", backdropFilter: "blur(4px)" }}
+        >
+          <TripPlanner
+            onPlanComplete={handlePlanComplete}
+            onStartTrip={handleStartTrip}
+            apiBase={API}
+            planState={planState === "planning" ? "planning" : planState === "ready" ? "ready" : "idle"}
           />
+        </div>
+      )}
 
-          {/* Trip planner overlay — shown when not actively tripping */}
-          {showPlanner && (
-            <div className="absolute inset-0 z-[1500] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-6">
-              <TripPlanner
-                onPlanComplete={handlePlanComplete}
-                onStartTrip={handleStartTrip}
-                apiBase={API}
-                planState={planState === "planning" ? "planning" : planState === "ready" ? "ready" : "idle"}
-              />
-            </div>
-          )}
+      {/* ── Countdown banner ──────────────────────────────────── */}
+      {showCountdown && !showOfflineOverlay && (
+        <div
+          className="absolute left-4 z-[80] transition-all duration-300"
+          style={{
+            top:   "4.5rem",
+            right: logOpen ? `${LOG_W + 16}px` : "1rem",
+          }}
+        >
+          <CountdownBanner
+            zone={nextZone!}
+            secondsUntil={countdownSeconds!}
+            packStatus={currentPackStatus}
+          />
+        </div>
+      )}
 
-          {/* Countdown banner — at top of map when tripping */}
-          {showCountdown && !showOfflineOverlay && (
-            <div className="absolute top-4 left-4 right-4 z-[1200]">
-              <CountdownBanner
-                zone={nextZone!}
-                secondsUntil={countdownSeconds!}
-                packStatus={currentPackStatus}
-              />
-            </div>
-          )}
-
-          {/* Offline simulation overlay */}
-          {showOfflineOverlay && offlineZone && (
-            <OfflineOverlay
-              durationSeconds={offlineSimDuration}
-              onDone={handleOfflineDone}
+      {/* ── Center overlay cards ──────────────────────────────── */}
+      {overlay.kind !== "none" && !showPlanner && !showOfflineOverlay && (
+        <div
+          className="absolute z-[80] transition-all duration-300"
+          style={{
+            top:       showCountdown ? "8rem" : "5rem",
+            left:      "1rem",
+            right:     logOpen ? `${LOG_W + 16}px` : "1rem",
+            maxWidth:  "520px",
+            margin:    "0 auto",
+          }}
+        >
+          {overlay.kind === "alert" && (
+            <AlertCard
+              deadzoneName={overlay.deadzoneName}
+              etaSeconds={overlay.etaSeconds}
+              confidence={overlay.confidence}
+              onPrepare={() => setOverlay({ kind: "preparing" })}
+              onSwitch={() => setOverlay({ kind: "none" })}
+              onStay={() => setOverlay({ kind: "preparing" })}
             />
           )}
-
-          {/* Center overlay card */}
-          {overlay.kind !== "none" && !showPlanner && !showOfflineOverlay && (
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1200] w-[min(520px,90%)]" style={{ top: showCountdown ? "5rem" : "1.5rem" }}>
-              {overlay.kind === "alert" && (
-                <AlertCard
-                  deadzoneName={overlay.deadzoneName}
-                  etaSeconds={overlay.etaSeconds}
-                  confidence={overlay.confidence}
-                  onPrepare={() => setOverlay({ kind: "preparing" })}
-                  onSwitch={() => setOverlay({ kind: "none" })}
-                  onStay={() => setOverlay({ kind: "preparing" })}
-                />
-              )}
-              {overlay.kind === "preparing" && <PreparingCard />}
-              {overlay.kind === "cached_found" && <CachedFoundCard />}
-              {overlay.kind === "ready" && (
-                <ReadyCard
-                  cached={overlay.cached}
-                  paidAmount={overlay.paidAmount}
-                  onOpen={() => setPackModalOpen(true)}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Toasts (top-right stack) */}
-          <div className="absolute top-6 right-6 z-[1200] flex flex-col gap-2">
-            {toasts.map((t) => (
-              <Toast
-                key={t.id}
-                variant={t.variant}
-                detail={"detail" in t ? t.detail : undefined}
-                onDismiss={() => dropToast(t.id)}
-              />
-            ))}
-          </div>
-
-          {/* Offline pill (bottom-right) */}
-          {offlineActive && !showOfflineOverlay && (
-            <div className="absolute bottom-4 right-4 z-[1200]">
-              <OfflinePill />
-            </div>
+          {overlay.kind === "preparing"   && <PreparingCard />}
+          {overlay.kind === "cached_found" && <CachedFoundCard />}
+          {overlay.kind === "ready" && (
+            <ReadyCard
+              cached={overlay.cached}
+              paidAmount={overlay.paidAmount}
+              onOpen={() => setPackModalOpen(true)}
+            />
           )}
         </div>
+      )}
 
-        <div className="flex-[2] min-h-0">
-          <LiveLogs events={events} />
-        </div>
+      {/* ── Toasts ────────────────────────────────────────────── */}
+      <div className="absolute top-16 z-[90] flex flex-col gap-2" style={{ right: logOpen ? `${LOG_W + 12}px` : "1rem" }}>
+        {toasts.map((t) => (
+          <Toast
+            key={t.id}
+            variant={t.variant}
+            detail={"detail" in t ? t.detail : undefined}
+            onDismiss={() => dropToast(t.id)}
+          />
+        ))}
       </div>
 
-      <Dashboard />
+      {/* ── Offline pill ──────────────────────────────────────── */}
+      {offlineActive && !showOfflineOverlay && (
+        <div className="absolute bottom-14 left-4 z-[80]">
+          <OfflinePill />
+        </div>
+      )}
 
+      {/* ── Agent log drawer (right side) ─────────────────────── */}
+      <div
+        className="absolute top-11 bottom-11 right-0 z-[60] flex flex-col"
+        style={{
+          width:     `${LOG_W}px`,
+          background:"rgba(5, 8, 16, 0.94)",
+          backdropFilter: "blur(18px)",
+          borderLeft: "1px solid rgba(0, 212, 255, 0.1)",
+          transform: logOpen ? "translateX(0)" : `translateX(${LOG_W}px)`,
+          transition:"transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      >
+        <LiveLogs events={events} />
+      </div>
+
+      {/* ── Dashboard strip (bottom) ──────────────────────────── */}
+      <div className="absolute bottom-0 left-0 right-0 z-[60]">
+        <Dashboard />
+      </div>
+
+      {/* ── Offline simulation overlay ────────────────────────── */}
+      {showOfflineOverlay && offlineZone && (
+        <OfflineOverlay
+          durationSeconds={offlineSimDuration}
+          onDone={handleOfflineDone}
+        />
+      )}
+
+      {/* ── Pack modal ────────────────────────────────────────── */}
       {packModalOpen && lastPack && (
         <PackModal
           url={lastPack.url}

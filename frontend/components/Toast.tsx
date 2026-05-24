@@ -3,16 +3,15 @@ import { useEffect } from "react";
 
 type Variant = "payment" | "reconnecting" | "synced";
 
-const CONFIG: Record<Variant, { icon: string; title: string; sub: string; ring: string; iconColor: string }> = {
-  payment:     { icon: "💸", title: "Agent settlement completed",
-                 sub: "Continuity pack acquired instantly.",
-                 ring: "ring-violet-400/40", iconColor: "" },
-  reconnecting:{ icon: "📶", title: "Connectivity restored",
-                 sub: "Syncing live route intelligence…",
-                 ring: "ring-sky-400/40", iconColor: "" },
-  synced:      { icon: "✅", title: "Real-time services resumed",
-                 sub: "Your journey is fully synchronized again.",
-                 ring: "ring-emerald-400/40", iconColor: "" },
+const CONFIG: Record<Variant, {
+  icon:   string;
+  title:  string;
+  sub:    string;
+  accent: string;
+}> = {
+  payment:      { icon: "⚡", title: "Agent settlement",      sub: "x402 pack acquired.",             accent: "#8b5cf6" },
+  reconnecting: { icon: "📶", title: "Connectivity restored", sub: "Syncing live route data…",         accent: "#00d4ff" },
+  synced:       { icon: "✅", title: "Back online",           sub: "Real-time services resumed.",      accent: "#10b981" },
 };
 
 export default function Toast({
@@ -21,20 +20,34 @@ export default function Toast({
   useEffect(() => {
     const id = setTimeout(onDismiss, autoDismissMs);
     return () => clearTimeout(id);
-    // mount-only: ignore identity changes of onDismiss so the timer actually fires
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const c = CONFIG[variant];
+
   return (
-    <div className={`bg-slate-900/95 backdrop-blur-md rounded-xl px-4 py-3
-                     ring-1 ${c.ring} animate-[fadeInRight_0.3s_ease-out]
-                     min-w-[280px] max-w-sm`}>
-      <div className="flex items-start gap-3">
-        <span className="text-xl leading-none">{c.icon}</span>
-        <div className="flex-1">
-          <div className="text-slate-100 text-sm font-medium">{c.title}</div>
-          <div className="text-slate-400 text-xs mt-0.5">{detail || c.sub}</div>
+    <div
+      className="flex items-start gap-3 rounded-xl px-4 py-3 animate-[fadeInRight_0.3s_ease-out] min-w-[260px] max-w-xs"
+      style={{
+        background:    "rgba(5, 8, 16, 0.94)",
+        backdropFilter:"blur(18px)",
+        border:        `1px solid ${c.accent}28`,
+        boxShadow:     `0 0 30px -8px ${c.accent}20, 0 16px 32px -12px rgba(0,0,0,0.6)`,
+      }}
+    >
+      {/* Icon */}
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 mt-0.5"
+        style={{ background: `${c.accent}14`, border: `1px solid ${c.accent}30` }}
+      >
+        {c.icon}
+      </div>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-slate-100">{c.title}</div>
+        <div className="text-xs mt-0.5" style={{ color: "#64748b" }}>
+          {detail || c.sub}
         </div>
       </div>
     </div>

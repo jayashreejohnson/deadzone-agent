@@ -11,25 +11,49 @@ export function AlertCard({
   const mins = Math.floor(etaSeconds / 60);
   const secs = etaSeconds % 60;
   return (
-    <Shell tone="amber">
-      <Header icon="⚠" title="Weak connectivity predicted ahead" tone="amber" />
-      <div className="grid grid-cols-3 gap-4 mt-5">
-        <Stat label="Location" value={deadzoneName} />
-        <Stat label="Est. interruption" value={`${mins}m ${secs.toString().padStart(2, "0")}s`} />
-        <Stat label="Signal confidence" value={`${confidence}%`} />
+    <Shell accent="#f59e0b" glow="rgba(245,158,11,0.18)">
+      <div className="flex items-center gap-3 mb-5">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+          style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)" }}
+        >
+          ⚠
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-slate-100">Dead zone ahead</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Weak connectivity predicted</p>
+        </div>
       </div>
-      <div className="mt-6 flex gap-2 flex-wrap">
-        <button onClick={onPrepare}
-          className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg bg-amber-400 text-slate-950 font-medium hover:bg-amber-300">
-          Prepare Continuity
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <StatTile label="Location"       value={deadzoneName} color="#f59e0b" />
+        <StatTile label="Est. blackout"  value={`${mins}m ${secs.toString().padStart(2, "0")}s`} color="#f59e0b" />
+        <StatTile label="Confidence"     value={`${confidence}%`} color="#10b981" />
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={onPrepare}
+          className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200"
+          style={{
+            background: "linear-gradient(135deg, #d97706 0%, #f59e0b 100%)",
+            color:      "#050810",
+            boxShadow:  "0 0 20px rgba(245,158,11,0.3)",
+          }}
+        >
+          Prepare Pack
         </button>
-        <button onClick={onSwitch}
-          className="px-4 py-2.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700">
-          Switch Route
+        <button
+          onClick={onSwitch}
+          className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+          style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          Reroute
         </button>
-        <button onClick={onStay}
-          className="px-4 py-2.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700">
-          Stay on Current Route
+        <button
+          onClick={onStay}
+          className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+          style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          Stay
         </button>
       </div>
     </Shell>
@@ -38,28 +62,41 @@ export function AlertCard({
 
 export function PreparingCard() {
   return (
-    <Shell tone="sky">
+    <Shell accent="#00d4ff" glow="rgba(0,212,255,0.14)">
       <div className="flex items-center gap-3">
-        <span className="inline-block w-3 h-3 rounded-full bg-sky-400 animate-pulse" />
-        <h3 className="text-lg font-medium text-slate-100">Preparing continuity pack…</h3>
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: "rgba(0,212,255,0.08)", border: "1px solid rgba(0,212,255,0.25)" }}
+        >
+          <span
+            className="inline-block w-5 h-5 rounded-full border-2 animate-spin"
+            style={{ borderColor: "rgba(0,212,255,0.2)", borderTopColor: "#00d4ff" }}
+          />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-slate-100">Building offline pack…</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Agents sourcing local intelligence</p>
+        </div>
       </div>
-      <p className="mt-2 text-sm text-slate-400">
-        Building offline route intelligence before signal loss.
-      </p>
     </Shell>
   );
 }
 
 export function CachedFoundCard() {
   return (
-    <Shell tone="violet">
+    <Shell accent="#8b5cf6" glow="rgba(139,92,246,0.15)">
       <div className="flex items-center gap-3">
-        <span className="text-xl">⚡</span>
-        <h3 className="text-lg font-medium text-slate-100">Existing continuity pack found</h3>
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+          style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)" }}
+        >
+          ⚡
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-slate-100">Cached pack found</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Reusing prior route intelligence via x402</p>
+        </div>
       </div>
-      <p className="mt-2 text-sm text-slate-400">
-        Reusing previously generated route intelligence.
-      </p>
     </Shell>
   );
 }
@@ -68,60 +105,79 @@ export function ReadyCard({
   cached, paidAmount, onOpen,
 }: { cached: boolean; paidAmount?: number; onOpen: () => void }) {
   return (
-    <Shell tone="emerald">
-      <div className="flex items-center gap-3">
-        <span className="text-xl">✅</span>
-        <h3 className="text-lg font-medium text-slate-100">Offline continuity ready</h3>
+    <Shell accent="#10b981" glow="rgba(16,185,129,0.16)">
+      <div className="flex items-center gap-3 mb-4">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+          style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)" }}
+        >
+          ✅
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-slate-100">Offline continuity ready</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Your journey is secured for the dead zone</p>
+        </div>
       </div>
-      <p className="mt-2 text-sm text-slate-400">
-        Your journey experience has been prepared locally.
-      </p>
+
       {cached && (
-        <div className="mt-3 inline-flex items-center gap-2 px-2.5 py-1 rounded-full
-                        bg-violet-500/15 text-violet-200 text-xs">
-          bought from agent_a · ${(paidAmount ?? 0.02).toFixed(2)}
+        <div
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium mb-4"
+          style={{
+            background: "rgba(139,92,246,0.12)",
+            color:      "#c4b5fd",
+            border:     "1px solid rgba(139,92,246,0.25)",
+          }}
+        >
+          <span>⚡</span>
+          bought from agent_a via x402 · ${(paidAmount ?? 0.02).toFixed(2)}
         </div>
       )}
-      <button onClick={onOpen}
-        className="mt-5 w-full px-4 py-2.5 rounded-lg bg-emerald-500 text-white font-medium hover:bg-emerald-400">
-        Open Continuity Pack
+
+      <button
+        onClick={onOpen}
+        className="w-full px-4 py-3 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200"
+        style={{
+          background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+          color:      "#fff",
+          boxShadow:  "0 0 24px rgba(16,185,129,0.3)",
+        }}
+      >
+        Open Continuity Pack →
       </button>
     </Shell>
   );
 }
 
-// ----- internals -----
+// ── Internals ────────────────────────────────────────────────────
 
-function Shell({ tone, children }: { tone: "amber" | "sky" | "violet" | "emerald";
-                                     children: React.ReactNode }) {
-  const ring = {
-    amber: "ring-amber-400/40 shadow-[0_0_60px_-15px_rgba(251,191,36,0.4)]",
-    sky: "ring-sky-400/40 shadow-[0_0_60px_-15px_rgba(56,189,248,0.4)]",
-    violet: "ring-violet-400/40 shadow-[0_0_60px_-15px_rgba(167,139,250,0.4)]",
-    emerald: "ring-emerald-400/40 shadow-[0_0_60px_-15px_rgba(52,211,153,0.5)]",
-  }[tone];
+function Shell({
+  accent, glow, children,
+}: { accent: string; glow: string; children: React.ReactNode }) {
   return (
-    <div className={`bg-slate-900/95 backdrop-blur-md rounded-2xl p-6 ring-1 ${ring}
-                     animate-[fadeInUp_0.35s_ease-out]`}>
+    <div
+      className="rounded-2xl p-5 animate-[fadeInUp_0.35s_ease-out]"
+      style={{
+        background:    "rgba(5, 8, 16, 0.92)",
+        backdropFilter:"blur(20px)",
+        border:        `1px solid ${accent}28`,
+        boxShadow:     `0 0 50px -12px ${glow}, 0 24px 48px -16px rgba(0,0,0,0.7)`,
+      }}
+    >
       {children}
     </div>
   );
 }
 
-function Header({ icon, title, tone }: { icon: string; title: string; tone: "amber" }) {
+function StatTile({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className={`text-2xl ${tone === "amber" ? "text-amber-300" : ""}`}>{icon}</span>
-      <h3 className="text-lg font-medium text-slate-100">{title}</h3>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="mt-1 text-slate-100 text-sm font-medium">{value}</div>
+    <div
+      className="rounded-xl px-3 py-2.5"
+      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+    >
+      <div className="text-[9px] uppercase tracking-[0.18em] text-slate-600 mb-1">{label}</div>
+      <div className="text-sm font-semibold leading-tight" style={{ color }}>
+        {value}
+      </div>
     </div>
   );
 }
