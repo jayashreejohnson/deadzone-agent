@@ -1,31 +1,17 @@
 from openai import OpenAI
 from dotenv import load_dotenv
-import os
 import json
 
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from tools import TOOLS, TOOL_FUNCTIONS
 
-# load_dotenv() is a no-op on Railway (env vars come from the platform), but
-# keeps local development working without any extra setup.
 load_dotenv()
-
-_api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-if not _api_key:
-    raise EnvironmentError(
-        "OPENROUTER_API_KEY is not set. "
-        "Add it as a Railway environment variable before deploying."
-    )
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=_api_key,
-    timeout=60.0,  # per-request timeout in seconds; prevents hanging forever
+    api_key=os.getenv("OPENROUTER_API_KEY")
 )
-
-# The agent only needs 3 tool calls + 1 final response.  Cap well above that
-# to handle retries but far below the original 50 which would run for minutes.
-_MAX_ITERATIONS = 10
-
 
 def run_agent1(route: str, departure_time: str, verbose: bool = True) -> str:
     if verbose:
@@ -43,10 +29,6 @@ def run_agent1(route: str, departure_time: str, verbose: bool = True) -> str:
                 "2. query_signal_history to get signal readings per segment "
                 "3. predict_dead_zones to identify and classify dead zones from the signal data "
                 "Always include location, start_time, duration_minutes, and severity for each dead zone. "
-                "Your final output MUST be a JSON object in this exact shape (no markdown fences):\n"
-                '{"dead_zones": [{"location": {"lat": <float>, "lon": <float>, '
-                '"description": <str>}, "start_time": <HH:MM str>, '
-                '"duration_minutes": <int>, "severity": <"high"|"medium"|"low">}, ...]}\n'
                 "Your final output will be read by another AI agent that will fetch offline content — "
                 "structure it clearly so that agent can act immediately without ambiguity. "
                 "If a tool returns an error, move on and work with what you have."
@@ -58,9 +40,10 @@ def run_agent1(route: str, departure_time: str, verbose: bool = True) -> str:
         }
     ]
 
+    MAX_ITERATIONS = 50
     iteration = 0
 
-    while iteration < _MAX_ITERATIONS:
+    while iteration < MAX_ITERATIONS:
         iteration += 1
         response = client.chat.completions.create(
             model="google/gemini-2.0-flash-001",
@@ -93,8 +76,7 @@ def run_agent1(route: str, departure_time: str, verbose: bool = True) -> str:
             if verbose:
                 print("\n=== Agent 1 Output ===")
                 print(msg.content)
-            # Guard against None content (LLM returned no text after tool calls)
-            return msg.content or ""
+            return msg.content
 
     messages.append({
         "role": "user",
@@ -105,7 +87,7 @@ def run_agent1(route: str, departure_time: str, verbose: bool = True) -> str:
         messages=messages,
         temperature=0.1
     )
-    return response.choices[0].message.content or ""
+    return response.choices[0].message.content
 
 
 if __name__ == "__main__":

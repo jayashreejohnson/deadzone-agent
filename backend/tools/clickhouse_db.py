@@ -9,6 +9,8 @@ _USE_CH = bool(os.getenv("CLICKHOUSE_HOST"))
 _client = None
 
 # In-memory tables — same shape as ClickHouse rows.
+# Capped to avoid unbounded memory growth in demo/dev mode.
+_MAX_ROWS = 1000
 _packs: list[dict] = []
 _events: list[dict] = []
 _payments: list[dict] = []
@@ -87,6 +89,8 @@ def save_pack(route_id: str, deadzone_id: str, url: str, owner_user_id: str,
     }
     if not _USE_CH:
         _packs.append(row)
+        if len(_packs) > _MAX_ROWS:
+            del _packs[: len(_packs) - _MAX_ROWS]
         return pack_id
     cli = _get_client()
     cli.insert("packs", [[
@@ -109,6 +113,8 @@ def log_event(user_id: str, route_id: str, deadzone_id: str, action: str,
     }
     if not _USE_CH:
         _events.append(row)
+        if len(_events) > _MAX_ROWS:
+            del _events[: len(_events) - _MAX_ROWS]
         return
     cli = _get_client()
     cli.insert("events", [[
@@ -128,6 +134,8 @@ def log_payment(tx_id: str, from_user: str, to_user: str, amount_usd: float, pac
     }
     if not _USE_CH:
         _payments.append(row)
+        if len(_payments) > _MAX_ROWS:
+            del _payments[: len(_payments) - _MAX_ROWS]
         return
     cli = _get_client()
     cli.insert("payments", [[

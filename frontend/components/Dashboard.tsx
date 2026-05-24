@@ -41,7 +41,7 @@ export default function Dashboard() {
         {stat("packs built", data?.packs_built ?? "—")}
         {stat("packs sold",  data?.packs_sold ?? "—")}
         {stat("$ paid",      data ? `$${data.total_paid_usd.toFixed(2)}` : "—")}
-        {stat("avg build",   data ? `${data.avg_build_ms} ms` : "—")}
+        {stat("avg build",   data ? `${Number(data.avg_build_ms).toFixed(0)} ms` : "—")}
       </div>
       <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Recent events</div>
       <div className="overflow-x-auto">

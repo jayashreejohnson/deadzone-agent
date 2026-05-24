@@ -39,15 +39,37 @@ def health():
 def predict(req: PredictRequest):
     try:
         output = run_agent1(req.route, req.departure_time, verbose=False)
-        clean = re.sub(r"```(?:json)?", "", output).strip()
+
+        # Strip markdown code fences that the LLM sometimes wraps around JSON.
+        # Pattern covers ```json ... ``` and ``` ... ``` (with optional newlines).
+        clean = re.sub(r"```(?:json)?\s*", "", output).strip()
+
         try:
-            dead_zones = json.loads(clean)
+            parsed = json.loads(clean)
         except Exception:
-            dead_zones = {"raw": output}
+            # Couldn't parse JSON — wrap in the expected shape so the backend
+            # normalize_zones() call degrades gracefully instead of crashing.
+            parsed = {"dead_zones": [], "raw": output}
+
+        # Normalise: the backend expects {"dead_zones": {"dead_zones": [...]}}
+        # so we must ensure the top-level dead_zones value is always a dict
+        # with a "dead_zones" list inside it.
+        if isinstance(parsed, list):
+            # LLM returned a bare list of zones
+            dead_zones = {"dead_zones": parsed}
+        elif isinstance(parsed, dict) and "dead_zones" in parsed and isinstance(parsed["dead_zones"], list):
+            # LLM returned {"dead_zones": [...]} — this is the expected shape
+            dead_zones = parsed
+        elif isinstance(parsed, dict) and "dead_zones" not in parsed:
+            # Unexpected dict shape — wrap it so the backend doesn't crash
+            dead_zones = {"dead_zones": [], "raw": output}
+        else:
+            dead_zones = parsed
+
         return {
             "route": req.route,
             "departure_time": req.departure_time,
-            "dead_zones": dead_zones
+            "dead_zones": dead_zones,
         }
     except EnvironmentError as e:
         raise HTTPException(status_code=500, detail=str(e))

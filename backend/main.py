@@ -33,8 +33,38 @@ from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import workflow
 
 
+def _check_env() -> None:
+    """Warn loudly at startup about missing env vars that affect functionality."""
+    missing_critical = []
+    missing_optional = []
+
+    if not os.getenv("OPENROUTER_API_KEY", "").strip():
+        missing_critical.append(
+            "OPENROUTER_API_KEY — LLM orchestrator will fall back to scripted mode"
+        )
+    if not os.getenv("AGENT1_URL", "").strip():
+        missing_optional.append(
+            "AGENT1_URL — dead-zone predictions will use the built-in stub (default: localhost:8001)"
+        )
+    if not os.getenv("PUBLIC_BASE_URL", "").strip():
+        missing_optional.append(
+            "PUBLIC_BASE_URL — static pack URLs will default to http://localhost:8000 "
+            "(set to https://sunny-appreciation-production.up.railway.app in production)"
+        )
+    if not os.getenv("NIMBLE_API_KEY", "").strip():
+        missing_optional.append("NIMBLE_API_KEY — web search will use stub data")
+    if not os.getenv("DD_API_KEY", "").strip() and not os.getenv("DATADOG_API_KEY", "").strip():
+        missing_optional.append("DD_API_KEY — Datadog LLM Observability disabled")
+
+    for msg in missing_critical:
+        print(f"[startup] WARNING: {msg}")
+    for msg in missing_optional:
+        print(f"[startup] INFO: {msg}")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    _check_env()
     db.init_db()
     seed_if_empty()
     yield
@@ -42,9 +72,21 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="DeadZone Agent", lifespan=lifespan)
 
+# Keep strong references to background tasks so they aren't GC'd mid-flight.
+_background_tasks: set[asyncio.Task] = set()
+
+_ALLOWED_ORIGINS = [
+    "https://deadzone-production-df6d.up.railway.app",
+    # Allow localhost variants for local dev
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,7 +127,10 @@ async def root():
 @app.post("/signal")
 async def signal(s: Signal):
     """Frontend tells us a user is heading into a dead zone. Orchestrator runs in background."""
-    asyncio.create_task(orchestrate(s.model_dump()))
+    task = asyncio.create_task(orchestrate(s.model_dump()))
+    # Hold a strong reference so the task isn't GC'd before it finishes.
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     return {"accepted": True}
 
 

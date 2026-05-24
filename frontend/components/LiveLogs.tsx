@@ -1,17 +1,17 @@
 "use client";
 import { useEffect, useRef } from "react";
 
-export type AgentEvent = Record<string, any> & { type: string };
+export type AgentEvent = Record<string, unknown> & { type: string };
 
 type Line = { bullet: string; color: string; label: string; sub?: string };
 
 function classify(e: AgentEvent): Line | null {
   if (e.type === "status") {
     return { bullet: "⚠", color: "text-amber-300",
-             label: e.msg || "Weak connectivity predicted ahead" };
+             label: (e.msg as string) || "Weak connectivity predicted ahead" };
   }
   if (e.type === "tool" && e.name === "nimble") {
-    const q = String(e.query || "").toLowerCase();
+    const q = String(e.query ?? "").toLowerCase();
     if (q.includes("weather"))
       return { bullet: "🟣", color: "text-violet-300", label: "Gathering weather intelligence" };
     if (q.includes("road") || q.includes("traffic"))
@@ -39,7 +39,7 @@ function classify(e: AgentEvent): Line | null {
   }
   if (e.type === "log") {
     return { bullet: "·", color: e.level === "warn" ? "text-yellow-300" : "text-slate-500",
-             label: e.msg || "" };
+             label: (e.msg as string) || "" };
   }
   return null;
 }

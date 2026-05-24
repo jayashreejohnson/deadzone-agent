@@ -85,7 +85,7 @@ async def publish(title: str, route_id: str, sections: list[dict]) -> str:
             backend = "static_fallback_after_error"
     fname = f"{uuid.uuid4().hex[:10]}.html"
     fpath = os.path.join(_PACKS_DIR, fname)
-    with open(fpath, "w") as f:
+    with open(fpath, "w", encoding="utf-8") as f:
         f.write(_render_html(title, route_id, sections))
     url = f"{_PUBLIC_BASE}/static/packs/{fname}"
     LLMObs.annotate(

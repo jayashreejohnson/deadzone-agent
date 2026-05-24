@@ -13,6 +13,7 @@ import os
 import json
 import asyncio
 import time
+import uuid
 from typing import Any
 
 from bus import emit
@@ -374,10 +375,15 @@ async def _run_with_llm(signal: dict) -> None:
                 args = json.loads(tc.function.arguments or "{}")
             except Exception:
                 args = {}
-            result = await _dispatch(tc.function.name, args, ctx)
+            try:
+                result = await _dispatch(tc.function.name, args, ctx)
+            except Exception as exc:
+                await emit({"type": "log", "level": "warn",
+                            "msg": f"tool {tc.function.name} raised: {exc!s}"})
+                result = {"error": str(exc)}
             return tc.id, tc.function.name, result
 
-        results = await asyncio.gather(*[_exec(tc) for tc in tool_calls])
+        results = await asyncio.gather(*[_exec(tc) for tc in tool_calls], return_exceptions=False)
         for tc_id, name, result in results:
             messages.append({
                 "role": "tool",
@@ -408,8 +414,12 @@ async def _run_scripted(signal: dict) -> None:
     if cached:
         seller_agent = "agent_" + cached["owner_user_id"].split("_")[-1]
         await emit({"type": "log", "level": "info", "msg": "cache hit — buying pack"})
-        result = await payments.pay(buyer_agent, seller_agent, PRICE_USD, "buy cached pack")
-        db.log_payment(result["tx_id"], buyer_agent, seller_agent, PRICE_USD, cached["pack_id"])
+        try:
+            result = await payments.pay(buyer_agent, seller_agent, PRICE_USD, "buy cached pack")
+            db.log_payment(result["tx_id"], buyer_agent, seller_agent, PRICE_USD, cached["pack_id"])
+        except Exception as e:
+            await emit({"type": "log", "level": "warn",
+                        "msg": f"payment failed ({e!s}); delivering pack anyway"})
         db.log_event(user_id, route_id, deadzone_id, "bought", cached["pack_id"], 0)
         await emit({"type": "pack_ready", "url": cached["url"],
                     "cached": True, "pack_id": cached["pack_id"]})
@@ -421,7 +431,12 @@ async def _run_scripted(signal: dict) -> None:
         ("poi",     f"points of interest near {signal['lat']:.3f},{signal['lng']:.3f}"),
         ("news",    f"local news near {signal['lat']:.3f},{signal['lng']:.3f}"),
     ]
-    results = await asyncio.gather(*[nimble.search(q) for _, q in queries])
+    try:
+        results = await asyncio.gather(*[nimble.search(q) for _, q in queries])
+    except Exception as e:
+        await emit({"type": "log", "level": "error",
+                    "msg": f"nimble search failed ({e!s}); aborting build"})
+        return
     headings = {"weather": "Weather", "road": "Road conditions",
                 "poi": "Points of interest", "news": "Local news"}
     sections = [{
@@ -431,8 +446,18 @@ async def _run_scripted(signal: dict) -> None:
     } for (topic, _), r in zip(queries, results)]
     source_count = sum(len(s["sources"]) for s in sections)
 
-    url = await senso.publish(f"Offline pack: {route_id}", route_id, sections)
-    pack_id = db.save_pack(route_id, deadzone_id, url, user_id, source_count)
+    try:
+        url = await senso.publish(f"Offline pack: {route_id}", route_id, sections)
+    except Exception as e:
+        await emit({"type": "log", "level": "error",
+                    "msg": f"senso publish failed ({e!s}); aborting build"})
+        return
+    try:
+        pack_id = db.save_pack(route_id, deadzone_id, url, user_id, source_count)
+    except Exception as e:
+        await emit({"type": "log", "level": "error",
+                    "msg": f"save_pack failed ({e!s}); delivering pack without DB record"})
+        pack_id = "pk_nosave_" + uuid.uuid4().hex[:8]
     build_ms = int((time.time() - ctx.t0) * 1000)
     db.log_event(user_id, route_id, deadzone_id, "built", pack_id, build_ms)
     await emit({"type": "pack_ready", "url": url, "cached": False, "pack_id": pack_id})

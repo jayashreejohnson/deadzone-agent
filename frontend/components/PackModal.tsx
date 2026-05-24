@@ -5,6 +5,10 @@ export default function PackModal({
 }: { url: string; html?: string | null; cached: boolean; paidAmount?: number; onClose: () => void }) {
   // Prefer the cached HTML blob (works without network). Fall back to URL.
   const offline = !!html;
+
+  // Guard against non-http(s) URLs before setting iframe src.
+  const safeUrl = url.startsWith("http://") || url.startsWith("https://") ? url : "";
+
   return (
     <div
       className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-6"
@@ -36,14 +40,28 @@ export default function PackModal({
           </button>
         </div>
         {html ? (
-          <iframe srcDoc={html} className="flex-1 w-full bg-white" sandbox="allow-popups" />
+          <iframe
+            srcDoc={html}
+            className="flex-1 w-full bg-white"
+            sandbox="allow-popups allow-same-origin"
+            title="Offline continuity pack"
+          />
+        ) : safeUrl ? (
+          <iframe
+            src={safeUrl}
+            className="flex-1 w-full bg-white"
+            sandbox="allow-scripts allow-popups allow-same-origin"
+            title="Continuity pack"
+          />
         ) : (
-          <iframe src={url} className="flex-1 w-full bg-white" />
+          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+            Pack URL unavailable.
+          </div>
         )}
         <div className="p-2 border-t bg-slate-50 text-xs text-slate-500 truncate shrink-0 flex items-center gap-2">
           {offline && (
             <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-medium">
-              📴 served from offline cache
+              served from offline cache
             </span>
           )}
           <span className="font-mono truncate">{url}</span>

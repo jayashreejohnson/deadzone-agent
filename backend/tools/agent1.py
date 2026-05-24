@@ -17,7 +17,14 @@ import httpx
 from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import tool
 
-_AGENT1_URL = os.getenv("AGENT1_URL", "http://localhost:8001").rstrip("/")
+_AGENT1_URL = os.getenv("AGENT1_URL", "").strip().rstrip("/")
+if not _AGENT1_URL:
+    _AGENT1_URL = "http://localhost:8001"
+    print(
+        "[agent1] WARNING: AGENT1_URL env var not set — "
+        "defaulting to http://localhost:8001, which will fail in production. "
+        "Set AGENT1_URL=https://beneficial-fascination-production.up.railway.app"
+    )
 
 
 def _stub_response(route: str, departure_time: str) -> dict:

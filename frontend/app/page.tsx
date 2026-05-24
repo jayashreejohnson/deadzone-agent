@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PackModal from "@/components/PackModal";
 import LiveLogs, { type AgentEvent } from "@/components/LiveLogs";
 import Dashboard from "@/components/Dashboard";
@@ -14,7 +14,8 @@ import {
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-const WS_URL = API.replace(/^http/, "ws") + "/ws";
+// Ensure wss:// for https:// backends and ws:// for http:// backends.
+const WS_URL = API.replace(/^https:\/\//, "wss://").replace(/^http:\/\//, "ws://") + "/ws";
 
 type User = "user_a" | "user_b";
 type Overlay =
@@ -57,22 +58,26 @@ export default function Page() {
   const [offlineActive, setOfflineActive] = useState(false);
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [lastPack, setLastPack] = useState<{ url: string; cached: boolean; paidAmount?: number; html?: string | null } | null>(null);
-  const [lastPayment, setLastPayment] = useState<{ amount: number; from: string; to: string } | null>(null);
 
   // ---- WebSocket: drive overlays/toasts/logs from server events ----
   useEffect(() => {
     let ws: WebSocket | null = null;
-    let reconnect: any;
+    let reconnect: ReturnType<typeof setTimeout> | undefined;
+    // lastPaymentRef lets the pack_ready handler read the latest payment without
+    // needing lastPayment in the effect deps (which would cause reconnect churn).
+    const lastPaymentRef = { current: null as { amount: number; from: string; to: string } | null };
+
     const connect = () => {
       ws = new WebSocket(WS_URL);
       ws.onmessage = (e) => {
         try {
-          const ev = JSON.parse(e.data);
+          const ev = JSON.parse(e.data) as Record<string, unknown> & { type: string };
           setEvents((prev) => [...prev.slice(-200), ev]);
 
           if (ev.type === "payment") {
             // Cache-hit detection: payment arrives → switch overlay if still in alert/preparing
-            setLastPayment({ amount: Number(ev.amount), from: ev.from, to: ev.to });
+            const payment = { amount: Number(ev.amount), from: String(ev.from), to: String(ev.to) };
+            lastPaymentRef.current = payment;
             setOverlay((cur) =>
               cur.kind === "alert" || cur.kind === "preparing"
                 ? { kind: "cached_found" }
@@ -83,36 +88,69 @@ export default function Page() {
               detail: `${ev.from} → ${ev.to}  $${Number(ev.amount).toFixed(2)}`,
             });
           } else if (ev.type === "pack_ready") {
+            const paidAmount = ev.cached ? (lastPaymentRef.current?.amount) : undefined;
             const pack = {
-              url: ev.url, cached: !!ev.cached,
-              paidAmount: ev.cached ? lastPayment?.amount : undefined,
+              url: String(ev.url), cached: !!ev.cached,
+              paidAmount,
               html: null as string | null,
             };
             setLastPack(pack);
             setOverlay({
-              kind: "ready", url: ev.url, cached: !!ev.cached,
-              paidAmount: ev.cached ? lastPayment?.amount : undefined,
+              kind: "ready", url: String(ev.url), cached: !!ev.cached,
+              paidAmount,
             });
             // Pre-fetch the pack HTML and cache it client-side so the modal
             // can render even if the network drops afterwards.
-            fetch(ev.url)
+            fetch(String(ev.url))
               .then((r) => r.text())
               .then((html) =>
                 setLastPack((p) => (p && p.url === ev.url ? { ...p, html } : p))
               )
               .catch(() => {});
           }
-        } catch {}
+        } catch {
+          // Ignore malformed WebSocket messages
+        }
+      };
+      ws.onerror = () => {
+        // Errors are followed by a close event; close handler manages reconnect.
+        // Explicitly close to ensure the onclose handler fires consistently.
+        ws?.close();
       };
       ws.onclose = () => { reconnect = setTimeout(connect, 1500); };
     };
     connect();
     return () => { clearTimeout(reconnect); ws?.close(); };
-    // intentionally not depending on lastPayment to avoid reconnect churn
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pending zone-enter side effects collected by the animation loop.
+  // Using a ref avoids triggering re-renders and lets us fire side effects
+  // outside the setState updater (which must be pure).
+  type ZoneEntry = { user: User; pos: LatLng; dzId: string; dzName: string };
+  const pendingZoneEntries = useRef<ZoneEntry[]>([]);
+
+  // ---- Zone enter handler (fires side-effects; safe to call outside updater) ----
+  const handleZoneEnter = useCallback((user: User, pos: LatLng, dzId: string, dzName: string) => {
+    setOverlay({ kind: "alert", deadzoneName: dzName, etaSeconds: 192, confidence: 92 });
+    // Auto-advance to preparing after 1.6s (unless cache-hit payment lands first)
+    setTimeout(() => {
+      setOverlay((cur) => cur.kind === "alert" ? { kind: "preparing" } : cur);
+    }, 1600);
+    // Fire signal to backend
+    fetch(`${API}/signal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: user, lat: pos.lat, lng: pos.lng,
+        eta_seconds: 240, route_id: ROUTE_ID, deadzone_id: dzId,
+      }),
+    }).catch(() => {});
+    setOfflineActive(true);
   }, []);
 
   // ---- Animation loop ----
+  // The setState updater must be pure — it only mutates trip state and enqueues
+  // zone-entry records into a ref. Side effects run in the effect below.
   useEffect(() => {
     const id = setInterval(() => {
       setTrips((prev) => {
@@ -129,7 +167,7 @@ export default function Page() {
             ? ROUTE_POLYLINE[ROUTE_POLYLINE.length - 1]
             : lerp(ROUTE_POLYLINE[segIdx], ROUTE_POLYLINE[segIdx + 1], segT);
 
-          // Zone enter detection
+          // Zone enter detection — only enqueue, do NOT call side-effects here
           const triggered = new Set(t.triggered);
           let insideZone: string | null = null;
           let justEntered = false;
@@ -140,7 +178,7 @@ export default function Page() {
               if (!triggered.has(dz.id)) {
                 triggered.add(dz.id);
                 justEntered = true;
-                handleZoneEnter(u, pos, dz.id, dz.name);
+                pendingZoneEntries.current.push({ user: u, pos, dzId: dz.id, dzName: dz.name });
               }
               break;
             }
@@ -159,24 +197,13 @@ export default function Page() {
     return () => clearInterval(id);
   }, []);
 
-  // ---- Zone enter/exit handlers ----
-  function handleZoneEnter(user: User, pos: LatLng, dzId: string, dzName: string) {
-    setOverlay({ kind: "alert", deadzoneName: dzName, etaSeconds: 192, confidence: 92 });
-    // Auto-advance to preparing after 1.6s (unless cache-hit payment lands first)
-    setTimeout(() => {
-      setOverlay((cur) => cur.kind === "alert" ? { kind: "preparing" } : cur);
-    }, 1600);
-    // Fire signal to backend
-    fetch(`${API}/signal`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: user, lat: pos.lat, lng: pos.lng,
-        eta_seconds: 240, route_id: ROUTE_ID, deadzone_id: dzId,
-      }),
-    }).catch(() => {});
-    setOfflineActive(true);
-  }
+  // Drain pending zone entries and fire side effects after each render tick.
+  useEffect(() => {
+    const entries = pendingZoneEntries.current.splice(0);
+    entries.forEach(({ user, pos, dzId, dzName }) =>
+      handleZoneEnter(user, pos, dzId, dzName)
+    );
+  });
 
   // (handleZoneExit removed — the dot parks inside the zone, never exits in the demo)
 

@@ -37,11 +37,13 @@ def seed_if_empty() -> None:
         )
 
     # Historical packs row entries
+    import os as _os
+    _pub_base = _os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
     for i in range(3):
         db.save_pack(
             route_id="nyc_to_burlington",
             deadzone_id=f"hist_zone_{i}",
-            url=f"http://localhost:8000/static/packs/hist_{i}.html",
+            url=f"{_pub_base}/static/packs/hist_{i}.html",
             owner_user_id=f"user_demo_{i}",
             source_count=8,
         )
@@ -65,7 +67,7 @@ def seed_if_empty() -> None:
     os.makedirs(packs_dir, exist_ok=True)
     fname = f"seed_{uuid.uuid4().hex[:8]}.html"
     fpath = os.path.join(packs_dir, fname)
-    with open(fpath, "w") as f:
+    with open(fpath, "w", encoding="utf-8") as f:
         f.write(f"""<!doctype html><html><head><meta charset='utf-8'>
 <title>Offline pack: nyc_to_burlington (seeded)</title>
 <style>body{{font-family:system-ui;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.55}}</style>

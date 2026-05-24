@@ -1,28 +1,28 @@
 "use client";
 import { useEffect, useRef } from "react";
 
-export type AgentEvent = Record<string, any> & { type: string; _ts?: number };
+export type AgentEvent = Record<string, unknown> & { type: string; _ts?: number };
 
 function renderLine(e: AgentEvent): { color: string; text: string } {
   switch (e.type) {
     case "status":
-      return { color: "text-orange-300", text: `⚠️  ${e.msg}` };
+      return { color: "text-orange-300", text: `⚠️  ${e.msg as string}` };
     case "tool":
-      if (e.name === "nimble") return { color: "text-sky-300", text: `🔎 nimble.search("${e.query}")` };
-      if (e.name === "senso") return { color: "text-violet-300", text: `📤 senso.publish — ${e.msg}` };
-      return { color: "text-slate-300", text: `🛠  ${e.name}` };
+      if (e.name === "nimble") return { color: "text-sky-300", text: `🔎 nimble.search("${e.query as string}")` };
+      if (e.name === "senso") return { color: "text-violet-300", text: `📤 senso.publish — ${e.msg as string}` };
+      return { color: "text-slate-300", text: `🛠  ${e.name as string}` };
     case "payment":
       return {
         color: "text-emerald-300",
-        text: `💸 x402: ${e.from} → ${e.to}  $${Number(e.amount).toFixed(4)}  tx=${e.tx?.slice(0, 14)}…`,
+        text: `💸 x402: ${e.from} → ${e.to}  $${Number(e.amount).toFixed(4)}  tx=${String(e.tx ?? "").slice(0, 14)}…`,
       };
     case "pack_ready":
       return {
         color: "text-emerald-400 font-semibold",
-        text: e.cached ? `✅ pack delivered (CACHED) — ${e.url}` : `✅ pack delivered — ${e.url}`,
+        text: e.cached ? `✅ pack delivered (CACHED) — ${e.url as string}` : `✅ pack delivered — ${e.url as string}`,
       };
     case "log":
-      return { color: e.level === "warn" ? "text-yellow-300" : "text-slate-400", text: `· ${e.msg}` };
+      return { color: e.level === "warn" ? "text-yellow-300" : "text-slate-400", text: `· ${e.msg as string}` };
     default:
       return { color: "text-slate-500", text: JSON.stringify(e) };
   }
