@@ -7,14 +7,17 @@ import Dashboard from "@/components/Dashboard";
 import Toast from "@/components/Toast";
 import OfflinePill from "@/components/OfflinePill";
 import { AlertCard, PreparingCard, CachedFoundCard, ReadyCard } from "@/components/OverlayCard";
+import TripPlanner from "@/components/TripPlanner";
+import CountdownBanner from "@/components/CountdownBanner";
+import OfflineOverlay from "@/components/OfflineOverlay";
 import {
-  ROUTE_ID, ROUTE_POLYLINE, DEAD_ZONES, distanceKm, lerp, type LatLng,
+  ROUTE_ID, DEFAULT_ROUTE_POLYLINE, DEFAULT_DEAD_ZONES,
+  distanceKm, lerp, type LatLng, type DeadZone,
 } from "@/lib/route";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-// Ensure wss:// for https:// backends and ws:// for http:// backends.
 const WS_URL = API.replace(/^https:\/\//, "wss://").replace(/^http:\/\//, "ws://") + "/ws";
 
 type User = "user_a" | "user_b";
@@ -36,20 +39,52 @@ type TripState = {
   triggered: Set<string>;
 };
 
+type PlanState = "idle" | "planning" | "ready" | "tripping";
+
 const STEP_MS = 350;
 const STEP_PROGRESS = 0.07;
 
-const initialTrip = (): TripState => ({
-  pos: ROUTE_POLYLINE[0], segIdx: 0, segT: 0,
-  running: false, insideZone: null, triggered: new Set(),
-});
+function buildRoutePolyline(zones: DeadZone[]): LatLng[] {
+  if (zones.length === 0) return DEFAULT_ROUTE_POLYLINE;
+  const first = zones[0];
+  const last = zones[zones.length - 1];
+  const points: LatLng[] = [
+    { lat: first.lat - 0.05, lng: first.lng - 0.05 }, // start
+    ...zones.map((z) => ({ lat: z.lat, lng: z.lng })),
+    { lat: last.lat + 0.03, lng: last.lng + 0.05 },   // end
+  ];
+  return points;
+}
 
 let _toastSeq = 1;
 
 export default function Page() {
   const [activeUser, setActiveUser] = useState<User>("user_a");
+
+  // Plan / trip state
+  const [planState, setPlanState] = useState<PlanState>("idle");
+  const [plannedZones, setPlannedZones] = useState<DeadZone[]>(DEFAULT_DEAD_ZONES);
+  const [routePolyline, setRoutePolyline] = useState<LatLng[]>(DEFAULT_ROUTE_POLYLINE);
+  const [routeId, setRouteId] = useState<string>(ROUTE_ID);
+  const [routeName, setRouteName] = useState<string>("");
+  const [nextZone, setNextZone] = useState<DeadZone | null>(null);
+  const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
+  const [zonePackStatus, setZonePackStatus] = useState<Record<string, "preparing" | "ready" | "cached">>({});
+  const [offlineZone, setOfflineZone] = useState<DeadZone | null>(null);
+  const [offlineSimDuration, setOfflineSimDuration] = useState<number>(0);
+  const [showOfflineOverlay, setShowOfflineOverlay] = useState(false);
+
+  const initialTrip = useCallback(
+    (): TripState => ({
+      pos: routePolyline[0], segIdx: 0, segT: 0,
+      running: false, insideZone: null, triggered: new Set(),
+    }),
+    [routePolyline]
+  );
+
   const [trips, setTrips] = useState<Record<User, TripState>>({
-    user_a: initialTrip(), user_b: initialTrip(),
+    user_a: { pos: DEFAULT_ROUTE_POLYLINE[0], segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
+    user_b: { pos: DEFAULT_ROUTE_POLYLINE[0], segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
   });
 
   const [events, setEvents] = useState<AgentEvent[]>([]);
@@ -59,12 +94,29 @@ export default function Page() {
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [lastPack, setLastPack] = useState<{ url: string; cached: boolean; paidAmount?: number; html?: string | null } | null>(null);
 
-  // ---- WebSocket: drive overlays/toasts/logs from server events ----
+  // ---- Countdown timer ----
+  useEffect(() => {
+    if (planState !== "tripping" || countdownSeconds === null) return;
+    if (countdownSeconds <= 0) {
+      // Enter offline mode
+      const zone = nextZone || plannedZones[0];
+      if (zone) {
+        setOfflineZone(zone);
+        const simDuration = Math.round((zone.duration_minutes || 4) * 60 * 0.3); // compressed
+        setOfflineSimDuration(Math.max(simDuration, 5));
+        setShowOfflineOverlay(true);
+        setOfflineActive(true);
+      }
+      return;
+    }
+    const id = setTimeout(() => setCountdownSeconds((s) => (s !== null ? s - 1 : null)), 1000);
+    return () => clearTimeout(id);
+  }, [planState, countdownSeconds, nextZone, plannedZones]);
+
+  // ---- WebSocket ----
   useEffect(() => {
     let ws: WebSocket | null = null;
     let reconnect: ReturnType<typeof setTimeout> | undefined;
-    // lastPaymentRef lets the pack_ready handler read the latest payment without
-    // needing lastPayment in the effect deps (which would cause reconnect churn).
     const lastPaymentRef = { current: null as { amount: number; from: string; to: string } | null };
 
     const connect = () => {
@@ -74,8 +126,21 @@ export default function Page() {
           const ev = JSON.parse(e.data) as Record<string, unknown> & { type: string };
           setEvents((prev) => [...prev.slice(-200), ev]);
 
+          if (ev.type === "zones_ready" && Array.isArray(ev.zones)) {
+            const zones: DeadZone[] = (ev.zones as Record<string, unknown>[]).map((z) => ({
+              id: String(z.id || "zone"),
+              name: String(z.description || z.name || z.id || "Dead zone"),
+              lat: Number(z.lat),
+              lng: Number(z.lng),
+              radius_km: Number(z.radius_km || 0.6),
+              duration_minutes: z.duration_minutes ? Number(z.duration_minutes) : undefined,
+              severity: (z.severity as DeadZone["severity"]) || "medium",
+            }));
+            setPlannedZones(zones);
+            setRoutePolyline(buildRoutePolyline(zones));
+          }
+
           if (ev.type === "payment") {
-            // Cache-hit detection: payment arrives → switch overlay if still in alert/preparing
             const payment = { amount: Number(ev.amount), from: String(ev.from), to: String(ev.to) };
             lastPaymentRef.current = payment;
             setOverlay((cur) =>
@@ -89,6 +154,7 @@ export default function Page() {
             });
           } else if (ev.type === "pack_ready") {
             const paidAmount = ev.cached ? (lastPaymentRef.current?.amount) : undefined;
+            const deadzoneId = String(ev.deadzone_id || routeId);
             const pack = {
               url: String(ev.url), cached: !!ev.cached,
               paidAmount,
@@ -99,8 +165,10 @@ export default function Page() {
               kind: "ready", url: String(ev.url), cached: !!ev.cached,
               paidAmount,
             });
-            // Pre-fetch the pack HTML and cache it client-side so the modal
-            // can render even if the network drops afterwards.
+            setZonePackStatus((prev) => ({
+              ...prev,
+              [deadzoneId]: ev.cached ? "cached" : "ready",
+            }));
             fetch(String(ev.url))
               .then((r) => r.text())
               .then((html) =>
@@ -112,45 +180,50 @@ export default function Page() {
           // Ignore malformed WebSocket messages
         }
       };
-      ws.onerror = () => {
-        // Errors are followed by a close event; close handler manages reconnect.
-        // Explicitly close to ensure the onclose handler fires consistently.
-        ws?.close();
-      };
+      ws.onerror = () => { ws?.close(); };
       ws.onclose = () => { reconnect = setTimeout(connect, 1500); };
     };
     connect();
     return () => { clearTimeout(reconnect); ws?.close(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pending zone-enter side effects collected by the animation loop.
-  // Using a ref avoids triggering re-renders and lets us fire side effects
-  // outside the setState updater (which must be pure).
-  type ZoneEntry = { user: User; pos: LatLng; dzId: string; dzName: string };
+  // Pending zone-enter side effects
+  type ZoneEntry = { user: User; pos: LatLng; dzId: string; dzName: string; zone: DeadZone };
   const pendingZoneEntries = useRef<ZoneEntry[]>([]);
 
-  // ---- Zone enter handler (fires side-effects; safe to call outside updater) ----
-  const handleZoneEnter = useCallback((user: User, pos: LatLng, dzId: string, dzName: string) => {
-    setOverlay({ kind: "alert", deadzoneName: dzName, etaSeconds: 192, confidence: 92 });
-    // Auto-advance to preparing after 1.6s (unless cache-hit payment lands first)
+  // ---- Zone enter handler ----
+  const handleZoneEnter = useCallback((user: User, pos: LatLng, dzId: string, dzName: string, zone: DeadZone) => {
+    setOverlay({ kind: "alert", deadzoneName: dzName, etaSeconds: (zone.duration_minutes || 4) * 60, confidence: 92 });
     setTimeout(() => {
       setOverlay((cur) => cur.kind === "alert" ? { kind: "preparing" } : cur);
     }, 1600);
-    // Fire signal to backend
+    setZonePackStatus((prev) => ({ ...prev, [dzId]: "preparing" }));
+
     fetch(`${API}/signal`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         user_id: user, lat: pos.lat, lng: pos.lng,
-        eta_seconds: 240, route_id: ROUTE_ID, deadzone_id: dzId,
+        eta_seconds: (zone.duration_minutes || 4) * 60,
+        route_id: routeId,
+        deadzone_id: dzId,
+        duration_minutes: zone.duration_minutes || 4,
+        severity: zone.severity || "medium",
+        zone_description: zone.name,
+        route: routeName,
       }),
     }).catch(() => {});
     setOfflineActive(true);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeId, routeName]);
 
   // ---- Animation loop ----
-  // The setState updater must be pure — it only mutates trip state and enqueues
-  // zone-entry records into a ref. Side effects run in the effect below.
+  const routePolylineRef = useRef(routePolyline);
+  useEffect(() => { routePolylineRef.current = routePolyline; }, [routePolyline]);
+  const plannedZonesRef = useRef(plannedZones);
+  useEffect(() => { plannedZonesRef.current = plannedZones; }, [plannedZones]);
+
   useEffect(() => {
     const id = setInterval(() => {
       setTrips((prev) => {
@@ -158,38 +231,40 @@ export default function Page() {
         (["user_a", "user_b"] as User[]).forEach((u) => {
           const t = prev[u];
           if (!t.running) return;
+          const poly = routePolylineRef.current;
           let segIdx = t.segIdx, segT = t.segT + STEP_PROGRESS;
-          while (segT >= 1 && segIdx < ROUTE_POLYLINE.length - 2) {
+          while (segT >= 1 && segIdx < poly.length - 2) {
             segT -= 1; segIdx += 1;
           }
-          const atEnd = segIdx >= ROUTE_POLYLINE.length - 2 && segT >= 1;
+          const atEnd = segIdx >= poly.length - 2 && segT >= 1;
           const pos = atEnd
-            ? ROUTE_POLYLINE[ROUTE_POLYLINE.length - 1]
-            : lerp(ROUTE_POLYLINE[segIdx], ROUTE_POLYLINE[segIdx + 1], segT);
+            ? poly[poly.length - 1]
+            : lerp(poly[segIdx], poly[segIdx + 1], segT);
 
-          // Zone enter detection — only enqueue, do NOT call side-effects here
+          const zones = plannedZonesRef.current;
           const triggered = new Set(t.triggered);
           let insideZone: string | null = null;
           let justEntered = false;
-          for (const dz of DEAD_ZONES) {
+          let enteredZone: DeadZone | null = null;
+          for (const dz of zones) {
             const d = distanceKm(pos, { lat: dz.lat, lng: dz.lng });
             if (d <= dz.radius_km) {
               insideZone = dz.id;
               if (!triggered.has(dz.id)) {
                 triggered.add(dz.id);
                 justEntered = true;
-                pendingZoneEntries.current.push({ user: u, pos, dzId: dz.id, dzName: dz.name });
+                enteredZone = dz;
+                pendingZoneEntries.current.push({ user: u, pos, dzId: dz.id, dzName: dz.name, zone: dz });
               }
               break;
             }
           }
-          // Park the dot inside the first zone it enters — gives the demo time
-          // for the Ready card / Open Continuity Pack interaction.
           next[u] = {
             ...t, segIdx, segT: atEnd ? 1 : segT,
             pos, insideZone, triggered,
             running: !atEnd && !justEntered,
           };
+          void enteredZone; // suppress unused warning
         });
         return next;
       });
@@ -197,15 +272,13 @@ export default function Page() {
     return () => clearInterval(id);
   }, []);
 
-  // Drain pending zone entries and fire side effects after each render tick.
+  // Drain pending zone entries and fire side effects
   useEffect(() => {
     const entries = pendingZoneEntries.current.splice(0);
-    entries.forEach(({ user, pos, dzId, dzName }) =>
-      handleZoneEnter(user, pos, dzId, dzName)
+    entries.forEach(({ user, pos, dzId, dzName, zone }) =>
+      handleZoneEnter(user, pos, dzId, dzName, zone)
     );
   });
-
-  // (handleZoneExit removed — the dot parks inside the zone, never exits in the demo)
 
   function pushToast(t: ToastItem) {
     setToasts((arr) => [...arr, t]);
@@ -214,26 +287,85 @@ export default function Page() {
     setToasts((arr) => arr.filter((t) => t.id !== id));
   }
 
-  // ---- Trip control ----
-  function startTrip(u: User) {
-    setOverlay({ kind: "none" });
-    setOfflineActive(false);
-    setToasts([]);                  // clear any stale toasts
-    setEvents([]);                  // fresh log per trip
-    setTrips((p) => ({ ...p, [u]: { ...initialTrip(), running: true } }));
-    setActiveUser(u);
+  // ---- Plan complete callback from TripPlanner ----
+  function handlePlanComplete(zones: DeadZone[], rid: string, route: string) {
+    setPlannedZones(zones.length > 0 ? zones : DEFAULT_DEAD_ZONES);
+    setRouteId(rid);
+    setRouteName(route);
+    setPlanState("ready");
+    const poly = buildRoutePolyline(zones.length > 0 ? zones : DEFAULT_DEAD_ZONES);
+    setRoutePolyline(poly);
+    const first = zones[0] || null;
+    setNextZone(first);
   }
-  function resetTrip(u: User) {
-    setTrips((p) => ({ ...p, [u]: initialTrip() }));
+
+  // ---- Start trip ----
+  function handleStartTrip() {
+    const zones = plannedZones.length > 0 ? plannedZones : DEFAULT_DEAD_ZONES;
+    const poly = buildRoutePolyline(zones);
+    setRoutePolyline(poly);
+    setPlanState("tripping");
     setOverlay({ kind: "none" });
     setOfflineActive(false);
     setToasts([]);
+    setEvents([]);
+    setShowOfflineOverlay(false);
+    setOfflineZone(null);
+    setCountdownSeconds(45); // demo countdown
+    setNextZone(zones[0] || null);
+    setZonePackStatus({});
+    // Reset trips with new route start
+    const startPos = poly[0];
+    setTrips({
+      user_a: { pos: startPos, segIdx: 0, segT: 0, running: true, insideZone: null, triggered: new Set() },
+      user_b: { pos: startPos, segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
+    });
+    setActiveUser("user_a");
+  }
+
+  // ---- Legacy start/reset (user_b cache demo) ----
+  function startTrip(u: User) {
+    setOverlay({ kind: "none" });
+    setOfflineActive(false);
+    setToasts([]);
+    setEvents([]);
+    const poly = routePolyline;
+    setTrips((p) => ({
+      ...p,
+      [u]: { pos: poly[0], segIdx: 0, segT: 0, running: true, insideZone: null, triggered: new Set() },
+    }));
+    setActiveUser(u);
+    if (planState === "idle") {
+      setPlanState("tripping");
+      setNextZone(plannedZones[0] || null);
+      setCountdownSeconds(45);
+    }
+  }
+  function resetTrip(u: User) {
+    const poly = routePolyline;
+    setTrips((p) => ({ ...p, [u]: { pos: poly[0], segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() } }));
+    setOverlay({ kind: "none" });
+    setOfflineActive(false);
+    setToasts([]);
+  }
+
+  // ---- Offline simulation done ----
+  function handleOfflineDone() {
+    setShowOfflineOverlay(false);
+    setOfflineActive(false);
+    setOfflineZone(null);
+    pushToast({ id: _toastSeq++, variant: "synced" });
   }
 
   const dots = useMemo(
     () => (["user_a", "user_b"] as User[]).map((u) => ({ user: u, pos: trips[u].pos })),
     [trips]
   );
+
+  const showPlanner = planState === "idle" || planState === "planning" || planState === "ready";
+  const showCountdown = planState === "tripping" && nextZone !== null && countdownSeconds !== null;
+  const currentPackStatus: "preparing" | "ready" | "cached" =
+    nextZone ? (zonePackStatus[nextZone.id] || "preparing") : "preparing";
 
   // ----------- Render -----------
   return (
@@ -258,25 +390,74 @@ export default function Page() {
               {u}
             </button>
           ))}
-          <button onClick={() => startTrip(activeUser)}
-            className="ml-3 px-3 py-1 text-sm rounded bg-sky-500 text-white hover:bg-sky-400">
-            ▶ Start trip ({activeUser})
-          </button>
-          <button onClick={() => resetTrip(activeUser)}
-            className="px-3 py-1 text-sm rounded bg-slate-800 text-slate-300 hover:bg-slate-700">
-            reset
-          </button>
+          {planState === "tripping" && (
+            <>
+              <button onClick={() => startTrip(activeUser)}
+                className="ml-3 px-3 py-1 text-sm rounded bg-sky-500 text-white hover:bg-sky-400">
+                ▶ Start trip ({activeUser})
+              </button>
+              <button onClick={() => resetTrip(activeUser)}
+                className="px-3 py-1 text-sm rounded bg-slate-800 text-slate-300 hover:bg-slate-700">
+                reset
+              </button>
+            </>
+          )}
+          {planState !== "tripping" && (
+            <button
+              onClick={() => { setPlanState("idle"); setPlannedZones(DEFAULT_DEAD_ZONES); setRoutePolyline(DEFAULT_ROUTE_POLYLINE); }}
+              className="ml-3 px-3 py-1 text-sm rounded bg-slate-800 text-slate-300 hover:bg-slate-700"
+            >
+              new trip
+            </button>
+          )}
         </div>
       </div>
 
       {/* Main */}
       <div className="flex flex-1 min-h-0 relative">
         <div className="flex-[3] min-h-0 relative">
-          <Map dots={dots} activeUser={activeUser} />
+          <Map
+            dots={dots}
+            activeUser={activeUser}
+            deadZones={plannedZones}
+            routePolyline={routePolyline}
+            nextZone={nextZone}
+          />
+
+          {/* Trip planner overlay — shown when not actively tripping */}
+          {showPlanner && (
+            <div className="absolute inset-0 z-[1500] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-6">
+              <TripPlanner
+                onPlanComplete={handlePlanComplete}
+                onStartTrip={handleStartTrip}
+                apiBase={API}
+                planState={planState === "planning" ? "planning" : planState === "ready" ? "ready" : "idle"}
+              />
+            </div>
+          )}
+
+          {/* Countdown banner — at top of map when tripping */}
+          {showCountdown && !showOfflineOverlay && (
+            <div className="absolute top-4 left-4 right-4 z-[1200]">
+              <CountdownBanner
+                zone={nextZone!}
+                secondsUntil={countdownSeconds!}
+                packStatus={currentPackStatus}
+              />
+            </div>
+          )}
+
+          {/* Offline simulation overlay */}
+          {showOfflineOverlay && offlineZone && (
+            <OfflineOverlay
+              durationSeconds={offlineSimDuration}
+              onDone={handleOfflineDone}
+            />
+          )}
 
           {/* Center overlay card */}
-          {overlay.kind !== "none" && (
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1200] w-[min(520px,90%)]">
+          {overlay.kind !== "none" && !showPlanner && !showOfflineOverlay && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1200] w-[min(520px,90%)]" style={{ top: showCountdown ? "5rem" : "1.5rem" }}>
               {overlay.kind === "alert" && (
                 <AlertCard
                   deadzoneName={overlay.deadzoneName}
@@ -312,7 +493,7 @@ export default function Page() {
           </div>
 
           {/* Offline pill (bottom-right) */}
-          {offlineActive && (
+          {offlineActive && !showOfflineOverlay && (
             <div className="absolute bottom-4 right-4 z-[1200]">
               <OfflinePill />
             </div>

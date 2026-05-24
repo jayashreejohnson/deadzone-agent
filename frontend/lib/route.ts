@@ -1,16 +1,8 @@
-// Short test route — 4 waypoints, ~15km total. One dead zone in the middle.
-// Designed so the full trip takes ~6 seconds and clearly triggers the agent.
+// Route and dead zone configuration with dynamic update support.
 
 export const ROUTE_ID = "test_route";
 
 export type LatLng = { lat: number; lng: number };
-
-export const ROUTE_POLYLINE: LatLng[] = [
-  { lat: 40.70, lng: -74.00 },  // start
-  { lat: 40.76, lng: -73.96 },  // approaching dead zone
-  { lat: 40.82, lng: -73.92 },  // through the middle
-  { lat: 40.88, lng: -73.88 },  // end
-];
 
 export type DeadZone = {
   id: string;
@@ -18,15 +10,37 @@ export type DeadZone = {
   lat: number;
   lng: number;
   radius_km: number;
+  duration_minutes?: number;
+  severity?: "high" | "medium" | "low";
 };
 
-export const DEAD_ZONES: DeadZone[] = [
-  { id: "test_zone_1", name: "Test dead zone", lat: 40.79, lng: -73.94, radius_km: 4 },
+// Default Manhattan → Newark route
+export const DEFAULT_ROUTE_POLYLINE: LatLng[] = [
+  { lat: 40.7549, lng: -73.9840 }, // Penn Station area
+  { lat: 40.7621, lng: -74.0312 }, // Lincoln Tunnel approach
+  { lat: 40.7282, lng: -74.0776 }, // Jersey City
+  { lat: 40.7357, lng: -74.1724 }, // Newark approach
+  { lat: 40.7357, lng: -74.1800 }, // Newark
 ];
 
-// Map view defaults — keep the whole route + zone visible at a glance.
-export const MAP_CENTER: [number, number] = [40.79, -73.94];
-export const MAP_ZOOM = 11;
+export const DEFAULT_DEAD_ZONES: DeadZone[] = [
+  { id: "lincoln_tunnel", name: "Lincoln Tunnel", lat: 40.7621, lng: -74.0312, radius_km: 0.8, duration_minutes: 4, severity: "high" },
+  { id: "newark_mccarter", name: "Newark McCarter Hwy", lat: 40.7357, lng: -74.1724, radius_km: 0.5, duration_minutes: 1, severity: "low" },
+];
+
+// Legacy exports kept for backwards compatibility (page.tsx still imports ROUTE_POLYLINE/DEAD_ZONES)
+export const ROUTE_POLYLINE: LatLng[] = DEFAULT_ROUTE_POLYLINE;
+export const DEAD_ZONES: DeadZone[] = DEFAULT_DEAD_ZONES;
+
+// Map view defaults
+export let MAP_CENTER: [number, number] = [40.748, -74.080];
+export let MAP_ZOOM = 12;
+
+/** Update the map center/zoom defaults at runtime. */
+export function setMapView(center: [number, number], zoom: number) {
+  MAP_CENTER = center;
+  MAP_ZOOM = zoom;
+}
 
 /** Haversine distance in kilometers. */
 export function distanceKm(a: LatLng, b: LatLng): number {

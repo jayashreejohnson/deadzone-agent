@@ -1,11 +1,29 @@
 "use client";
 import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Tooltip } from "react-leaflet";
-import { ROUTE_POLYLINE, DEAD_ZONES, MAP_CENTER, MAP_ZOOM, type LatLng } from "@/lib/route";
+import { DEFAULT_ROUTE_POLYLINE, DEFAULT_DEAD_ZONES, MAP_CENTER, MAP_ZOOM, type LatLng, type DeadZone } from "@/lib/route";
 
 type Dot = { user: "user_a" | "user_b"; pos: LatLng | null };
 
-export default function Map({ dots, activeUser }: { dots: Dot[]; activeUser: string }) {
-  const polylinePos: [number, number][] = ROUTE_POLYLINE.map((p) => [p.lat, p.lng]);
+type MapProps = {
+  dots: Dot[];
+  activeUser: string;
+  deadZones?: DeadZone[];
+  routePolyline?: LatLng[];
+  nextZone?: DeadZone | null;
+};
+
+function severityIcon(severity?: string): string {
+  if (severity === "high") return "⚠️ High";
+  if (severity === "medium") return "🟡 Medium";
+  if (severity === "low") return "🟢 Low";
+  return "";
+}
+
+export default function Map({ dots, activeUser, deadZones, routePolyline, nextZone }: MapProps) {
+  const zones = deadZones && deadZones.length > 0 ? deadZones : DEFAULT_DEAD_ZONES;
+  const route = routePolyline && routePolyline.length > 0 ? routePolyline : DEFAULT_ROUTE_POLYLINE;
+  const polylinePos: [number, number][] = route.map((p) => [p.lat, p.lng]);
+
   return (
     <MapContainer
       center={MAP_CENTER}
@@ -18,16 +36,39 @@ export default function Map({ dots, activeUser }: { dots: Dot[]; activeUser: str
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <Polyline positions={polylinePos} pathOptions={{ color: "#60a5fa", weight: 4 }} />
-      {DEAD_ZONES.map((dz) => (
-        <Circle
-          key={dz.id}
-          center={[dz.lat, dz.lng]}
-          radius={dz.radius_km * 1000}
-          pathOptions={{ color: "#f97316", fillColor: "#f97316", fillOpacity: 0.18, weight: 1 }}
-        >
-          <Tooltip>{dz.name} (dead zone)</Tooltip>
-        </Circle>
-      ))}
+      {zones.map((dz) => {
+        const isNext = nextZone?.id === dz.id;
+        // Next zone: pulsing orange-red; others use severity color
+        const color = isNext
+          ? "#ef4444"
+          : dz.severity === "high"
+          ? "#f97316"
+          : dz.severity === "low"
+          ? "#22c55e"
+          : "#f97316";
+        const fillOpacity = isNext ? 0.35 : 0.18;
+        const weight = isNext ? 2 : 1;
+        const className = isNext ? "animate-pulse" : undefined;
+        return (
+          <Circle
+            key={dz.id}
+            center={[dz.lat, dz.lng]}
+            radius={dz.radius_km * 1000}
+            pathOptions={{ color, fillColor: color, fillOpacity, weight, className }}
+          >
+            <Tooltip>
+              <div className="text-sm font-medium">{dz.name}</div>
+              {dz.severity && (
+                <div className="text-xs mt-0.5">
+                  {severityIcon(dz.severity)}
+                  {dz.duration_minutes ? ` — ${dz.duration_minutes} min blackout` : ""}
+                </div>
+              )}
+              {isNext && <div className="text-xs text-red-400 mt-0.5">Next dead zone</div>}
+            </Tooltip>
+          </Circle>
+        );
+      })}
       {dots.map(
         (d) =>
           d.pos && (
