@@ -283,12 +283,15 @@ async def run(signal: dict) -> None:
     await emit({"type": "status",
                 "msg": f"Dead zone in {eta // 60} min â€” preparing pack",
                 "user_id": signal["user_id"]})
-    LLMObs.annotate(
-        input_data=signal,
-        metadata={"path": "llm" if _OPENAI_KEY else "scripted_fallback", "model": _MODEL},
-        tags={"workflow": "deadzone_signal", "user_id": signal["user_id"],
-              "route_id": signal["route_id"], "deadzone_id": signal["deadzone_id"]},
-    )
+    try:
+        LLMObs.annotate(
+            input_data=signal,
+            metadata={"path": "llm" if _OPENAI_KEY else "scripted_fallback", "model": _MODEL},
+            tags={"workflow": "deadzone_signal", "user_id": signal["user_id"],
+                  "route_id": signal["route_id"], "deadzone_id": signal["deadzone_id"]},
+        )
+    except Exception:
+        pass  # LLMObs disabled — no-op
 
     if _OPENAI_KEY:
         try:
@@ -333,11 +336,14 @@ async def _run_with_llm(signal: dict) -> None:
     from openai import AsyncOpenAI
     client = AsyncOpenAI(api_key=_OPENAI_KEY, base_url="https://openrouter.ai/api/v1")
     ctx = _Ctx(signal)
-    LLMObs.annotate(
-        input_data=signal,
-        metadata={"model": _MODEL, "tools_available": [t["function"]["name"] for t in TOOLS]},
-        tags={"agent": "pack_builder"},
-    )
+    try:
+        LLMObs.annotate(
+            input_data=signal,
+            metadata={"model": _MODEL, "tools_available": [t["function"]["name"] for t in TOOLS]},
+            tags={"agent": "pack_builder"},
+        )
+    except Exception:
+        pass  # LLMObs disabled — no-op
 
     messages: list[dict] = [
         {"role": "system", "content": SYSTEM_PROMPT},
