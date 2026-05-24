@@ -101,6 +101,7 @@ export default function Page() {
   const [evalData, setEvalData]           = useState<{ score: number; slaPass: boolean } | null>(null);
   const [isReplaying, setIsReplaying]     = useState(false);
   const [boundsVersion, setBoundsVersion] = useState(0);
+  const [wsConnected, setWsConnected]     = useState(false);
 
   void initialTrip; // suppress unused warning
 
@@ -130,6 +131,7 @@ export default function Page() {
 
     const connect = () => {
       ws = new WebSocket(WS_URL);
+      ws.onopen   = () => { setWsConnected(true); };
       ws.onmessage = (e) => {
         try {
           const ev = JSON.parse(e.data) as Record<string, unknown> & { type: string };
@@ -183,7 +185,7 @@ export default function Page() {
         } catch { /* Ignore malformed messages */ }
       };
       ws.onerror  = () => { ws?.close(); };
-      ws.onclose  = () => { reconnect = setTimeout(connect, 1500); };
+      ws.onclose  = () => { setWsConnected(false); reconnect = setTimeout(connect, 1500); };
     };
     connect();
     return () => { clearTimeout(reconnect); ws?.close(); };
@@ -192,7 +194,8 @@ export default function Page() {
 
   // ── Zone entry handling ───────────────────────────────────────
   type ZoneEntry = { user: User; pos: LatLng; dzId: string; dzName: string; zone: DeadZone };
-  const pendingZoneEntries = useRef<ZoneEntry[]>([]);
+  const pendingZoneEntries  = useRef<ZoneEntry[]>([]);
+  const pendingTripComplete = useRef(false);
 
   const handleZoneEnter = useCallback((user: User, pos: LatLng, dzId: string, dzName: string, zone: DeadZone) => {
     setOverlay({ kind: "alert", deadzoneName: dzName, etaSeconds: (zone.duration_minutes || 4) * 60, confidence: 92 });
@@ -216,6 +219,12 @@ export default function Page() {
       }),
     }).catch(() => {});
     setOfflineActive(true);
+    // Advance nextZone to the next unvisited zone on this route
+    setNextZone(() => {
+      const all = plannedZonesRef.current;
+      const idx = all.findIndex((z) => z.id === dzId);
+      return idx >= 0 && idx + 1 < all.length ? all[idx + 1] : null;
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeId, routeName]);
 
@@ -256,6 +265,7 @@ export default function Page() {
               break;
             }
           }
+          if (atEnd && u === "user_a") pendingTripComplete.current = true;
           next[u] = { ...t, segIdx, segT: atEnd ? 1 : segT, pos, insideZone, triggered, running: !atEnd && !justEntered };
           void enteredZone;
         });
@@ -271,6 +281,10 @@ export default function Page() {
     entries.forEach(({ user, pos, dzId, dzName, zone }) =>
       handleZoneEnter(user, pos, dzId, dzName, zone)
     );
+    if (pendingTripComplete.current) {
+      pendingTripComplete.current = false;
+      handleTripComplete();
+    }
   });
 
   function pushToast(t: ToastItem) { setToasts((arr) => [...arr, t]); }
@@ -346,6 +360,11 @@ export default function Page() {
     setOfflineActive(false);
     setOfflineZone(null);
     pushToast({ id: _toastSeq++, variant: "synced" });
+    // Resume trip after the dead zone simulation ends
+    setTrips((prev) => {
+      const t = prev.user_a;
+      return t.running ? prev : { ...prev, user_a: { ...t, running: true } };
+    });
   }
 
   const dots = useMemo(
@@ -391,6 +410,38 @@ export default function Page() {
       setIsReplaying(false);
     }
   }
+
+  function handleTripComplete() {
+    // Show 'back online' toast then slide back to the planner
+    pushToast({ id: _toastSeq++, variant: "synced" });
+    setTimeout(() => {
+      const poly = routePolylineRef.current;
+      const start = poly[0] || DEFAULT_ROUTE_POLYLINE[0];
+      setPlanState("idle");
+      setOverlay({ kind: "none" });
+      setOfflineActive(false);
+      setCountdownSeconds(null);
+      setNextZone(null);
+      setEvalData(null);
+      setTrips({
+        user_a: { pos: start, segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
+        user_b: { pos: start, segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
+      });
+    }, 3500);
+  }
+
+  // Auto-resume trip 5 s after ReadyCard appears
+  useEffect(() => {
+    if (overlay.kind !== "ready" || planState !== "tripping") return;
+    const timer = setTimeout(() => {
+      setOverlay({ kind: "none" });
+      setTrips((prev) => {
+        const t = prev.user_a;
+        return t.running ? prev : { ...prev, user_a: { ...t, running: true } };
+      });
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [overlay.kind, planState]);
 
   const LOG_W = 300;
 
@@ -459,6 +510,20 @@ export default function Page() {
           <span className="text-xs text-slate-600 hidden md:block tracking-wide">
             live · autonomous
           </span>
+          {/* WS status dot */}
+          <span
+            className="hidden sm:flex items-center gap-1 text-[10px] font-medium tracking-wide"
+            style={{ color: wsConnected ? "#10b981" : "#94a3b8" }}
+          >
+            <span
+              className="inline-block w-1.5 h-1.5 rounded-full"
+              style={{
+                background: wsConnected ? "#10b981" : "#475569",
+                boxShadow: wsConnected ? "0 0 6px #10b981" : "none",
+              }}
+            />
+            {wsConnected ? "live" : "connecting"}
+          </span>
         </div>
 
         {/* Right — controls */}
@@ -518,7 +583,7 @@ export default function Page() {
               style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
               title={`Replay trace ${traceId}`}
             >
-              <span>?</span>
+              <span>⏮</span>
               <span className="hidden sm:inline">Replay</span>
             </button>
           )}
@@ -527,7 +592,7 @@ export default function Page() {
               className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium flex items-center gap-1.5"
               style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
             >
-              <span className="animate-pulse">?</span>
+              <span className="animate-pulse">●</span>
               <span className="hidden sm:inline">Replaying</span>
             </div>
           )}

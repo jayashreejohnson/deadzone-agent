@@ -151,11 +151,14 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
     setLoading(true);
     setError(null);
     setDetectedZones([]);
+    const abort = new AbortController();
+    const timeoutId = setTimeout(() => abort.abort(), 25_000);
     try {
       const res = await fetch(`${apiBase}/plan`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ route: selected.api, departure_time: departureTime }),
+        signal:  abort.signal,
       });
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
@@ -174,8 +177,13 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
       setDetectedZones(zones);
       onPlanComplete(zones, rid, selected.api);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to reach planning API");
+      setError(
+        e instanceof Error && e.name === "AbortError"
+          ? "Scan timed out — please try again"
+          : e instanceof Error ? e.message : "Failed to reach planning API"
+      );
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }
