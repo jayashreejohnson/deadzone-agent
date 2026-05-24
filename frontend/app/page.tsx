@@ -372,7 +372,11 @@ export default function Page() {
     [trips]
   );
 
-  const showPlanner    = planState === "idle" || planState === "planning" || planState === "ready";
+  // "idle" and "planning" → full-screen modal (map hidden, nothing to show yet)
+  // "ready"              → compact corner card (map visible with plotted zones)
+  const showPlannerModal  = planState === "idle" || planState === "planning";
+  const showPlannerCard   = planState === "ready";
+  const showPlanner       = showPlannerModal || showPlannerCard;
   const showCountdown  = planState === "tripping" && nextZone !== null && countdownSeconds !== null;
   const currentPackStatus: "preparing" | "ready" | "cached" =
     nextZone ? (zonePackStatus[nextZone.id] || "preparing") : "preparing";
@@ -614,8 +618,8 @@ export default function Page() {
         </div>
       </div>
 
-      {/* ── Trip planner modal ────────────────────────────────── */}
-      {showPlanner && (
+      {/* ── Trip planner — full-screen modal (idle / planning) ── */}
+      {showPlannerModal && (
         <div
           className="absolute inset-0 z-[1500] flex items-center justify-center p-6"
           style={{ background: "rgba(5,8,16,0.7)", backdropFilter: "blur(4px)" }}
@@ -624,7 +628,22 @@ export default function Page() {
             onPlanComplete={handlePlanComplete}
             onStartTrip={handleStartTrip}
             apiBase={API}
-            planState={planState === "planning" ? "planning" : planState === "ready" ? "ready" : "idle"}
+            planState={planState === "planning" ? "planning" : "idle"}
+          />
+        </div>
+      )}
+
+      {/* ── Trip planner — compact card (ready) — map visible behind ── */}
+      {showPlannerCard && (
+        <div
+          className="absolute z-[1500] p-3"
+          style={{ top: "3.5rem", left: "1rem", width: "min(420px, calc(100vw - 2rem))" }}
+        >
+          <TripPlanner
+            onPlanComplete={handlePlanComplete}
+            onStartTrip={handleStartTrip}
+            apiBase={API}
+            planState="ready"
           />
         </div>
       )}
