@@ -1,19 +1,68 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { DeadZone } from "@/lib/route";
 
-type TripPlannerProps = {
-  onPlanComplete: (zones: DeadZone[], routeId: string, route: string) => void;
-  onStartTrip: () => void;
-  apiBase: string;
-  planState: "idle" | "planning" | "ready";
+// ── Curated US routes ──────────────────────────────────────────────────────
+type Severity = "high" | "medium" | "low";
+type Route = {
+  label:    string;   // Display name  e.g. "Manhattan → Newark"
+  api:      string;   // Sent to /plan  e.g. "Manhattan to Newark"
+  region:   string;
+  hint:     string;   // Dead-zone characteristic
+  severity: Severity; // Dominant severity on this route
 };
+
+const ROUTES: Route[] = [
+  // Northeast
+  { label: "Manhattan → Newark",          api: "Manhattan to Newark",          region: "Northeast", hint: "Lincoln Tunnel",       severity: "high"   },
+  { label: "New York → Philadelphia",      api: "New York to Philadelphia",     region: "Northeast", hint: "NJ Turnpike corridor", severity: "medium" },
+  { label: "New York → Boston",            api: "New York to Boston",           region: "Northeast", hint: "I-95 & CT dead zones", severity: "medium" },
+  { label: "Washington DC → Baltimore",    api: "Washington DC to Baltimore",   region: "Northeast", hint: "Harbor Tunnel",        severity: "medium" },
+  { label: "Boston → Providence",          api: "Boston to Providence",         region: "Northeast", hint: "I-95 rural gaps",      severity: "low"    },
+  // Southeast
+  { label: "Atlanta → Charlotte",          api: "Atlanta to Charlotte",         region: "Southeast", hint: "Appalachian signal gaps", severity: "medium" },
+  { label: "Miami → Orlando",              api: "Miami to Orlando",             region: "Southeast", hint: "Everglades rural",     severity: "medium" },
+  { label: "Nashville → Memphis",          api: "Nashville to Memphis",         region: "Southeast", hint: "Rural I-40",           severity: "low"    },
+  // Midwest
+  { label: "Chicago → Milwaukee",          api: "Chicago to Milwaukee",         region: "Midwest",   hint: "I-94 corridor",        severity: "low"    },
+  { label: "Chicago → Detroit",            api: "Chicago to Detroit",           region: "Midwest",   hint: "Industrial I-94",      severity: "medium" },
+  { label: "Chicago → St. Louis",          api: "Chicago to St. Louis",         region: "Midwest",   hint: "Rural I-55",           severity: "low"    },
+  // South
+  { label: "Dallas → Houston",             api: "Dallas to Houston",            region: "South",     hint: "Rural I-45",           severity: "medium" },
+  { label: "Houston → San Antonio",        api: "Houston to San Antonio",       region: "South",     hint: "Hill Country gaps",    severity: "low"    },
+  // West
+  { label: "Los Angeles → Las Vegas",      api: "Los Angeles to Las Vegas",     region: "West",      hint: "Mojave Desert",        severity: "high"   },
+  { label: "Los Angeles → San Diego",      api: "Los Angeles to San Diego",     region: "West",      hint: "Camp Pendleton",       severity: "medium" },
+  { label: "San Francisco → Los Angeles",  api: "San Francisco to Los Angeles", region: "West",      hint: "Coastal I-5 gaps",     severity: "medium" },
+  { label: "Seattle → Portland",           api: "Seattle to Portland",          region: "West",      hint: "Rural I-5",            severity: "low"    },
+  { label: "Denver → Colorado Springs",    api: "Denver to Colorado Springs",   region: "Mountain",  hint: "I-25 mountain terrain", severity: "low"   },
+];
+
+const POPULAR: Route[] = [
+  ROUTES.find((r) => r.api === "Manhattan to Newark")!,
+  ROUTES.find((r) => r.api === "Los Angeles to Las Vegas")!,
+  ROUTES.find((r) => r.api === "Chicago to Detroit")!,
+  ROUTES.find((r) => r.api === "Atlanta to Charlotte")!,
+  ROUTES.find((r) => r.api === "Seattle to Portland")!,
+];
+
+const REGIONS = Array.from(new Set(ROUTES.map((r) => r.region)));
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 function getDefaultDepartureTime(): string {
   const d = new Date(Date.now() + 30 * 60 * 1000);
-  const h = d.getHours().toString().padStart(2, "0");
-  const m = d.getMinutes().toString().padStart(2, "0");
-  return `${h}:${m}`;
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function SeverityDot({ severity }: { severity: Severity }) {
+  const color = severity === "high" ? "#ef4444" : severity === "medium" ? "#f59e0b" : "#10b981";
+  return (
+    <span
+      className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+      style={{ background: color, boxShadow: `0 0 4px ${color}80` }}
+    />
+  );
 }
 
 function SeverityChip({ severity }: { severity?: string }) {
@@ -28,7 +77,7 @@ function SeverityChip({ severity }: { severity?: string }) {
     return (
       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full tracking-wider"
             style={{ background: "rgba(245,158,11,0.15)", color: "#fcd34d", border: "1px solid rgba(245,158,11,0.3)" }}>
-        MEDIUM
+        MED
       </span>
     );
   return (
@@ -39,14 +88,66 @@ function SeverityChip({ severity }: { severity?: string }) {
   );
 }
 
+// ── Main component ───────────────────────────────────────────────────────────
+
+type TripPlannerProps = {
+  onPlanComplete: (zones: DeadZone[], routeId: string, route: string) => void;
+  onStartTrip: () => void;
+  apiBase: string;
+  planState: "idle" | "planning" | "ready";
+};
+
 export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, planState }: TripPlannerProps) {
-  const [route, setRoute]               = useState("");
+  const [selected, setSelected]         = useState<Route | null>(null);
+  const [query, setQuery]               = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [departureTime, setDepartureTime] = useState(getDefaultDepartureTime);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState<string | null>(null);
   const [detectedZones, setDetectedZones] = useState<DeadZone[]>([]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Filter routes by query
+  const q = query.toLowerCase();
+  const filtered = q
+    ? ROUTES.filter((r) => r.label.toLowerCase().includes(q) || r.hint.toLowerCase().includes(q) || r.region.toLowerCase().includes(q))
+    : ROUTES;
+
+  // Group filtered routes by region (preserve region order)
+  const grouped = REGIONS.flatMap((region) => {
+    const routes = filtered.filter((r) => r.region === region);
+    return routes.length ? [{ region, routes }] : [];
+  });
+
+  function pickRoute(r: Route) {
+    setSelected(r);
+    setQuery("");
+    setDropdownOpen(false);
+    setDetectedZones([]);
+    setError(null);
+  }
+
+  function clearSelection() {
+    setSelected(null);
+    setQuery("");
+    setDetectedZones([]);
+    setError(null);
+  }
+
   async function handlePlan() {
+    if (!selected) return;
     setLoading(true);
     setError(null);
     setDetectedZones([]);
@@ -54,7 +155,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
       const res = await fetch(`${apiBase}/plan`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ route, departure_time: departureTime }),
+        body:    JSON.stringify({ route: selected.api, departure_time: departureTime }),
       });
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
@@ -71,7 +172,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
 
       const rid = String(data.route_id || "test_route");
       setDetectedZones(zones);
-      onPlanComplete(zones, rid, route);
+      onPlanComplete(zones, rid, selected.api);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to reach planning API");
     } finally {
@@ -79,7 +180,8 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
     }
   }
 
-  const isReady = planState === "ready" && detectedZones.length > 0;
+  const isReady   = planState === "ready" && detectedZones.length > 0;
+  const isLocked  = loading || isReady;
 
   return (
     <div
@@ -92,7 +194,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
       }}
     >
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-5">
         <div
           className="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
           style={{ background: "rgba(0,212,255,0.1)", border: "1px solid rgba(0,212,255,0.25)" }}
@@ -100,36 +202,131 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
           🛰
         </div>
         <div>
-          <h2 className="text-base font-semibold text-slate-100 tracking-tight">Neural Route Scan</h2>
-          <p className="text-[11px] text-slate-500 tracking-wide">AI predicts dead zones before you leave</p>
+          <h2 className="text-base font-semibold text-slate-100 tracking-tight">Route Dead Zone Scan</h2>
+          <p className="text-[11px] text-slate-500 tracking-wide">Select a US route — AI predicts coverage gaps</p>
         </div>
       </div>
 
       <div className="space-y-4">
-        {/* Route input */}
-        <div>
+        {/* ── Quick-pick chips ───────────────────────────────── */}
+        {!isLocked && !selected && (
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.15em] text-slate-600 mb-2">Popular routes</p>
+            <div className="flex flex-wrap gap-1.5">
+              {POPULAR.map((r) => (
+                <button
+                  key={r.api}
+                  onClick={() => pickRoute(r)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
+                             transition-all duration-150 hover:scale-[1.03] active:scale-95"
+                  style={{
+                    background: "rgba(0,212,255,0.06)",
+                    border:     "1px solid rgba(0,212,255,0.2)",
+                    color:      "#94a3b8",
+                  }}
+                >
+                  <SeverityDot severity={r.severity} />
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Combobox ──────────────────────────────────────── */}
+        <div ref={containerRef} className="relative">
           <label className="block text-[10px] uppercase tracking-[0.15em] text-slate-500 mb-1.5">
             Route
           </label>
-          <input
-            type="text"
-            value={route}
-            onChange={(e) => setRoute(e.target.value)}
-            placeholder="e.g. Boston to Providence, LA to San Diego…"
-            disabled={loading || isReady}
-            className="w-full rounded-lg px-3.5 py-2.5 text-slate-100 text-sm placeholder-slate-600
-                       focus:outline-none disabled:opacity-40 transition-all duration-200"
-            style={{
-              background:   "rgba(255,255,255,0.04)",
-              border:       "1px solid rgba(0,212,255,0.18)",
-              fontFamily:   "inherit",
-            }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(0,212,255,0.5)")}
-            onBlur={(e)  => (e.currentTarget.style.borderColor = "rgba(0,212,255,0.18)")}
-          />
+
+          {selected ? (
+            /* ── Selected state ── */
+            <div
+              className="flex items-center gap-2 rounded-lg px-3.5 py-2.5"
+              style={{
+                background: "rgba(0,212,255,0.06)",
+                border:     "1px solid rgba(0,212,255,0.35)",
+              }}
+            >
+              <SeverityDot severity={selected.severity} />
+              <span className="flex-1 text-slate-100 text-sm font-medium">{selected.label}</span>
+              <span className="text-[11px] text-slate-500 hidden sm:inline">{selected.hint}</span>
+              {!isLocked && (
+                <button
+                  onClick={clearSelection}
+                  className="ml-2 text-slate-500 hover:text-slate-300 transition-colors text-base leading-none"
+                  title="Change route"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ) : (
+            /* ── Search input ── */
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setDropdownOpen(true); }}
+              onFocus={(e) => { setDropdownOpen(true); e.currentTarget.style.borderColor = "rgba(0,212,255,0.5)"; }}
+              onBlur={(e)  => (e.currentTarget.style.borderColor = "rgba(0,212,255,0.18)")}
+              placeholder="Search US routes…"
+              disabled={isLocked}
+              className="w-full rounded-lg px-3.5 py-2.5 text-slate-100 text-sm placeholder-slate-600
+                         focus:outline-none disabled:opacity-40 transition-all duration-200"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border:     "1px solid rgba(0,212,255,0.18)",
+                fontFamily: "inherit",
+              }}
+            />
+          )}
+
+          {/* ── Dropdown ── */}
+          {dropdownOpen && !selected && !isLocked && (
+            <div
+              className="absolute z-50 w-full mt-1.5 rounded-xl overflow-y-auto"
+              style={{
+                background:    "rgba(5, 8, 16, 0.97)",
+                backdropFilter:"blur(20px)",
+                border:        "1px solid rgba(0,212,255,0.18)",
+                boxShadow:     "0 16px 40px -8px rgba(0,0,0,0.7)",
+                maxHeight:     "260px",
+              }}
+            >
+              {grouped.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                  No matching routes
+                </div>
+              ) : (
+                grouped.map(({ region, routes }) => (
+                  <div key={region}>
+                    <div
+                      className="px-3.5 pt-2.5 pb-1 text-[9px] uppercase tracking-[0.2em]"
+                      style={{ color: "#334155" }}
+                    >
+                      {region}
+                    </div>
+                    {routes.map((r) => (
+                      <button
+                        key={r.api}
+                        onMouseDown={(e) => { e.preventDefault(); pickRoute(r); }}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left
+                                   transition-colors duration-100 hover:bg-white/5"
+                      >
+                        <SeverityDot severity={r.severity} />
+                        <span className="flex-1 text-sm text-slate-200 font-medium">{r.label}</span>
+                        <span className="text-[11px] text-slate-500 hidden sm:inline shrink-0">{r.hint}</span>
+                        <SeverityChip severity={r.severity} />
+                      </button>
+                    ))}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Departure time */}
+        {/* ── Departure time ────────────────────────────────── */}
         <div>
           <label className="block text-[10px] uppercase tracking-[0.15em] text-slate-500 mb-1.5">
             Departure Time
@@ -138,7 +335,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
             type="time"
             value={departureTime}
             onChange={(e) => setDepartureTime(e.target.value)}
-            disabled={loading || isReady}
+            disabled={isLocked}
             className="w-full rounded-lg px-3.5 py-2.5 text-slate-100 text-sm
                        focus:outline-none disabled:opacity-40 transition-all duration-200"
             style={{
@@ -152,7 +349,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
           />
         </div>
 
-        {/* Error */}
+        {/* ── Error ─────────────────────────────────────────── */}
         {error && (
           <div className="text-red-300 text-sm rounded-lg px-3.5 py-2.5"
                style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
@@ -160,11 +357,11 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
           </div>
         )}
 
-        {/* Plan button */}
+        {/* ── Scan button ───────────────────────────────────── */}
         {!isReady && (
           <button
             onClick={handlePlan}
-            disabled={loading || !route.trim()}
+            disabled={loading || !selected}
             className="w-full px-4 py-3 rounded-lg font-semibold text-sm tracking-wide
                        disabled:opacity-40 disabled:cursor-not-allowed
                        flex items-center justify-center gap-2.5 transition-all duration-200"
@@ -183,22 +380,18 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
                   className="inline-block w-4 h-4 rounded-full border-2 animate-spin"
                   style={{ borderColor: "rgba(0,212,255,0.25)", borderTopColor: "#00d4ff" }}
                 />
-                <span style={{ color: "#00d4ff" }}>Agent scanning route…</span>
+                <span style={{ color: "#00d4ff" }}>Scanning route…</span>
               </>
             ) : (
-              <>
-                <span>⚡</span>
-                Scan for Dead Zones
-              </>
+              <>⚡ Scan for Dead Zones</>
             )}
           </button>
         )}
       </div>
 
-      {/* Results */}
+      {/* ── Results ───────────────────────────────────────────── */}
       {isReady && detectedZones.length > 0 && (
         <div className="mt-5 space-y-3 animate-[fadeInUp_0.35s_ease-out]">
-          {/* Divider */}
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px" style={{ background: "rgba(0,212,255,0.12)" }} />
             <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
@@ -207,16 +400,15 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
             <div className="flex-1 h-px" style={{ background: "rgba(0,212,255,0.12)" }} />
           </div>
 
-          {/* Zone list */}
           <div className="space-y-2">
             {detectedZones.map((zone, idx) => (
               <div
                 key={zone.id}
-                className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 animate-[fadeInUp_0.3s_ease-out]"
+                className="flex items-center gap-3 rounded-xl px-3.5 py-2.5"
                 style={{
-                  background:    "rgba(255,255,255,0.03)",
-                  border:        "1px solid rgba(255,255,255,0.07)",
-                  animationDelay:`${idx * 60}ms`,
+                  background:     "rgba(255,255,255,0.03)",
+                  border:         "1px solid rgba(255,255,255,0.07)",
+                  animationDelay: `${idx * 60}ms`,
                 }}
               >
                 <span className="text-slate-500 text-xs font-mono w-4 shrink-0 text-center">
@@ -235,7 +427,6 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
             ))}
           </div>
 
-          {/* Action buttons */}
           <button
             onClick={onStartTrip}
             className="w-full px-4 py-3 rounded-xl font-semibold text-sm tracking-wide
@@ -250,7 +441,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
           </button>
 
           <button
-            onClick={() => { setDetectedZones([]); setError(null); }}
+            onClick={() => { clearSelection(); }}
             className="w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
             style={{
               background: "rgba(255,255,255,0.04)",
