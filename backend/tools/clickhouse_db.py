@@ -15,17 +15,22 @@ _payments: list[dict] = []
 
 
 def _get_client():
-    global _client
+    global _client, _USE_CH
     if _client is not None:
         return _client
     import clickhouse_connect
-    _client = clickhouse_connect.get_client(
-        host=os.environ["CLICKHOUSE_HOST"],
-        username=os.getenv("CLICKHOUSE_USER", "default"),
-        password=os.getenv("CLICKHOUSE_PASSWORD", ""),
-        secure=True,
-    )
-    return _client
+    try:
+        _client = clickhouse_connect.get_client(
+            host=os.environ["CLICKHOUSE_HOST"],
+            username=os.getenv("CLICKHOUSE_USER", "default"),
+            password=os.getenv("CLICKHOUSE_PASSWORD", ""),
+            secure=True,
+        )
+        return _client
+    except Exception as e:
+        print(f"[clickhouse_db] Connection failed: {e} — falling back to in-memory store.")
+        _USE_CH = False
+        return None
 
 
 def init_db() -> None:
@@ -37,6 +42,8 @@ def init_db() -> None:
     with open(os.path.join(here, "schema.sql")) as f:
         ddl = f.read()
     cli = _get_client()
+    if cli is None:
+        return  # fell back to in-memory during connection attempt
     for stmt in [s.strip() for s in ddl.split(";") if s.strip()]:
         cli.command(stmt)
     print("[clickhouse_db] schema applied.")
