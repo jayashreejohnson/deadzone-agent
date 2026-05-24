@@ -25,7 +25,7 @@ _GOOGLE_MAPS_KEY   = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
 
 _COVERAGEMAP_URL   = "https://enterprise.coveragemap.com/api/v1/signal-strength/lookup"
 _GMAPS_URL         = "https://maps.googleapis.com/maps/api/directions/json"
-_DEAD_ZONE_DBM     = -105   # below this = dead zone
+_DEAD_ZONE_DBM     = -95    # below this = weak/dead signal (poor call/data quality)
 _CLUSTER_GAP_KM    = 8.0    # points further apart than this start a new cluster
 
 
@@ -223,17 +223,22 @@ async def predict(route: str, departure_time: str) -> dict:
     if _COVERAGEMAP_KEY and _GOOGLE_MAPS_KEY:
         try:
             data = await _coveragemap_predict(route, departure_time)
-            print(f"[agent1] CoverageMap: {_count_zones(data)} dead zone(s) for '{route}'")
-            try:
-                LLMObs.annotate(
-                    input_data=payload,
-                    output_data={"dead_zones_count": _count_zones(data)},
-                    metadata={"backend": "coveragemap"},
-                    tags={"tool": "agent1_predict"},
-                )
-            except Exception:
-                pass
-            return data
+            zone_count = _count_zones(data)
+            print(f"[agent1] CoverageMap: {zone_count} dead zone(s) for '{route}'")
+            if zone_count > 0:
+                try:
+                    LLMObs.annotate(
+                        input_data=payload,
+                        output_data={"dead_zones_count": zone_count},
+                        metadata={"backend": "coveragemap"},
+                        tags={"tool": "agent1_predict"},
+                    )
+                except Exception:
+                    pass
+                return data
+            # CoverageMap found no weak signal points — route has good coverage.
+            # Fall through to LLM which can predict tunnels / terrain gaps.
+            print(f"[agent1] CoverageMap found 0 zones for '{route}'; supplementing with LLM")
         except Exception as e:
             print(f"[agent1] CoverageMap failed ({e}); falling back to LLM")
 
