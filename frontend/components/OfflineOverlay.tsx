@@ -34,7 +34,7 @@ export default function OfflineOverlay({ durationSeconds, onDone }: OfflineOverl
 
   return (
     <div
-      className={`absolute inset-0 z-[2000] flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm transition-opacity duration-600 ${
+      className={`absolute inset-0 z-[2000] flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm transition-opacity duration-500 ${
         fading ? "opacity-0" : "opacity-100"
       }`}
     >

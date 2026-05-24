@@ -45,8 +45,8 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
       const data = await res.json();
 
       // Map API response to DeadZone type
-      // Response shape: { route_id, zones: [{ id, lat, lng, description, start_time, duration_minutes, severity }] }
-      const zones: DeadZone[] = (data.zones || []).map((z: Record<string, unknown>) => ({
+      // Response shape: { route_id, dead_zones: [{ id, lat, lng, description, start_time, duration_minutes, severity }] }
+      const zones: DeadZone[] = (data.dead_zones || data.zones || []).map((z: Record<string, unknown>) => ({
         id: String(z.id || z.deadzone_id || "zone"),
         name: String(z.description || z.name || z.id || "Dead zone"),
         lat: Number(z.lat),
