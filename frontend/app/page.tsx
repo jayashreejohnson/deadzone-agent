@@ -100,6 +100,7 @@ export default function Page() {
   const [traceId, setTraceId]             = useState<string | null>(null);
   const [evalData, setEvalData]           = useState<{ score: number; slaPass: boolean } | null>(null);
   const [isReplaying, setIsReplaying]     = useState(false);
+  const [boundsVersion, setBoundsVersion] = useState(0);
 
   void initialTrip; // suppress unused warning
 
@@ -277,12 +278,15 @@ export default function Page() {
 
   // ── Plan complete ─────────────────────────────────────────────
   function handlePlanComplete(zones: DeadZone[], rid: string, route: string) {
-    setPlannedZones(zones.length > 0 ? zones : DEFAULT_DEAD_ZONES);
+    const resolved = zones.length > 0 ? zones : DEFAULT_DEAD_ZONES;
+    setPlannedZones(resolved);
     setRouteId(rid);
     setRouteName(route);
     setPlanState("ready");
-    setRoutePolyline(buildRoutePolyline(zones.length > 0 ? zones : DEFAULT_DEAD_ZONES));
-    setNextZone(zones[0] || null);
+    setRoutePolyline(buildRoutePolyline(resolved));
+    setNextZone(resolved[0] || null);
+    // Trigger map pan/zoom to show the new route
+    setBoundsVersion((v) => v + 1);
   }
 
   // ── Start trip ────────────────────────────────────────────────
@@ -412,6 +416,7 @@ export default function Page() {
           deadZones={plannedZones}
           routePolyline={routePolyline}
           nextZone={nextZone}
+          boundsVersion={boundsVersion}
         />
       </div>
 

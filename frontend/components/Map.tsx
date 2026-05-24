@@ -1,5 +1,6 @@
 "use client";
-import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Tooltip } from "react-leaflet";
+import { useEffect } from "react";
+import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import { DEFAULT_ROUTE_POLYLINE, DEFAULT_DEAD_ZONES, MAP_CENTER, MAP_ZOOM, type LatLng, type DeadZone } from "@/lib/route";
 
 type Dot = { user: "user_a" | "user_b"; pos: LatLng | null };
@@ -10,7 +11,33 @@ type MapProps = {
   deadZones?: DeadZone[];
   routePolyline?: LatLng[];
   nextZone?: DeadZone | null;
+  /** Increment to trigger a fitBounds on the current zones */
+  boundsVersion?: number;
 };
+
+/** Inner component — has access to the Leaflet map instance via useMap(). */
+function MapAutoBounds({ zones, route, boundsVersion }: {
+  zones: DeadZone[];
+  route: LatLng[];
+  boundsVersion?: number;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    // Collect all lat/lng points from the route polyline
+    const pts: [number, number][] = route.map((p) => [p.lat, p.lng]);
+    if (pts.length < 2) return;
+    try {
+      // Add padding so dead-zone circles aren't clipped
+      map.fitBounds(pts, { padding: [48, 48], maxZoom: 14, animate: true });
+    } catch {
+      // Leaflet can throw if the map isn't ready yet — silently ignore
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boundsVersion]);
+
+  return null;
+}
 
 function severityLabel(severity?: string): string {
   if (severity === "high")   return "⚠️ High";
@@ -19,7 +46,7 @@ function severityLabel(severity?: string): string {
   return "";
 }
 
-export default function Map({ dots, activeUser, deadZones, routePolyline, nextZone }: MapProps) {
+export default function Map({ dots, activeUser, deadZones, routePolyline, nextZone, boundsVersion }: MapProps) {
   const zones = deadZones && deadZones.length > 0 ? deadZones : DEFAULT_DEAD_ZONES;
   const route = routePolyline && routePolyline.length > 0 ? routePolyline : DEFAULT_ROUTE_POLYLINE;
   const polylinePos: [number, number][] = route.map((p) => [p.lat, p.lng]);
@@ -38,6 +65,9 @@ export default function Map({ dots, activeUser, deadZones, routePolyline, nextZo
         subdomains="abcd"
         maxZoom={19}
       />
+
+      {/* Auto-pan to route bounds when a new plan comes in */}
+      <MapAutoBounds zones={zones} route={route} boundsVersion={boundsVersion} />
 
       {/* Route polyline — electric cyan */}
       <Polyline

@@ -40,7 +40,7 @@ function SeverityChip({ severity }: { severity?: string }) {
 }
 
 export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, planState }: TripPlannerProps) {
-  const [route, setRoute]               = useState("Manhattan to Newark");
+  const [route, setRoute]               = useState("");
   const [departureTime, setDepartureTime] = useState(getDefaultDepartureTime);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState<string | null>(null);
@@ -115,7 +115,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
             type="text"
             value={route}
             onChange={(e) => setRoute(e.target.value)}
-            placeholder="Manhattan to Newark"
+            placeholder="e.g. Boston to Providence, LA to San Diego…"
             disabled={loading || isReady}
             className="w-full rounded-lg px-3.5 py-2.5 text-slate-100 text-sm placeholder-slate-600
                        focus:outline-none disabled:opacity-40 transition-all duration-200"
