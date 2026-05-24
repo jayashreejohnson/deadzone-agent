@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Tooltip, useMap } from "react-leaflet";
-import { DEFAULT_ROUTE_POLYLINE, DEFAULT_DEAD_ZONES, MAP_CENTER, MAP_ZOOM, type LatLng, type DeadZone } from "@/lib/route";
+import { MAP_CENTER, MAP_ZOOM, type LatLng, type DeadZone } from "@/lib/route";
 
 type Dot = { user: "user_a" | "user_b"; pos: LatLng | null };
 
@@ -47,8 +47,10 @@ function severityLabel(severity?: string): string {
 }
 
 export default function Map({ dots, activeUser, deadZones, routePolyline, nextZone, boundsVersion }: MapProps) {
-  const zones = deadZones && deadZones.length > 0 ? deadZones : DEFAULT_DEAD_ZONES;
-  const route = routePolyline && routePolyline.length > 0 ? routePolyline : DEFAULT_ROUTE_POLYLINE;
+  // Use exactly what's passed in — never fall back to the default Manhattan/Newark data
+  // so the map is clean before a route is scanned.
+  const zones = deadZones ?? [];
+  const route = routePolyline ?? [];
   const polylinePos: [number, number][] = route.map((p) => [p.lat, p.lng]);
 
   return (

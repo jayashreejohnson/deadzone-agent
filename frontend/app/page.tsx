@@ -11,7 +11,7 @@ import TripPlanner from "@/components/TripPlanner";
 import CountdownBanner from "@/components/CountdownBanner";
 import OfflineOverlay from "@/components/OfflineOverlay";
 import {
-  ROUTE_ID, DEFAULT_ROUTE_POLYLINE, DEFAULT_DEAD_ZONES,
+  ROUTE_ID, DEFAULT_ROUTE_POLYLINE,
   distanceKm, lerp, type LatLng, type DeadZone,
 } from "@/lib/route";
 
@@ -62,8 +62,8 @@ export default function Page() {
 
   // Plan / trip state
   const [planState, setPlanState]         = useState<PlanState>("idle");
-  const [plannedZones, setPlannedZones]   = useState<DeadZone[]>(DEFAULT_DEAD_ZONES);
-  const [routePolyline, setRoutePolyline] = useState<LatLng[]>(DEFAULT_ROUTE_POLYLINE);
+  const [plannedZones, setPlannedZones]   = useState<DeadZone[]>([]);
+  const [routePolyline, setRoutePolyline] = useState<LatLng[]>([]);
   const [routeId, setRouteId]             = useState<string>(ROUTE_ID);
   const [routeName, setRouteName]         = useState<string>("");
   const [nextZone, setNextZone]           = useState<DeadZone | null>(null);
@@ -292,7 +292,7 @@ export default function Page() {
 
   // ── Plan complete ─────────────────────────────────────────────
   function handlePlanComplete(zones: DeadZone[], rid: string, route: string) {
-    const resolved = zones.length > 0 ? zones : DEFAULT_DEAD_ZONES;
+    const resolved = zones;
     setPlannedZones(resolved);
     setRouteId(rid);
     setRouteName(route);
@@ -305,7 +305,7 @@ export default function Page() {
 
   // ── Start trip ────────────────────────────────────────────────
   function handleStartTrip() {
-    const zones = plannedZones.length > 0 ? plannedZones : DEFAULT_DEAD_ZONES;
+    const zones = plannedZones;
     const poly  = buildRoutePolyline(zones);
     setRoutePolyline(poly);
     setPlanState("tripping");
@@ -567,7 +567,7 @@ export default function Page() {
           )}
           {planState !== "tripping" && (
             <button
-              onClick={() => { setPlanState("idle"); setPlannedZones(DEFAULT_DEAD_ZONES); setRoutePolyline(DEFAULT_ROUTE_POLYLINE); }}
+              onClick={() => { setPlanState("idle"); setPlannedZones([]); setRoutePolyline([]); }}
               className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
               style={{ background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }}
             >

@@ -601,9 +601,11 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
     user_id     = signal["user_id"]
     buyer_agent = "agent_" + user_id.split("_")[-1]
     dur_min     = signal.get("duration_minutes", 4)
-    lat         = signal.get("lat", 0)
-    lng         = signal.get("lng", 0)
     zone_desc   = signal.get("zone_description", "")
+    route_label = signal.get("route", route_id.replace("_", " "))
+
+    # Human-readable location hint for search queries — prefer zone description, else route name
+    location = zone_desc if zone_desc else route_label
 
     # Step 1: cache lookup
     cache_result = await _timed_dispatch(
@@ -634,24 +636,24 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
         await _eval_pack(ctx)
         return
 
-    # Step 2: parallel web searches (depth by zone duration)
+    # Step 2: parallel web searches — queries use zone name + route for relevant content
     if dur_min >= 5:
         topics = [
-            ("weather", f"weather forecast near {lat:.3f},{lng:.3f}"),
-            ("road",    f"road conditions on route {route_id}"),
-            ("poi",     f"points of interest near {lat:.3f},{lng:.3f}"),
-            ("news",    f"local news near {lat:.3f},{lng:.3f}"),
+            ("weather", f"weather forecast {location} driving {route_label}"),
+            ("road",    f"road conditions traffic {location} {route_label}"),
+            ("poi",     f"rest stops points of interest near {location} {route_label}"),
+            ("news",    f"local news {location} {route_label}"),
         ]
     elif dur_min >= 2:
         topics = [
-            ("weather", f"weather forecast near {lat:.3f},{lng:.3f}"),
-            ("road",    f"road conditions on route {route_id}"),
-            ("news",    f"local news near {lat:.3f},{lng:.3f}"),
+            ("weather", f"weather forecast {location} {route_label}"),
+            ("road",    f"road conditions traffic {location} {route_label}"),
+            ("news",    f"local news {location} {route_label}"),
         ]
     else:
         topics = [
-            ("road", f"road conditions on route {route_id}"),
-            ("news", f"local news near {lat:.3f},{lng:.3f}"),
+            ("road", f"road conditions traffic {location} {route_label}"),
+            ("news", f"local news {location} {route_label}"),
         ]
 
     search_results = await asyncio.gather(*[
