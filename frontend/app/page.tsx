@@ -372,7 +372,7 @@ export default function Page() {
 
       {/* ── Top navigation bar ────────────────────────────────── */}
       <div
-        className="absolute top-0 left-0 right-0 z-[100] px-4 py-2.5 flex items-center justify-between"
+        className="absolute top-0 left-0 right-0 z-[1100] px-4 py-2.5 flex items-center justify-between"
         style={{
           background:    "rgba(5, 8, 16, 0.88)",
           backdropFilter:"blur(18px)",
@@ -480,7 +480,7 @@ export default function Page() {
       {/* ── Trip planner modal ────────────────────────────────── */}
       {showPlanner && (
         <div
-          className="absolute inset-0 z-[80] flex items-center justify-center p-6"
+          className="absolute inset-0 z-[1500] flex items-center justify-center p-6"
           style={{ background: "rgba(5,8,16,0.7)", backdropFilter: "blur(4px)" }}
         >
           <TripPlanner
@@ -495,7 +495,7 @@ export default function Page() {
       {/* ── Countdown banner ──────────────────────────────────── */}
       {showCountdown && !showOfflineOverlay && (
         <div
-          className="absolute left-4 z-[80] transition-all duration-300"
+          className="absolute left-4 z-[1200] transition-all duration-300"
           style={{
             top:   "4.5rem",
             right: logOpen ? `${LOG_W + 16}px` : "1rem",
@@ -512,7 +512,7 @@ export default function Page() {
       {/* ── Center overlay cards ──────────────────────────────── */}
       {overlay.kind !== "none" && !showPlanner && !showOfflineOverlay && (
         <div
-          className="absolute z-[80] flex justify-center transition-all duration-300"
+          className="absolute z-[1200] flex justify-center transition-all duration-300"
           style={{
             top:   showCountdown ? "8rem" : "5rem",
             left:  "1rem",
@@ -544,7 +544,7 @@ export default function Page() {
       )}
 
       {/* ── Toasts ────────────────────────────────────────────── */}
-      <div className="absolute top-16 z-[90] flex flex-col gap-2" style={{ right: logOpen ? `${LOG_W + 12}px` : "1rem" }}>
+      <div className="absolute top-16 z-[1300] flex flex-col gap-2" style={{ right: logOpen ? `${LOG_W + 12}px` : "1rem" }}>
         {toasts.map((t) => (
           <Toast
             key={t.id}
@@ -557,14 +557,14 @@ export default function Page() {
 
       {/* ── Offline pill ──────────────────────────────────────── */}
       {offlineActive && !showOfflineOverlay && (
-        <div className="absolute bottom-14 left-4 z-[80]">
+        <div className="absolute bottom-14 left-4 z-[1200]">
           <OfflinePill />
         </div>
       )}
 
       {/* ── Agent log drawer (right side) ─────────────────────── */}
       <div
-        className="absolute top-11 bottom-11 right-0 z-[60] flex flex-col"
+        className="absolute top-11 bottom-11 right-0 z-[1050] flex flex-col"
         style={{
           width:     `${LOG_W}px`,
           background:"rgba(5, 8, 16, 0.94)",
@@ -578,7 +578,7 @@ export default function Page() {
       </div>
 
       {/* ── Dashboard strip (bottom) ──────────────────────────── */}
-      <div className="absolute bottom-0 left-0 right-0 z-[60]">
+      <div className="absolute bottom-0 left-0 right-0 z-[1050]">
         <Dashboard />
       </div>
 
