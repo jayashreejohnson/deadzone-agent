@@ -106,6 +106,11 @@ class Signal(BaseModel):
     eta_seconds: int = 240
     route_id: str
     deadzone_id: str
+    # New fields — passed from Agent 1 predictions
+    duration_minutes: int = 4
+    severity: str = "medium"  # "high" | "medium" | "low"
+    zone_description: str = ""  # e.g. "Lincoln Tunnel Mid"
+    route: str = ""  # e.g. "Manhattan to Newark"
 
 
 class PlanRequest(BaseModel):
@@ -147,6 +152,8 @@ async def plan(req: PlanRequest):
         output_data={"route_id": route_id, "zone_count": len(zones)},
         tags={"workflow": "plan_route"},
     )
+    await emit({"type": "zones_ready", "zones": zones, "route_id": route_id,
+                "route": req.route, "departure_time": req.departure_time})
     return {
         "route_id": route_id,
         "route": req.route,
@@ -178,6 +185,10 @@ async def run_pipeline(req: PipelineRequest):
             "eta_seconds": (z.get("duration_minutes") or 4) * 60,
             "route_id": route_id,
             "deadzone_id": z["id"],
+            "duration_minutes": z.get("duration_minutes") or 4,
+            "severity": z.get("severity") or "medium",
+            "zone_description": z.get("description") or "",
+            "route": req.route,
         }
         await orchestrate(signal_payload)
         # Look up the pack that was just built/bought for this route+zone

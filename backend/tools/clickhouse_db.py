@@ -14,6 +14,7 @@ _MAX_ROWS = 1000
 _packs: list[dict] = []
 _events: list[dict] = []
 _payments: list[dict] = []
+_signal_history: list[dict] = []
 
 
 def _get_client():
@@ -208,3 +209,23 @@ def has_any_events() -> bool:
         return len(_events) > 0
     cli = _get_client()
     return cli.query("SELECT count() FROM events").result_rows[0][0] > 0
+
+
+def save_signal_quality(route_id: str, lat: float, lng: float,
+                        signal_dbm: int, timestamp: Optional[datetime] = None) -> None:
+    """Record a signal quality observation for a route segment."""
+    row = {
+        "route_id": route_id,
+        "lat": lat,
+        "lng": lng,
+        "signal_dbm": signal_dbm,
+        "ts": timestamp or datetime.utcnow(),
+    }
+    _signal_history.append(row)
+    if len(_signal_history) > _MAX_ROWS:
+        del _signal_history[: len(_signal_history) - _MAX_ROWS]
+
+
+def get_signal_history(route_id: str) -> list[dict]:
+    """Return all signal quality records for a given route_id."""
+    return [r for r in _signal_history if r["route_id"] == route_id]

@@ -9,12 +9,57 @@ from datetime import datetime, timedelta
 from tools import clickhouse_db as db
 
 
+def seed_signal_history() -> None:
+    """Insert ~20 synthetic signal quality data points for the Manhattan-to-Newark route.
+
+    Signal quality varies to create realistic dead zones around Lincoln Tunnel coordinates.
+    signal_dbm values: strong signal = -60 to -75, weak = -85 to -95, dead zone = -100 to -113.
+    """
+    route_id = "manhattan_to_newark@17:00"
+
+    # Waypoints along Manhattan → Lincoln Tunnel → Newark
+    # Each tuple: (lat, lng, signal_dbm, offset_minutes)
+    waypoints = [
+        # Manhattan — good signal
+        (40.7580, -73.9855, -62, -20),   # Times Square area
+        (40.7558, -73.9990, -65, -18),   # 9th Ave / 40th St
+        (40.7540, -74.0020, -68, -16),   # 10th Ave approach
+        (40.7530, -74.0070, -72, -14),   # Lincoln Tunnel entrance approach
+        # Lincoln Tunnel — dead zone begins
+        (40.7621, -74.0185, -88, -12),   # Tunnel entrance (signal degrading)
+        (40.7621, -74.0245, -97, -10),   # Tunnel mid-entry
+        (40.7621, -74.0312, -110, -8),   # Lincoln Tunnel Mid (deep dead zone)
+        (40.7621, -74.0370, -108, -6),   # Tunnel mid-exit
+        (40.7621, -74.0430, -95, -4),    # Tunnel exit (signal recovering)
+        # NJ Turnpike / Weehawken — signal recovering
+        (40.7600, -74.0500, -82, -2),    # NJ Turnpike approach
+        (40.7545, -74.0620, -75, 0),     # Weehawken
+        (40.7490, -74.0750, -70, 2),     # North Bergen
+        # Route 3 toward Newark — mixed signal
+        (40.7430, -74.0900, -73, 4),     # Secaucus area
+        (40.7380, -74.1050, -78, 6),     # Rutherford approach
+        (40.7357, -74.1200, -85, 8),     # McCarter Hwy approach (signal dips)
+        (40.7357, -74.1500, -102, 10),   # Newark McCarter Hwy (second dead zone)
+        (40.7357, -74.1724, -105, 12),   # Newark McCarter Hwy Mid
+        (40.7357, -74.1900, -97, 14),    # McCarter exit
+        # Newark downtown — recovering
+        (40.7357, -74.2050, -76, 16),    # Newark Penn Station area
+        (40.7282, -74.1724, -68, 18),    # Newark downtown
+    ]
+
+    for lat, lng, dbm, offset_min in waypoints:
+        ts = datetime.utcnow() - timedelta(minutes=abs(offset_min) + 30)
+        db.save_signal_quality(route_id, lat, lng, dbm, ts)
+
+
 def seed_if_empty() -> None:
     if db.has_any_events():
         print("[seed] events table not empty — skipping seed.")
+        seed_signal_history()  # always seed signal history (in-memory, idempotent)
         return
 
     print("[seed] seeding historical events + demo cache pack.")
+    seed_signal_history()
 
     # Historical built/bought events
     for i in range(6):
