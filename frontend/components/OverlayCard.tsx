@@ -102,8 +102,11 @@ export function CachedFoundCard() {
 }
 
 export function ReadyCard({
-  cached, paidAmount, onOpen,
-}: { cached: boolean; paidAmount?: number; onOpen: () => void }) {
+  cached, paidAmount, evalScore, slaPass, onOpen,
+}: { cached: boolean; paidAmount?: number; evalScore?: number; slaPass?: boolean; onOpen: () => void }) {
+  const scoreColor = evalScore !== undefined
+    ? (evalScore >= 80 ? "#10b981" : evalScore >= 60 ? "#f59e0b" : "#ef4444")
+    : undefined;
   return (
     <Shell accent="#10b981" glow="rgba(16,185,129,0.16)">
       <div className="flex items-center gap-3 mb-4">
@@ -113,10 +116,20 @@ export function ReadyCard({
         >
           ✅
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h3 className="text-base font-semibold text-slate-100">Offline continuity ready</h3>
           <p className="text-xs text-slate-500 mt-0.5">Your journey is secured for the dead zone</p>
         </div>
+        {evalScore !== undefined && scoreColor && (
+          <div
+            className="shrink-0 flex flex-col items-center justify-center w-12 h-12 rounded-xl"
+            style={{ background: `${scoreColor}12`, border: `1px solid ${scoreColor}30` }}
+            title={`Quality score ${evalScore}/100 ? SLA ${slaPass ? "passed" : "missed"}`}
+          >
+            <span className="text-sm font-bold tabular-nums" style={{ color: scoreColor }}>{evalScore}</span>
+            <span className="text-[8px] uppercase tracking-wider" style={{ color: scoreColor }}>score</span>
+          </div>
+        )}
       </div>
 
       {cached && (

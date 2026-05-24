@@ -1,4 +1,4 @@
-"""ClickHouse wrapper with in-memory fallback so the demo runs without setup."""
+﻿"""ClickHouse wrapper with in-memory fallback so the demo runs without setup."""
 from __future__ import annotations
 import os
 import uuid
@@ -8,7 +8,7 @@ from typing import Any, Optional
 _USE_CH = bool(os.getenv("CLICKHOUSE_HOST"))
 _client = None
 
-# In-memory tables — same shape as ClickHouse rows.
+# In-memory tables â€” same shape as ClickHouse rows.
 # Capped to avoid unbounded memory growth in demo/dev mode.
 _MAX_ROWS = 1000
 _packs: list[dict] = []
@@ -31,7 +31,7 @@ def _get_client():
         )
         return _client
     except Exception as e:
-        print(f"[clickhouse_db] Connection failed: {e} — falling back to in-memory store.")
+        print(f"[clickhouse_db] Connection failed: {e} â€” falling back to in-memory store.")
         _USE_CH = False
         return None
 
@@ -39,7 +39,7 @@ def _get_client():
 def init_db() -> None:
     """Create tables if using real ClickHouse. No-op for in-memory."""
     if not _USE_CH:
-        print("[clickhouse_db] CLICKHOUSE_HOST not set — using in-memory store.")
+        print("[clickhouse_db] CLICKHOUSE_HOST not set â€” using in-memory store.")
         return
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     with open(os.path.join(here, "schema.sql")) as f:
@@ -229,3 +229,30 @@ def save_signal_quality(route_id: str, lat: float, lng: float,
 def get_signal_history(route_id: str) -> list[dict]:
     """Return all signal quality records for a given route_id."""
     return [r for r in _signal_history if r["route_id"] == route_id]
+
+
+# ── Trace / replay storage ────────────────────────────────────────────────────
+
+_traces: dict[str, list] = {}
+_MAX_TRACES = 50
+
+
+def append_trace_event(trace_id: str, event: dict) -> None:
+    """Record one event against a trace for later replay."""
+    if trace_id not in _traces:
+        if len(_traces) >= _MAX_TRACES:
+            # Evict the oldest trace (dict preserves insertion order in Python 3.7+)
+            oldest = next(iter(_traces))
+            del _traces[oldest]
+        _traces[trace_id] = []
+    _traces[trace_id].append(event)
+
+
+def get_trace(trace_id: str) -> list[dict]:
+    """Return all recorded events for a trace (empty list if unknown)."""
+    return list(_traces.get(trace_id, []))
+
+
+def list_traces() -> list[str]:
+    """Return trace IDs ordered most-recent-first."""
+    return list(reversed(list(_traces.keys())))

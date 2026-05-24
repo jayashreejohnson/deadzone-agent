@@ -35,11 +35,14 @@ async def pay(from_agent: str, to_agent: str, amount_usd: float, memo: str = "")
         "tx": tx_id,
     })
     result = {"tx_id": tx_id, "amount": amount_usd, "from": from_agent, "to": to_agent}
-    LLMObs.annotate(
-        input_data={"from": from_agent, "to": to_agent, "amount_usd": amount_usd, "memo": memo},
-        output_data=result,
-        metadata={"settlement": "x402_simulated", "from_wallet": wallet_for(from_agent),
-                  "to_wallet": wallet_for(to_agent)},
-        tags={"tool": "x402_pay"},
-    )
+    try:
+        LLMObs.annotate(
+            input_data={"from": from_agent, "to": to_agent, "amount_usd": amount_usd, "memo": memo},
+            output_data=result,
+            metadata={"settlement": "x402_simulated", "from_wallet": wallet_for(from_agent),
+                      "to_wallet": wallet_for(to_agent)},
+            tags={"tool": "x402_pay"},
+        )
+    except Exception:
+        pass  # LLMObs disabled or no active span
     return result

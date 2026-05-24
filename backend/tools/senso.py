@@ -72,12 +72,15 @@ async def publish(title: str, route_id: str, sections: list[dict]) -> str:
                 data = resp.json()
             url = data.get("url") or data.get("public_url")
             if url:
-                LLMObs.annotate(
-                    input_data={"title": title, "route_id": route_id, "section_count": len(sections)},
-                    output_data=url,
-                    metadata={"backend": "senso", "destination": "cited.md"},
-                    tags={"tool": "senso_publish"},
-                )
+                try:
+                    LLMObs.annotate(
+                        input_data={"title": title, "route_id": route_id, "section_count": len(sections)},
+                        output_data=url,
+                        metadata={"backend": "senso", "destination": "cited.md"},
+                        tags={"tool": "senso_publish"},
+                    )
+                except Exception:
+                    pass  # LLMObs disabled or no active span
                 return url
         except Exception as e:
             await emit({"type": "log", "level": "warn",
@@ -88,10 +91,13 @@ async def publish(title: str, route_id: str, sections: list[dict]) -> str:
     with open(fpath, "w", encoding="utf-8") as f:
         f.write(_render_html(title, route_id, sections))
     url = f"{_PUBLIC_BASE}/static/packs/{fname}"
-    LLMObs.annotate(
-        input_data={"title": title, "route_id": route_id, "section_count": len(sections)},
-        output_data=url,
-        metadata={"backend": backend, "file": fname},
-        tags={"tool": "senso_publish"},
-    )
+    try:
+        LLMObs.annotate(
+            input_data={"title": title, "route_id": route_id, "section_count": len(sections)},
+            output_data=url,
+            metadata={"backend": backend, "file": fname},
+            tags={"tool": "senso_publish"},
+        )
+    except Exception:
+        pass  # LLMObs disabled or no active span
     return url

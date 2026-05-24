@@ -132,7 +132,17 @@ async def root():
 @app.post("/signal")
 async def signal(s: Signal):
     """Frontend tells us a user is heading into a dead zone. Orchestrator runs in background."""
-    task = asyncio.create_task(orchestrate(s.model_dump()))
+    signal_data = s.model_dump()
+
+    async def _safe_orchestrate(data: dict) -> None:
+        try:
+            await orchestrate(data)
+        except Exception as exc:
+            import traceback
+            print(f"[signal] orchestrator error: {exc}", flush=True)
+            traceback.print_exc()
+
+    task = asyncio.create_task(_safe_orchestrate(signal_data))
     # Hold a strong reference so the task isn't GC'd before it finishes.
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
@@ -214,6 +224,52 @@ async def run_pipeline(req: PipelineRequest):
 @app.get("/dashboard")
 async def dashboard():
     return db.dashboard_summary()
+
+
+
+@app.get("/traces")
+async def list_traces():
+    """List all trace IDs (most-recent-first) for the replay UI."""
+    return {"traces": db.list_traces()}
+
+
+@app.get("/trace/{trace_id}")
+async def get_trace(trace_id: str):
+    """Return all recorded events for a specific trace."""
+    from fastapi import HTTPException
+    events = db.get_trace(trace_id)
+    if not events:
+        raise HTTPException(status_code=404, detail="Trace not found")
+    return {"trace_id": trace_id, "events": events, "count": len(events)}
+
+
+@app.get("/replay/{trace_id}")
+async def replay_trace(trace_id: str, speed: float = 1.0):
+    """SSE stream of trace events at original timing."""
+    from fastapi import HTTPException
+    from fastapi.responses import StreamingResponse
+    events = db.get_trace(trace_id)
+    if not events:
+        raise HTTPException(status_code=404, detail="Trace not found")
+
+    async def _stream():
+        import json as _json
+        yield "data: " + _json.dumps({"type": "replay_start", "trace_id": trace_id, "count": len(events)}) + "\n\n"
+        last_t = 0
+        for ev in events:
+            t_ms = ev.get("t_ms", 0) or 0
+            delay = max(0.0, (t_ms - last_t) / (1000.0 * max(speed, 0.1)))
+            if delay > 0.01:
+                await asyncio.sleep(min(delay, 1.5))
+            last_t = t_ms
+            yield "data: " + _json.dumps(ev, default=str) + "\n\n"
+        yield "data: " + _json.dumps({"type": "replay_end", "trace_id": trace_id}) + "\n\n"
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.websocket("/ws")

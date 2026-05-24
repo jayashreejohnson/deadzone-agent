@@ -83,12 +83,15 @@ async def search(query: str) -> dict:
     await emit({"type": "tool", "name": "nimble", "query": query})
     if not _API_KEY:
         result = _stub_for(query)
-        LLMObs.annotate(
-            input_data=query,
-            output_data=result["summary"],
-            metadata={"backend": "stub", "source_count": len(result["sources"])},
-            tags={"tool": "nimble_search"},
-        )
+        try:
+            LLMObs.annotate(
+                input_data=query,
+                output_data=result["summary"],
+                metadata={"backend": "stub", "source_count": len(result["sources"])},
+                tags={"tool": "nimble_search"},
+            )
+        except Exception:
+            pass  # LLMObs disabled or no active span
         return result
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -115,21 +118,27 @@ async def search(query: str) -> dict:
         else:
             summary = " ".join(s["snippet"] for s in sources[:2]) or _stub_for(query)["summary"]
             result = {"query": query, "summary": summary, "sources": sources}
-        LLMObs.annotate(
-            input_data=query,
-            output_data=result["summary"],
-            metadata={"backend": "nimble", "source_count": len(result["sources"])},
-            tags={"tool": "nimble_search"},
-        )
+        try:
+            LLMObs.annotate(
+                input_data=query,
+                output_data=result["summary"],
+                metadata={"backend": "nimble", "source_count": len(result["sources"])},
+                tags={"tool": "nimble_search"},
+            )
+        except Exception:
+            pass  # LLMObs disabled or no active span
         return result
     except Exception as e:
         await emit({"type": "log", "level": "warn",
                     "msg": f"nimble failed ({e!s}); using stub"})
         result = _stub_for(query)
-        LLMObs.annotate(
-            input_data=query,
-            output_data=result["summary"],
-            metadata={"backend": "stub_after_error", "error": str(e)},
-            tags={"tool": "nimble_search"},
-        )
+        try:
+            LLMObs.annotate(
+                input_data=query,
+                output_data=result["summary"],
+                metadata={"backend": "stub_after_error", "error": str(e)},
+                tags={"tool": "nimble_search"},
+            )
+        except Exception:
+            pass  # LLMObs disabled or no active span
         return result

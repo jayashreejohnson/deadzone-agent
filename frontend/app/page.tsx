@@ -97,6 +97,9 @@ export default function Page() {
   const [lastPack, setLastPack]           = useState<{
     url: string; cached: boolean; paidAmount?: number; html?: string | null
   } | null>(null);
+  const [traceId, setTraceId]             = useState<string | null>(null);
+  const [evalData, setEvalData]           = useState<{ score: number; slaPass: boolean } | null>(null);
+  const [isReplaying, setIsReplaying]     = useState(false);
 
   void initialTrip; // suppress unused warning
 
@@ -143,6 +146,15 @@ export default function Page() {
             }));
             setPlannedZones(zones);
             setRoutePolyline(buildRoutePolyline(zones));
+          }
+
+          if (ev.type === "trace_started") {
+            setTraceId(String(ev.trace_id || ""));
+            setEvalData(null);  // reset eval for new run
+          }
+
+          if (ev.type === "eval_complete") {
+            setEvalData({ score: ev.score as number, slaPass: ev.sla_pass as boolean });
           }
 
           if (ev.type === "payment") {
@@ -343,6 +355,39 @@ export default function Page() {
     nextZone ? (zonePackStatus[nextZone.id] || "preparing") : "preparing";
 
   // ── LOG_DRAWER_WIDTH ─────────────────────────────────────────
+  // Replay handler
+  async function handleReplay() {
+    if (!traceId || isReplaying) return;
+    setIsReplaying(true);
+    setEvents([]);
+    setEvalData(null);
+    try {
+      const resp = await fetch(`${API}/trace/${traceId}`);
+      if (!resp.ok) throw new Error("trace not found");
+      const data = (await resp.json()) as { events: AgentEvent[] };
+      const traceEvents = data.events;
+      for (let i = 0; i < traceEvents.length; i++) {
+        const ev = traceEvents[i];
+        const nextEv = traceEvents[i + 1];
+        const delay = nextEv
+          ? Math.min(Math.max((Number(nextEv.t_ms) || 0) - (Number(ev.t_ms) || 0), 0), 600)
+          : 0;
+        setEvents((prev) => [...prev, ev]);
+        if (ev.type === "pack_ready") {
+          setOverlay({ kind: "ready", url: String(ev.url), cached: !!ev.cached });
+        }
+        if (ev.type === "eval_complete") {
+          setEvalData({ score: ev.score as number, slaPass: ev.sla_pass as boolean });
+        }
+        if (delay > 20) await new Promise((r) => setTimeout(r, delay));
+      }
+    } catch (e) {
+      console.error("Replay failed:", e);
+    } finally {
+      setIsReplaying(false);
+    }
+  }
+
   const LOG_W = 300;
 
   // ── Render ────────────────────────────────────────────────────
@@ -403,7 +448,7 @@ export default function Page() {
               className="text-[10px] tracking-widest uppercase px-1.5 py-0.5 rounded"
               style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.2)" }}
             >
-              Neural
+              OPS
             </span>
           </div>
           <span className="text-xs text-slate-600 hidden md:block tracking-wide">
@@ -458,6 +503,28 @@ export default function Page() {
             >
               new trip
             </button>
+          )}
+
+          {/* Replay button */}
+          {traceId && !isReplaying && (
+            <button
+              onClick={handleReplay}
+              className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200 flex items-center gap-1.5"
+              style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
+              title={`Replay trace ${traceId}`}
+            >
+              <span>?</span>
+              <span className="hidden sm:inline">Replay</span>
+            </button>
+          )}
+          {isReplaying && (
+            <div
+              className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium flex items-center gap-1.5"
+              style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
+            >
+              <span className="animate-pulse">?</span>
+              <span className="hidden sm:inline">Replaying</span>
+            </div>
           )}
 
           {/* Log toggle */}
@@ -536,6 +603,8 @@ export default function Page() {
               <ReadyCard
                 cached={overlay.cached}
                 paidAmount={overlay.paidAmount}
+                evalScore={evalData?.score}
+                slaPass={evalData?.slaPass}
                 onOpen={() => setPackModalOpen(true)}
               />
             )}
@@ -574,7 +643,12 @@ export default function Page() {
           transition:"transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
-        <LiveLogs events={events} />
+        <LiveLogs
+          events={events}
+          traceId={traceId ?? undefined}
+          isReplaying={isReplaying}
+          onReplay={traceId ? handleReplay : undefined}
+        />
       </div>
 
       {/* ── Dashboard strip (bottom) ──────────────────────────── */}
