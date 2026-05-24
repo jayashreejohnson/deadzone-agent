@@ -82,6 +82,19 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
     }
 
 
+def _is_lincoln_tunnel_stub(data: dict) -> bool:
+    """Return True if the response looks like the known hardcoded Lincoln Tunnel stub."""
+    try:
+        zones = data["dead_zones"]["dead_zones"]
+        if not zones:
+            return False
+        first = zones[0]["location"]
+        # Lincoln Tunnel Mid is at ~40.762, -74.031
+        return abs(first.get("lat", 0) - 40.7621) < 0.01 and abs(first.get("lon", 0) - (-74.0312)) < 0.01
+    except Exception:
+        return False
+
+
 def _hardcoded_fallback(route: str, departure_time: str) -> dict:
     """Last-resort static response when neither Agent 1 nor the LLM is available."""
     return {
@@ -110,13 +123,24 @@ async def predict(route: str, departure_time: str) -> dict:
     """Predict dead zones for a route. Tries Agent 1 first, then LLM fallback."""
     payload = {"route": route, "departure_time": departure_time}
 
-    # 1. Try the original Agent 1 service
+    # 1. Try the original Agent 1 service — but only trust it if it returns zones
+    #    whose coordinates actually match the requested route (not the Lincoln Tunnel stub).
     if _AGENT1_URL and _AGENT1_URL != "http://localhost:8001":
         try:
             async with httpx.AsyncClient(timeout=15.0) as http:
                 resp = await http.post(f"{_AGENT1_URL}/predict", json=payload)
                 resp.raise_for_status()
                 data = resp.json()
+
+            # Sanity-check: if the external service returned the known hardcoded Lincoln
+            # Tunnel stub (lat≈40.76, lng≈-74.03) for a route that has nothing to do with
+            # NJ/NY, discard the response and fall through to LLM prediction instead.
+            if _is_lincoln_tunnel_stub(data) and "newark" not in route.lower() \
+                    and "manhattan" not in route.lower() and "new jersey" not in route.lower() \
+                    and "lincoln" not in route.lower():
+                print(f"[agent1] External service returned NJ stub for '{route}'; using LLM fallback")
+                raise ValueError("stub response for non-NJ route")
+
             data.setdefault("_source", "agent1")
             try:
                 LLMObs.annotate(
@@ -129,7 +153,7 @@ async def predict(route: str, departure_time: str) -> dict:
                 pass
             return data
         except Exception as e:
-            print(f"[agent1] Agent 1 unreachable ({e}); using LLM fallback")
+            print(f"[agent1] Agent 1 skipped ({e}); using LLM fallback")
 
     # 2. LLM-based prediction (works for any route worldwide)
     try:
