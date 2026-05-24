@@ -1,20 +1,141 @@
-"""Agent 1 client — predicts dead zones for any driving route.
+"""Agent 1 — dead zone prediction for any driving route.
 
-Primary path: POST {AGENT1_URL}/predict (the original hackathon service).
-Fallback: LLM-based prediction via OpenRouter — generates geographically
-accurate dead zones from the model's knowledge of tunnels, rural gaps,
-underground sections, etc.  Works for any route worldwide.
+Prediction priority:
+  1. CoverageMap API + Google Maps Directions  — real signal strength data
+  2. LLM fallback (OpenRouter/Gemini)          — geographic knowledge
+  3. Hardcoded stub                             — last resort only
+
+CoverageMap queries T-Mobile signal strength at evenly-spaced waypoints
+along the actual road route. Points below -105 dBm are flagged as dead zones
+and clustered into segments.
 """
 from __future__ import annotations
 import os
 import re
 import json
+import math
 import httpx
 from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import tool
 
-_AGENT1_URL = os.getenv("AGENT1_URL", "").strip().rstrip("/")
-_OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
+_AGENT1_URL        = os.getenv("AGENT1_URL",         "").strip().rstrip("/")
+_OPENROUTER_KEY    = os.getenv("OPENROUTER_API_KEY",  "").strip()
+_COVERAGEMAP_KEY   = os.getenv("COVERAGEMAP_API_KEY", "").strip()
+_GOOGLE_MAPS_KEY   = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
+
+_COVERAGEMAP_URL   = "https://enterprise.coveragemap.com/api/v1/signal-strength/lookup"
+_GMAPS_URL         = "https://maps.googleapis.com/maps/api/directions/json"
+_DEAD_ZONE_DBM     = -105   # below this = dead zone
+_CLUSTER_GAP_KM    = 8.0    # points further apart than this start a new cluster
+
+
+# ── Real data: CoverageMap + Google Maps ──────────────────────────
+
+async def _get_waypoints(origin: str, destination: str, num_points: int = 30) -> list[dict]:
+    """Decode the overview polyline from Google Maps Directions into lat/lng waypoints."""
+    import polyline as poly_lib
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.get(
+            _GMAPS_URL,
+            params={"origin": origin, "destination": destination, "key": _GOOGLE_MAPS_KEY},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    if data.get("status") != "OK":
+        raise ValueError(f"Google Maps error: {data.get('status')} — {data.get('error_message', '')}")
+
+    encoded = data["routes"][0]["overview_polyline"]["points"]
+    coords  = poly_lib.decode(encoded)
+    step    = max(1, len(coords) // num_points)
+    sampled = coords[::step][:num_points]
+    return [{"lat": lat, "lng": lng} for lat, lng in sampled]
+
+
+async def _check_signal(waypoints: list[dict]) -> list[dict]:
+    """Query CoverageMap for T-Mobile signal at each waypoint. Returns dead zone points."""
+    dead: list[dict] = []
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for wp in waypoints:
+            try:
+                resp = await client.get(
+                    _COVERAGEMAP_URL,
+                    headers={"Authorization": f"Bearer {_COVERAGEMAP_KEY}"},
+                    params={"latitude": wp["lat"], "longitude": wp["lng"], "providers": "TMO"},
+                )
+                resp.raise_for_status()
+                results = resp.json()
+                result  = results[0] if results else {}
+                dbm     = result.get("signal", {}).get("signal")
+                if dbm is not None and dbm < _DEAD_ZONE_DBM:
+                    dead.append({**wp, "signal_dbm": dbm})
+            except Exception:
+                pass  # skip failed waypoints; don't abort the whole route
+    return dead
+
+
+def _haversine_km(a: dict, b: dict) -> float:
+    R = 6371.0
+    dlat = math.radians(b["lat"] - a["lat"])
+    dlng = math.radians(b["lng"] - a["lng"])
+    h = math.sin(dlat / 2) ** 2 + math.cos(math.radians(a["lat"])) * math.cos(math.radians(b["lat"])) * math.sin(dlng / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(h))
+
+
+def _cluster_to_zones(dead_points: list[dict], departure_time: str) -> list[dict]:
+    """Group nearby dead zone points into dead zone objects."""
+    if not dead_points:
+        return []
+
+    clusters: list[list[dict]] = []
+    current = [dead_points[0]]
+    for pt in dead_points[1:]:
+        if _haversine_km(current[-1], pt) <= _CLUSTER_GAP_KM:
+            current.append(pt)
+        else:
+            clusters.append(current)
+            current = [pt]
+    clusters.append(current)
+
+    zones = []
+    for cluster in clusters:
+        lat = sum(p["lat"] for p in cluster) / len(cluster)
+        lon = sum(p["lng"] for p in cluster) / len(cluster)
+        avg_dbm  = sum(p.get("signal_dbm", -110) for p in cluster) / len(cluster)
+        dur_min  = max(1, min(10, len(cluster) * 2))
+        severity = "high" if avg_dbm < -115 else "medium" if avg_dbm < -110 else "low"
+        zones.append({
+            "location": {"lat": lat, "lon": lon, "description": f"Low signal zone ({avg_dbm:.0f} dBm)"},
+            "start_time":       departure_time,
+            "duration_minutes": dur_min,
+            "severity":         severity,
+        })
+    return zones
+
+
+async def _coveragemap_predict(route: str, departure_time: str) -> dict:
+    """Real dead zone prediction: Google Maps waypoints → CoverageMap signal check."""
+    # Parse "Origin to Destination"
+    parts = re.split(r"\s+to\s+", route, maxsplit=1, flags=re.IGNORECASE)
+    if len(parts) != 2:
+        raise ValueError(f"Cannot parse route '{route}' — expected 'Origin to Destination'")
+    origin, destination = parts[0].strip(), parts[1].strip()
+
+    waypoints  = await _get_waypoints(origin, destination, num_points=30)
+    dead_pts   = await _check_signal(waypoints)
+    zones      = _cluster_to_zones(dead_pts, departure_time)
+
+    # If CoverageMap returned no dead zones, still return an empty list
+    # (the LLM fallback handles zero-zone routes by fabricating one)
+    return {
+        "route":          route,
+        "departure_time": departure_time,
+        "dead_zones":     {"dead_zones": zones},
+        "_source":        "coveragemap",
+    }
+
+
+# ── LLM fallback ─────────────────────────────────────────────────
 
 _LLM_SYSTEM = (
     "You are a cellular network coverage expert with deep knowledge of real-world "
@@ -54,110 +175,72 @@ Guidelines:
 
 
 async def _llm_predict(route: str, departure_time: str) -> dict:
-    """Use the LLM to predict dead zones when Agent 1 is offline."""
     if not _OPENROUTER_KEY:
         return _hardcoded_fallback(route, departure_time)
-
     from openai import AsyncOpenAI
     client = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1")
-
     prompt = _LLM_PROMPT.format(route=route, departure_time=departure_time)
     resp = await client.chat.completions.create(
         model="google/gemini-2.0-flash-001",
-        messages=[
-            {"role": "system", "content": _LLM_SYSTEM},
-            {"role": "user",   "content": prompt},
-        ],
+        messages=[{"role": "system", "content": _LLM_SYSTEM}, {"role": "user", "content": prompt}],
         temperature=0.2,
     )
     raw = resp.choices[0].message.content or ""
-    # Strip markdown code fences if the model adds them anyway
     raw = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()
     data = json.loads(raw)
-    return {
-        "route":          route,
-        "departure_time": departure_time,
-        "dead_zones":     data,
-        "_source":        "llm_predict",
-    }
+    return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict"}
 
 
 def _is_lincoln_tunnel_stub(data: dict) -> bool:
-    """Return True if the response looks like the known hardcoded Lincoln Tunnel stub."""
     try:
-        zones = data["dead_zones"]["dead_zones"]
-        if not zones:
-            return False
-        first = zones[0]["location"]
-        # Lincoln Tunnel Mid is at ~40.762, -74.031
+        first = data["dead_zones"]["dead_zones"][0]["location"]
         return abs(first.get("lat", 0) - 40.7621) < 0.01 and abs(first.get("lon", 0) - (-74.0312)) < 0.01
     except Exception:
         return False
 
 
 def _hardcoded_fallback(route: str, departure_time: str) -> dict:
-    """Last-resort static response when neither Agent 1 nor the LLM is available."""
     return {
-        "route":          route,
-        "departure_time": departure_time,
-        "dead_zones": {
-            "dead_zones": [
-                {
-                    "location": {"lat": 40.7621, "lon": -74.0312,
-                                 "description": "Lincoln Tunnel Mid"},
-                    "start_time": "17:06", "duration_minutes": 5, "severity": "high",
-                },
-                {
-                    "location": {"lat": 40.7357, "lon": -74.1724,
-                                 "description": "Newark McCarter Hwy"},
-                    "start_time": "17:16", "duration_minutes": 1, "severity": "low",
-                },
-            ]
-        },
+        "route": route, "departure_time": departure_time,
+        "dead_zones": {"dead_zones": [
+            {"location": {"lat": 40.7621, "lon": -74.0312, "description": "Lincoln Tunnel Mid"},
+             "start_time": "17:06", "duration_minutes": 5, "severity": "high"},
+            {"location": {"lat": 40.7357, "lon": -74.1724, "description": "Newark McCarter Hwy"},
+             "start_time": "17:16", "duration_minutes": 1, "severity": "low"},
+        ]},
         "_source": "hardcoded_fallback",
     }
 
 
+# ── Public API ────────────────────────────────────────────────────
+
 @tool(name="agent1_predict")
 async def predict(route: str, departure_time: str) -> dict:
-    """Predict dead zones for a route. Tries Agent 1 first, then LLM fallback."""
+    """Predict dead zones. CoverageMap (real) → LLM (fallback) → hardcoded (last resort)."""
     payload = {"route": route, "departure_time": departure_time}
 
-    # 1. Try the original Agent 1 service — but only trust it if it returns zones
-    #    whose coordinates actually match the requested route (not the Lincoln Tunnel stub).
-    if _AGENT1_URL and _AGENT1_URL != "http://localhost:8001":
+    # 1. Real signal data via CoverageMap + Google Maps
+    if _COVERAGEMAP_KEY and _GOOGLE_MAPS_KEY:
         try:
-            async with httpx.AsyncClient(timeout=15.0) as http:
-                resp = await http.post(f"{_AGENT1_URL}/predict", json=payload)
-                resp.raise_for_status()
-                data = resp.json()
-
-            # Sanity-check: if the external service returned the known hardcoded Lincoln
-            # Tunnel stub (lat≈40.76, lng≈-74.03) for a route that has nothing to do with
-            # NJ/NY, discard the response and fall through to LLM prediction instead.
-            if _is_lincoln_tunnel_stub(data) and "newark" not in route.lower() \
-                    and "manhattan" not in route.lower() and "new jersey" not in route.lower() \
-                    and "lincoln" not in route.lower():
-                print(f"[agent1] External service returned NJ stub for '{route}'; using LLM fallback")
-                raise ValueError("stub response for non-NJ route")
-
-            data.setdefault("_source", "agent1")
+            data = await _coveragemap_predict(route, departure_time)
+            print(f"[agent1] CoverageMap: {_count_zones(data)} dead zone(s) for '{route}'")
             try:
                 LLMObs.annotate(
                     input_data=payload,
                     output_data={"dead_zones_count": _count_zones(data)},
-                    metadata={"backend": "agent1", "url": _AGENT1_URL},
+                    metadata={"backend": "coveragemap"},
                     tags={"tool": "agent1_predict"},
                 )
             except Exception:
                 pass
             return data
         except Exception as e:
-            print(f"[agent1] Agent 1 skipped ({e}); using LLM fallback")
+            print(f"[agent1] CoverageMap failed ({e}); falling back to LLM")
 
-    # 2. LLM-based prediction (works for any route worldwide)
+    # 2. LLM geographic knowledge fallback
     try:
         data = await _llm_predict(route, departure_time)
+        print(f"[agent1] LLM: {_count_zones(data)} dead zone(s) for '{route}'")
         try:
             LLMObs.annotate(
                 input_data=payload,
