@@ -512,34 +512,34 @@ export default function Page() {
       {/* ── Center overlay cards ──────────────────────────────── */}
       {overlay.kind !== "none" && !showPlanner && !showOfflineOverlay && (
         <div
-          className="absolute z-[80] transition-all duration-300"
+          className="absolute z-[80] flex justify-center transition-all duration-300"
           style={{
-            top:       showCountdown ? "8rem" : "5rem",
-            left:      "1rem",
-            right:     logOpen ? `${LOG_W + 16}px` : "1rem",
-            maxWidth:  "520px",
-            margin:    "0 auto",
+            top:   showCountdown ? "8rem" : "5rem",
+            left:  "1rem",
+            right: logOpen ? `${LOG_W + 16}px` : "1rem",
           }}
         >
-          {overlay.kind === "alert" && (
-            <AlertCard
-              deadzoneName={overlay.deadzoneName}
-              etaSeconds={overlay.etaSeconds}
-              confidence={overlay.confidence}
-              onPrepare={() => setOverlay({ kind: "preparing" })}
-              onSwitch={() => setOverlay({ kind: "none" })}
-              onStay={() => setOverlay({ kind: "preparing" })}
-            />
-          )}
-          {overlay.kind === "preparing"   && <PreparingCard />}
-          {overlay.kind === "cached_found" && <CachedFoundCard />}
-          {overlay.kind === "ready" && (
-            <ReadyCard
-              cached={overlay.cached}
-              paidAmount={overlay.paidAmount}
-              onOpen={() => setPackModalOpen(true)}
-            />
-          )}
+          <div style={{ width: "100%", maxWidth: "520px" }}>
+            {overlay.kind === "alert" && (
+              <AlertCard
+                deadzoneName={overlay.deadzoneName}
+                etaSeconds={overlay.etaSeconds}
+                confidence={overlay.confidence}
+                onPrepare={() => setOverlay({ kind: "preparing" })}
+                onSwitch={() => setOverlay({ kind: "none" })}
+                onStay={() => setOverlay({ kind: "preparing" })}
+              />
+            )}
+            {overlay.kind === "preparing"    && <PreparingCard />}
+            {overlay.kind === "cached_found" && <CachedFoundCard />}
+            {overlay.kind === "ready" && (
+              <ReadyCard
+                cached={overlay.cached}
+                paidAmount={overlay.paidAmount}
+                onOpen={() => setPackModalOpen(true)}
+              />
+            )}
+          </div>
         </div>
       )}
 
