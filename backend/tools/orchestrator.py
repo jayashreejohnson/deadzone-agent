@@ -213,6 +213,7 @@ class _Ctx:
         self.cached: bool = False
         self.last_payment_tx: str | None = None
         self.delivered: bool = False
+        self.event_logged: bool = False  # guard against double-counting
 
 
 async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
@@ -248,10 +249,13 @@ async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
         return result
 
     if name == "clickhouse_log_event":
-        db.log_event(
-            args["user_id"], args["route_id"], args["deadzone_id"], args["action"],
-            args.get("pack_id", ""), args.get("build_ms", 0),
-        )
+        # Skip if deliver_pack already auto-logged for this run (avoid double-counting).
+        if not ctx.event_logged:
+            db.log_event(
+                args["user_id"], args["route_id"], args["deadzone_id"], args["action"],
+                args.get("pack_id", ""), args.get("build_ms", 0),
+            )
+            ctx.event_logged = True
         return {"ok": True}
 
     if name == "deliver_pack":
@@ -260,8 +264,23 @@ async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
         if args.get("pack_id"):
             ctx.pack_id = args["pack_id"]
         ctx.delivered = True
-        await emit({"type": "pack_ready", "url": args["url"],
-                    "cached": args["cached"], "pack_id": ctx.pack_id})
+        # Auto-log telemetry event — ensures dashboard counts even if LLM skips the tool.
+        if not ctx.event_logged:
+            build_ms = int((time.time() - ctx.t0) * 1000)
+            action = "bought" if ctx.cached else "built"
+            db.log_event(
+                ctx.signal["user_id"], ctx.signal["route_id"],
+                ctx.signal["deadzone_id"], action,
+                ctx.pack_id, build_ms if action == "built" else 0,
+            )
+            ctx.event_logged = True
+        await emit({
+            "type": "pack_ready",
+            "url": args["url"],
+            "cached": args["cached"],
+            "pack_id": ctx.pack_id,
+            "deadzone_id": ctx.signal.get("deadzone_id", ""),
+        })
         return {"ok": True}
 
     return {"error": f"unknown tool: {name}"}
