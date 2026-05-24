@@ -33,6 +33,13 @@ def init() -> None:
     if not _API_KEY:
         print("[datadog] DD_API_KEY not set — LLM Observability disabled "
               "(decorators will no-op).")
+        # LLMObs.annotate() throws when called without an active span even when
+        # disabled, so patch it to a true no-op so every call site is safe.
+        try:
+            from ddtrace.llmobs import LLMObs
+            LLMObs.annotate = staticmethod(lambda *a, **kw: None)
+        except Exception:
+            pass
         return
     try:
         from ddtrace.llmobs import LLMObs
