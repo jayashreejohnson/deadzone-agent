@@ -520,10 +520,10 @@ const FEATURES: Feature[] = [
   },
   {
     num: "06",
-    title: "Seamless Recovery",
+    title: "Seamless Return",
     tagline: "The app never looked like it stopped.",
     description:
-      "Everything else on this page is about going dark. Seamless Recovery is about what happens when you come back. The moment your phone detects signal, DeadZone triggers a quiet, automatic sequence. Messages that queued deliver instantly. A short confirmation goes to everyone you notified. Your navigation session resumes from your current position. Your podcast picks up from the exact second it paused. Articles refresh to their live versions. There is no moment of catching up, no backlog to sort through. You surface and everything is already where it should be.",
+      "Everything else on this page is about going dark. Seamless Return is about what happens when you come back. The moment your phone detects signal, DeadZone triggers a quiet, automatic sequence. Messages that queued deliver instantly. A short confirmation goes to everyone you notified. Your navigation session resumes from your current position. Your podcast picks up from the exact second it paused. Articles refresh to their live versions. There is no moment of catching up, no backlog to sort through. You surface and everything is already where it should be.",
     accent: "#00d4ff",
     screen: <SeamlessScreen />,
   },
