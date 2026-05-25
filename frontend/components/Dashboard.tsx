@@ -65,9 +65,8 @@ export default function Dashboard() {
   }, []);
 
   const stats: StatDef[] = [
-    { icon: "⚡", label: "packs built", value: data?.packs_built ?? "—",                           color: "#00d4ff" },
-    { icon: "💾", label: "packs sold",  value: data?.packs_sold  ?? "—",                           color: "#8b5cf6" },
-    { icon: "$",  label: "$ paid",      value: data ? `$${data.total_paid_usd.toFixed(2)}` : "—", color: "#10b981" },
+    { icon: "⚡", label: "packs built", value: data?.packs_built ?? "—",                                color: "#00d4ff" },
+    { icon: "💾", label: "cached",      value: data?.packs_sold  ?? "—",                                color: "#8b5cf6" },
     { icon: "⏱", label: "avg build",   value: data ? `${Number(data.avg_build_ms).toFixed(0)}ms` : "—", color: "#f59e0b" },
   ];
 

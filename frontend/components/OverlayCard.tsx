@@ -164,7 +164,7 @@ export function ReadyCard({
           }}
         >
           <span>⚡</span>
-          bought from agent_a via x402 · ${(paidAmount ?? 0.02).toFixed(2)}
+          Served from network cache — instant delivery
         </div>
       )}
 

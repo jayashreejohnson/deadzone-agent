@@ -25,7 +25,8 @@ function classify(e: AgentEvent): Line | null {
     return { bullet: "📦", color: "#10b981", label: "Assembling continuity pack", glow: "rgba(16,185,129,0.4)" };
   }
   if (e.type === "payment") {
-    return { bullet: "💳", color: "#c4b5fd", label: "x402 agent settlement", sub: `${e.from} → ${e.to}  $${Number(e.amount).toFixed(2)}`, glow: "rgba(196,181,253,0.4)" };
+    // Payment is infrastructure detail — hidden from the user-facing log.
+    return null;
   }
   if (e.type === "pack_ready") {
     return { bullet: "✅", color: "#10b981", label: e.cached ? "Offline pack reused (cached)" : "Continuity pack assembled", glow: "rgba(16,185,129,0.5)" };
