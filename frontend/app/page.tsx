@@ -10,6 +10,7 @@ import { AlertCard, PreparingCard, CachedFoundCard, ReadyCard } from "@/componen
 import TripPlanner from "@/components/TripPlanner";
 import CountdownBanner from "@/components/CountdownBanner";
 import OfflineOverlay from "@/components/OfflineOverlay";
+import MobileVisionWidget from "@/components/MobileVisionWidget";
 import {
   ROUTE_ID, DEFAULT_ROUTE_POLYLINE,
   distanceKm, lerp, type LatLng, type DeadZone,
@@ -787,6 +788,9 @@ export default function Page() {
       <div className="absolute bottom-0 left-0 right-0 z-[1050]">
         <Dashboard />
       </div>
+
+      {/* ── Floating mobile vision preview (visible above planner backdrop) ── */}
+      <MobileVisionWidget />
 
       {/* ── Offline simulation overlay ────────────────────────── */}
       {showOfflineOverlay && offlineZone && (

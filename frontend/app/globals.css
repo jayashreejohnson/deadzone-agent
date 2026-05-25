@@ -170,3 +170,20 @@ body {
 .neon-border-red   { border-color: rgba(239,68,68,0.40); }
 .neon-border-emerald { border-color: rgba(16,185,129,0.35); }
 .neon-border-violet  { border-color: rgba(139,92,246,0.35); }
+
+/* ── Mobile vision widget — slow breathing glow ──────────────── */
+@keyframes mvw-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 28px -8px rgba(0, 212, 255, 0.30),
+      0 16px 40px -12px rgba(0, 0, 0, 0.70);
+  }
+  50% {
+    box-shadow:
+      0 0 36px -6px rgba(167, 139, 250, 0.45),
+      0 16px 40px -12px rgba(0, 0, 0, 0.70);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mvw-glow-animated { animation: none !important; }
+}
