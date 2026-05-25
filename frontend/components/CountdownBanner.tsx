@@ -81,7 +81,7 @@ export default function CountdownBanner({ zone, secondsUntil, packStatus }: Coun
                     : "0 0 20px rgba(0,212,255,0.15)";
 
   const PRE_ZONE_ACTIONS = [
-    { icon: "🎵", label: "Buffer audio" },
+    { icon: "📥", label: "Open your pack" },
     { icon: "💬", label: "Send a text" },
     { icon: "🗺", label: "Save maps" },
     { icon: "📸", label: "Screenshot nav" },

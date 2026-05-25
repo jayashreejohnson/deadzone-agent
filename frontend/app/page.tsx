@@ -142,9 +142,11 @@ export default function Page() {
           const ev = JSON.parse(e.data) as Record<string, unknown> & { type: string };
           setEvents((prev) => [...prev.slice(-200), ev]);
 
-          // Only accept zones_ready from WS when actively planning —
-          // ignore events from other users' concurrent scans while a trip is running.
-          if (ev.type === "zones_ready" && Array.isArray(ev.zones) && planStateRef.current !== "tripping") {
+          // Only accept zones_ready while actively planning our OWN scan.
+          // Block in "ready" and "tripping" states — other users' concurrent scans
+          // on the shared WS channel would otherwise overwrite our plannedZones.
+          if (ev.type === "zones_ready" && Array.isArray(ev.zones) &&
+              (planStateRef.current === "idle" || planStateRef.current === "planning")) {
             const zones: DeadZone[] = (ev.zones as Record<string, unknown>[]).map((z) => ({
               id:               String(z.id || "zone"),
               name:             String(z.description || z.name || z.id || "Dead zone"),
