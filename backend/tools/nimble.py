@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 import json
+import asyncio
 import httpx
 from bus import emit
 from ddtrace.llmobs import LLMObs
@@ -15,6 +16,89 @@ NIMBLE_URL = "https://api.webit.live/api/v1/realtime/serp"
 _API_KEY       = os.getenv("NIMBLE_API_KEY",    "").strip()
 _OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 _MODEL         = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001")
+
+_URL_CHECK_TIMEOUT = 3.0   # seconds per URL reachability check
+
+# Byte patterns that indicate a soft 404 (server says 200 but content says "not found").
+# Checked against the first ~512 bytes of the response body, lowercased.
+_SOFT_404_PATTERNS = (
+    b"404 not found",
+    b"page not found",
+    b"page does not exist",
+    b"content not found",
+    b"this page could not be found",
+    b"the page you are looking for",
+    b"no longer available",
+    b"article not found",
+)
+
+
+async def _is_reachable(url: str) -> bool:
+    """Return True only when the URL serves real, accessible content.
+
+    Strategy
+    --------
+    1. HEAD request — cheap, no body downloaded.
+       • 2xx  →  reachable ✓
+       • 4xx / 5xx (except 405 "HEAD not allowed")  →  unreachable immediately;
+         no point retrying with GET when the server already said the page is gone.
+       • 405 or connection error  →  fall through to GET.
+
+    2. Streaming GET with a Range header — reads only the first 512 bytes.
+       • Non-2xx status  →  unreachable.
+       • 2xx but body starts with a known soft-404 phrase  →  unreachable.
+         (Catches sites that return HTTP 200 for "Page Not Found" pages.)
+    """
+    if not url or not url.startswith("http"):
+        return False
+    try:
+        async with httpx.AsyncClient(
+            timeout=_URL_CHECK_TIMEOUT,
+            follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; DeadZonePackBuilder/1.0)"},
+        ) as client:
+            try:
+                r = await client.head(url)
+                if 200 <= r.status_code < 300:
+                    return True
+                if r.status_code != 405:
+                    # Definitive failure (404, 403, 410, 5xx …) — skip GET
+                    return False
+            except Exception:
+                pass  # HEAD timed out or connection refused — try GET
+
+            # HEAD returned 405 ("not allowed") or failed — use a minimal GET
+            async with client.stream("GET", url, headers={"Range": "bytes=0-511"}) as r:
+                if not (200 <= r.status_code < 300):
+                    return False
+                # Read the first chunk to detect soft-404 pages
+                chunk = b""
+                async for c in r.aiter_bytes(512):
+                    chunk = c
+                    break
+                return not any(pat in chunk.lower() for pat in _SOFT_404_PATTERNS)
+    except Exception:
+        return False
+
+
+async def _validate_sources(sources: list[dict]) -> list[dict]:
+    """Check all source URLs in parallel.
+
+    Each source gets a ``reachable`` boolean. Reachable sources are returned
+    first so the pack leads with working links; unreachable ones are kept at
+    the end so senso.py can still render title + snippet as plain text.
+    Result is capped at 4 entries total.
+    """
+    if not sources:
+        return sources
+    checks = await asyncio.gather(*[_is_reachable(s.get("url", "")) for s in sources])
+    for source, ok in zip(sources, checks):
+        source["reachable"] = bool(ok)
+    reachable   = [s for s in sources if s["reachable"]]
+    unreachable = [s for s in sources if not s["reachable"]]
+    # Reachable sources first; keep unreachable ones so their text/snippet is still readable
+    return (reachable + unreachable)[:4]
+
 
 _LLM_SYSTEM = (
     "You are a web-search result simulator. "
@@ -31,6 +115,12 @@ Query: {query}
 Return ONLY valid JSON — no markdown fences, no explanation. Use this exact schema:
 {{"summary": "<2-3 sentence factual summary specific to the location/route in the query>",
   "sources": [
+    {{"url": "<realistic authoritative URL for this region>",
+      "title": "<realistic page title>",
+      "snippet": "<1-2 sentence excerpt relevant to the query>"}},
+    {{"url": "<realistic authoritative URL for this region>",
+      "title": "<realistic page title>",
+      "snippet": "<1-2 sentence excerpt relevant to the query>"}},
     {{"url": "<realistic authoritative URL for this region>",
       "title": "<realistic page title>",
       "snippet": "<1-2 sentence excerpt relevant to the query>"}},
@@ -112,6 +202,7 @@ async def search(query: str) -> dict:
     await emit({"type": "tool", "name": "nimble", "query": query})
     if not _API_KEY:
         result = await _llm_stub(query)
+        result["sources"] = await _validate_sources(result.get("sources", []))
         try:
             LLMObs.annotate(
                 input_data=query,
@@ -136,7 +227,7 @@ async def search(query: str) -> dict:
                    or data.get("organic_results")
                    or [])
         sources = []
-        for item in organic[:4]:
+        for item in organic[:8]:   # extra candidates — reachable ones are picked first after URL check
             sources.append({
                 "url": item.get("url") or item.get("link") or "",
                 "title": item.get("title") or item.get("displayed_title") or "",
@@ -147,6 +238,7 @@ async def search(query: str) -> dict:
         else:
             summary = " ".join(s["snippet"] for s in sources[:2]) or (await _llm_stub(query))["summary"]
             result = {"query": query, "summary": summary, "sources": sources}
+        result["sources"] = await _validate_sources(result.get("sources", []))
         try:
             LLMObs.annotate(
                 input_data=query,
@@ -161,6 +253,7 @@ async def search(query: str) -> dict:
         await emit({"type": "log", "level": "warn",
                     "msg": f"nimble failed ({e!s}); using llm_stub"})
         result = await _llm_stub(query)
+        result["sources"] = await _validate_sources(result.get("sources", []))
         try:
             LLMObs.annotate(
                 input_data=query,

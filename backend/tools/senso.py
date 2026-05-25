@@ -31,6 +31,8 @@ def _render_html(title: str, route_id: str, sections: list[dict]) -> str:
   .sources {{ margin-top: 0.5rem; padding-left: 1.25rem; font-size: 0.9rem; color: #444; }}
   .sources li {{ margin-bottom: 0.4rem; }}
   .sources a {{ color: #1d4ed8; text-decoration: none; }}
+  .no-link {{ color: #888; font-style: italic; }}
+  .no-sources-note {{ color: #999; font-style: italic; list-style-type: none; margin-left: -1.25rem; }}
   .badge {{ display: inline-block; padding: 2px 8px; background: #eef2ff; color: #4338ca;
             border-radius: 999px; font-size: 0.75rem; margin-left: 0.5rem; }}
 </style>
@@ -44,11 +46,28 @@ def _render_html(title: str, route_id: str, sections: list[dict]) -> str:
         srcs = s.get("sources") or []
         if srcs:
             parts.append("<ul class='sources'>")
+            has_any_reachable = any(
+                src_.get("reachable", True) and src_.get("url", "") for src_ in srcs
+            )
             for src in srcs:
-                url = html.escape(src.get("url", ""))
-                t = html.escape(src.get("title", url))
-                snip = html.escape(src.get("snippet", ""))
-                parts.append(f"<li><a href='{url}' target='_blank'>{t}</a> — {snip}</li>")
+                url       = src.get("url", "")
+                reachable = src.get("reachable", True)   # default True: backward-compat with old packs
+                t         = html.escape(src.get("title") or url or "Source")
+                snip      = html.escape(src.get("snippet", ""))
+                sep       = " — " if snip else ""
+                if url and reachable:
+                    parts.append(
+                        f"<li><a href='{html.escape(url)}' target='_blank'>{t}</a>{sep}{snip}</li>"
+                    )
+                else:
+                    # URL is absent or failed reachability check — show as plain text
+                    parts.append(f"<li><span class='no-link'>{t}</span>{sep}{snip}</li>")
+            if not has_any_reachable:
+                parts.append(
+                    "<li class='no-sources-note'>"
+                    "⚠ No accessible sources could be verified at pack-build time."
+                    "</li>"
+                )
             parts.append("</ul>")
     parts.append("</body></html>")
     return "\n".join(parts)

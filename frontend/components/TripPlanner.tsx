@@ -13,37 +13,38 @@ type Route = {
 };
 
 const ROUTES: Route[] = [
-  // Northeast
-  { label: "Manhattan → Newark",          api: "Manhattan to Newark",          region: "Northeast", hint: "Lincoln Tunnel",       severity: "high"   },
-  { label: "New York → Philadelphia",      api: "New York to Philadelphia",     region: "Northeast", hint: "NJ Turnpike corridor", severity: "medium" },
-  { label: "New York → Boston",            api: "New York to Boston",           region: "Northeast", hint: "I-95 & CT dead zones", severity: "medium" },
-  { label: "Washington DC → Baltimore",    api: "Washington DC to Baltimore",   region: "Northeast", hint: "Harbor Tunnel",        severity: "medium" },
-  { label: "Boston → Providence",          api: "Boston to Providence",         region: "Northeast", hint: "I-95 rural gaps",      severity: "low"    },
-  // Southeast
-  { label: "Atlanta → Charlotte",          api: "Atlanta to Charlotte",         region: "Southeast", hint: "Appalachian signal gaps", severity: "medium" },
-  { label: "Miami → Orlando",              api: "Miami to Orlando",             region: "Southeast", hint: "Everglades rural",     severity: "medium" },
-  { label: "Nashville → Memphis",          api: "Nashville to Memphis",         region: "Southeast", hint: "Rural I-40",           severity: "low"    },
-  // Midwest
-  { label: "Chicago → Milwaukee",          api: "Chicago to Milwaukee",         region: "Midwest",   hint: "I-94 corridor",        severity: "low"    },
-  { label: "Chicago → Detroit",            api: "Chicago to Detroit",           region: "Midwest",   hint: "Industrial I-94",      severity: "medium" },
-  { label: "Chicago → St. Louis",          api: "Chicago to St. Louis",         region: "Midwest",   hint: "Rural I-55",           severity: "low"    },
-  // South
-  { label: "Dallas → Houston",             api: "Dallas to Houston",            region: "South",     hint: "Rural I-45",           severity: "medium" },
-  { label: "Houston → San Antonio",        api: "Houston to San Antonio",       region: "South",     hint: "Hill Country gaps",    severity: "low"    },
-  // West
-  { label: "Los Angeles → Las Vegas",      api: "Los Angeles to Las Vegas",     region: "West",      hint: "Mojave Desert",        severity: "high"   },
-  { label: "Los Angeles → San Diego",      api: "Los Angeles to San Diego",     region: "West",      hint: "Camp Pendleton",       severity: "medium" },
-  { label: "San Francisco → Los Angeles",  api: "San Francisco to Los Angeles", region: "West",      hint: "Coastal I-5 gaps",     severity: "medium" },
-  { label: "Seattle → Portland",           api: "Seattle to Portland",          region: "West",      hint: "Rural I-5",            severity: "low"    },
-  { label: "Denver → Colorado Springs",    api: "Denver to Colorado Springs",   region: "Mountain",  hint: "I-25 mountain terrain", severity: "low"   },
+  // Northeast — tunnel routes guarantee dead zones
+  { label: "Manhattan → Newark",          api: "Manhattan to Newark",          region: "Northeast", hint: "Lincoln Tunnel",                    severity: "high"   },
+  { label: "Washington DC → Baltimore",   api: "Washington DC to Baltimore",   region: "Northeast", hint: "Baltimore Harbor Tunnel",            severity: "high"   },
+  { label: "New York → Philadelphia",     api: "New York to Philadelphia",     region: "Northeast", hint: "NJ Turnpike underpasses",            severity: "medium" },
+  { label: "New York → Boston",           api: "New York to Boston",           region: "Northeast", hint: "I-95 CT/RI coverage gaps",           severity: "medium" },
+  // Southeast — mountain terrain & remote corridors
+  { label: "Atlanta → Charlotte",         api: "Atlanta to Charlotte",         region: "Southeast", hint: "Blue Ridge mountain gaps",           severity: "high"   },
+  { label: "Miami → Orlando",             api: "Miami to Orlando",             region: "Southeast", hint: "Everglades rural corridor",          severity: "medium" },
+  // Mountain — tunnels + canyon roads
+  { label: "Denver → Vail",               api: "Denver to Vail",               region: "Mountain",  hint: "Eisenhower Tunnel + I-70 canyons",  severity: "high"   },
+  { label: "Phoenix → Sedona",            api: "Phoenix to Sedona",            region: "Mountain",  hint: "AZ-89A mountain switchbacks",        severity: "high"   },
+  { label: "Salt Lake City → Moab",       api: "Salt Lake City to Moab",       region: "Mountain",  hint: "US-191 canyon country",              severity: "high"   },
+  // West — desert & coastal
+  { label: "Los Angeles → Las Vegas",     api: "Los Angeles to Las Vegas",     region: "West",      hint: "Mojave Desert dead zones",           severity: "high"   },
+  { label: "Los Angeles → San Diego",     api: "Los Angeles to San Diego",     region: "West",      hint: "Camp Pendleton corridor",            severity: "medium" },
+  { label: "San Francisco → Los Angeles", api: "San Francisco to Los Angeles", region: "West",      hint: "Coastal I-5 remote stretches",       severity: "medium" },
+  // Pacific NW — mountain passes
+  { label: "Seattle → Spokane",           api: "Seattle to Spokane",           region: "Pacific NW",hint: "Cascade Mountain passes",            severity: "high"   },
+  // South — rural highways
+  { label: "Dallas → Houston",            api: "Dallas to Houston",            region: "South",     hint: "Rural I-45 Texas Hill Country",      severity: "medium" },
+  // Transit — subway tunnels (complete blackouts underground)
+  { label: "NYC: Times Square → Brooklyn",      api: "Times Square to Atlantic Terminal Brooklyn via NYC Subway",         region: "Transit", hint: "East River subway tunnel",          severity: "high"   },
+  { label: "Boston: South Station → Harvard",   api: "South Station Boston to Harvard Square via Red Line Subway",        region: "Transit", hint: "Charles River underwater tunnel",    severity: "high"   },
+  { label: "SF: Embarcadero → SFO Airport",     api: "Embarcadero San Francisco to SFO Airport via BART",                region: "Transit", hint: "BART transbay tube under the Bay",  severity: "high"   },
 ];
 
 const POPULAR: Route[] = [
   ROUTES.find((r) => r.api === "Manhattan to Newark")!,
+  ROUTES.find((r) => r.api === "Times Square to Atlantic Terminal Brooklyn via NYC Subway")!,
   ROUTES.find((r) => r.api === "Los Angeles to Las Vegas")!,
-  ROUTES.find((r) => r.api === "Chicago to Detroit")!,
-  ROUTES.find((r) => r.api === "Atlanta to Charlotte")!,
-  ROUTES.find((r) => r.api === "Seattle to Portland")!,
+  ROUTES.find((r) => r.api === "Denver to Vail")!,
+  ROUTES.find((r) => r.api === "Phoenix to Sedona")!,
 ];
 
 const REGIONS = Array.from(new Set(ROUTES.map((r) => r.region)));
