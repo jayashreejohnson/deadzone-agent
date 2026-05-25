@@ -629,34 +629,35 @@ export default function Page() {
         </div>
       </div>
 
-      {/* ── Trip planner — full-screen modal (idle / planning) ── */}
-      {showPlannerModal && (
-        <div
-          className="absolute inset-0 z-[1500] flex items-center justify-center p-6"
-          style={{ background: "rgba(5,8,16,0.7)", backdropFilter: "blur(4px)" }}
-        >
-          <TripPlanner
-            onPlanComplete={handlePlanComplete}
-            onStartTrip={handleStartTrip}
-            apiBase={API}
-            planState={planState === "planning" ? "planning" : "idle"}
-          />
-        </div>
-      )}
-
-      {/* ── Trip planner — compact card (ready) — map visible behind ── */}
-      {showPlannerCard && (
-        <div
-          className="absolute z-[1500] p-3"
-          style={{ top: "3.5rem", left: "1rem", width: "min(420px, calc(100vw - 2rem))" }}
-        >
-          <TripPlanner
-            onPlanComplete={handlePlanComplete}
-            onStartTrip={handleStartTrip}
-            apiBase={API}
-            planState="ready"
-          />
-        </div>
+      {/* ── Trip planner — single stable instance, repositions modal→card ── */}
+      {/* Keeping one component tree node ensures React never unmounts TripPlanner
+          when planState flips idle→ready, so detectedZones/mode/selected survive. */}
+      {showPlanner && (
+        <>
+          {/* Backdrop — only in modal mode, has no state so safe to mount/unmount */}
+          {showPlannerModal && (
+            <div
+              className="absolute inset-0 z-[1499]"
+              style={{ background: "rgba(5,8,16,0.7)", backdropFilter: "blur(4px)" }}
+            />
+          )}
+          {/* Wrapper repositions without unmounting TripPlanner */}
+          <div
+            className="absolute z-[1500]"
+            style={
+              showPlannerModal
+                ? { inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }
+                : { top: "3.5rem", left: "1rem", width: "min(420px, calc(100vw - 2rem))", padding: "0.75rem" }
+            }
+          >
+            <TripPlanner
+              onPlanComplete={handlePlanComplete}
+              onStartTrip={handleStartTrip}
+              apiBase={API}
+              planState={planState === "planning" ? "planning" : planState === "ready" ? "ready" : "idle"}
+            />
+          </div>
+        </>
       )}
 
       {/* ── Countdown banner ──────────────────────────────────── */}
