@@ -566,7 +566,7 @@ export default function MobilePage() {
             key={f.num}
             id={`section-${f.num}`}
             className="flex flex-col"
-            style={{ minHeight: "100vh" }}
+            style={{ minHeight: "calc(100vh - 62px)" }}
           >
             {/* Content fills available space, centered vertically */}
             <div className="flex-1 flex items-center py-4">
