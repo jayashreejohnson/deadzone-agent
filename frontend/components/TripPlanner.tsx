@@ -36,7 +36,7 @@ const DRIVING_ROUTES: Route[] = [
 const TRANSIT_ROUTES: Route[] = [
   // ── New York City Subway ──────────────────────────────────────────────
   {
-    label: "E: Jamaica → World Trade Center",
+    label: "E: Jamaica → WTC",
     api:   "E train Jamaica Center to World Trade Center via NYC Subway",
     region: "New York", hint: "Midtown tunnel + Lower Manhattan underground",
     severity: "high", mode: "transit",
