@@ -24,20 +24,9 @@ type Route = {
 
 // ── Driving routes ─────────────────────────────────────────────────────────
 const DRIVING_ROUTES: Route[] = [
-  { label: "Manhattan → Newark",          api: "Manhattan to Newark",          region: "Northeast",  hint: "Lincoln Tunnel",                    severity: "high",   mode: "driving" },
-  { label: "Washington DC → Baltimore",   api: "Washington DC to Baltimore",   region: "Northeast",  hint: "Baltimore Harbor Tunnel",            severity: "high",   mode: "driving" },
-  { label: "New York → Philadelphia",     api: "New York to Philadelphia",     region: "Northeast",  hint: "NJ Turnpike underpasses",            severity: "medium", mode: "driving" },
-  { label: "New York → Boston",           api: "New York to Boston",           region: "Northeast",  hint: "I-95 CT/RI coverage gaps",           severity: "medium", mode: "driving" },
-  { label: "Atlanta → Charlotte",         api: "Atlanta to Charlotte",         region: "Southeast",  hint: "Blue Ridge mountain gaps",           severity: "high",   mode: "driving" },
-  { label: "Miami → Orlando",             api: "Miami to Orlando",             region: "Southeast",  hint: "Everglades rural corridor",          severity: "medium", mode: "driving" },
-  { label: "Denver → Vail",               api: "Denver to Vail",               region: "Mountain",   hint: "Eisenhower Tunnel + I-70 canyons",  severity: "high",   mode: "driving" },
-  { label: "Phoenix → Sedona",            api: "Phoenix to Sedona",            region: "Mountain",   hint: "AZ-89A mountain switchbacks",        severity: "high",   mode: "driving" },
-  { label: "Salt Lake City → Moab",       api: "Salt Lake City to Moab",       region: "Mountain",   hint: "US-191 canyon country",              severity: "high",   mode: "driving" },
-  { label: "Los Angeles → Las Vegas",     api: "Los Angeles to Las Vegas",     region: "West",       hint: "Mojave Desert dead zones",           severity: "high",   mode: "driving" },
-  { label: "Los Angeles → San Diego",     api: "Los Angeles to San Diego",     region: "West",       hint: "Camp Pendleton corridor",            severity: "medium", mode: "driving" },
-  { label: "San Francisco → Los Angeles", api: "San Francisco to Los Angeles", region: "West",       hint: "Coastal I-5 remote stretches",       severity: "medium", mode: "driving" },
-  { label: "Seattle → Spokane",           api: "Seattle to Spokane",           region: "Pacific NW", hint: "Cascade Mountain passes",            severity: "high",   mode: "driving" },
-  { label: "Dallas → Houston",            api: "Dallas to Houston",            region: "South",      hint: "Rural I-45 Texas Hill Country",      severity: "medium", mode: "driving" },
+  { label: "Manhattan → Newark",      api: "Manhattan to Newark",      region: "Northeast", hint: "Lincoln Tunnel",                   severity: "high", mode: "driving" },
+  { label: "Denver → Vail",           api: "Denver to Vail",           region: "Mountain",  hint: "Eisenhower Tunnel + I-70 canyons", severity: "high", mode: "driving" },
+  { label: "Los Angeles → Las Vegas", api: "Los Angeles to Las Vegas", region: "West",      hint: "Mojave Desert dead zones",         severity: "high", mode: "driving" },
 ];
 
 // ── Transit routes — real lines, official MTA / agency colors ─────────────
@@ -51,54 +40,11 @@ const TRANSIT_ROUTES: Route[] = [
     line: { code: "E", color: "#0039A6", textColor: "white" },
   },
   {
-    label: "A: Far Rockaway → Penn Station",
-    api:   "A train Far Rockaway to Penn Station via NYC Subway",
-    region: "New York", hint: "East River tunnel + Manhattan underground",
-    severity: "high", mode: "transit",
-    line: { code: "A", color: "#0039A6", textColor: "white" },
-  },
-  {
-    label: "1: Van Cortlandt Park → South Ferry",
-    api:   "1 train Van Cortlandt Park to South Ferry via NYC Subway",
-    region: "New York", hint: "Entire Manhattan stretch underground",
-    severity: "high", mode: "transit",
-    line: { code: "1", color: "#EE352E", textColor: "white" },
-  },
-  {
     label: "L: Canarsie → 8th Ave",
     api:   "L train Canarsie to 8th Avenue via NYC Subway",
     region: "New York", hint: "Canarsie tunnel under East River",
     severity: "high", mode: "transit",
     line: { code: "L", color: "#A7A9AC", textColor: "black" },
-  },
-  {
-    label: "N: Astoria → Bay Ridge",
-    api:   "N train Astoria to Bay Ridge-95th Street via NYC Subway",
-    region: "New York", hint: "Manhattan Bridge + 4th Ave tunnel",
-    severity: "high", mode: "transit",
-    line: { code: "N", color: "#FCCC0A", textColor: "black" },
-  },
-  {
-    label: "7: Flushing → Hudson Yards",
-    api:   "7 train Flushing Main Street to Hudson Yards via NYC Subway",
-    region: "New York", hint: "Elevated in Queens → underground Midtown",
-    severity: "medium", mode: "transit",
-    line: { code: "7", color: "#B933AD", textColor: "white" },
-  },
-  // ── Boston MBTA ───────────────────────────────────────────────────────
-  {
-    label: "Red Line: Harvard → Braintree",
-    api:   "Red Line Harvard Square to Braintree via Boston MBTA",
-    region: "Boston", hint: "Charles River tunnel + downtown stations",
-    severity: "high", mode: "transit",
-    line: { code: "RL", color: "#DA291C", textColor: "white" },
-  },
-  {
-    label: "Green Line: Lechmere → Heath St",
-    api:   "Green Line Lechmere to Heath Street via Boston MBTA",
-    region: "Boston", hint: "Boylston Street subway tunnel",
-    severity: "medium", mode: "transit",
-    line: { code: "GL", color: "#00843D", textColor: "white" },
   },
   // ── SF BART ───────────────────────────────────────────────────────────
   {
@@ -108,38 +54,12 @@ const TRANSIT_ROUTES: Route[] = [
     severity: "high", mode: "transit",
     line: { code: "BART", color: "#009AC7", textColor: "white" },
   },
-  // ── Chicago CTA ───────────────────────────────────────────────────────
-  {
-    label: "Blue Line: O'Hare → Forest Park",
-    api:   "Blue Line OHare to Forest Park via Chicago CTA",
-    region: "Chicago", hint: "O'Hare tunnel + State St subway loop",
-    severity: "high", mode: "transit",
-    line: { code: "BL", color: "#00A1DE", textColor: "white" },
-  },
-  // ── DC Metro ──────────────────────────────────────────────────────────
-  {
-    label: "Red Line: Shady Grove → Glenmont",
-    api:   "Red Line Shady Grove to Glenmont via DC Metro",
-    region: "Washington DC", hint: "Dupont Circle + Gallery Pl underground",
-    severity: "medium", mode: "transit",
-    line: { code: "RED", color: "#BF0D3E", textColor: "white" },
-  },
 ];
 
 // ── Popular picks ──────────────────────────────────────────────────────────
-const POPULAR_DRIVING: Route[] = [
-  DRIVING_ROUTES.find(r => r.api === "Manhattan to Newark")!,
-  DRIVING_ROUTES.find(r => r.api === "Los Angeles to Las Vegas")!,
-  DRIVING_ROUTES.find(r => r.api === "Denver to Vail")!,
-  DRIVING_ROUTES.find(r => r.api === "Phoenix to Sedona")!,
-];
+const POPULAR_DRIVING: Route[] = DRIVING_ROUTES;
 
-const POPULAR_TRANSIT: Route[] = [
-  TRANSIT_ROUTES.find(r => r.line?.code === "E")!,
-  TRANSIT_ROUTES.find(r => r.line?.code === "A")!,
-  TRANSIT_ROUTES.find(r => r.line?.code === "L")!,
-  TRANSIT_ROUTES.find(r => r.line?.code === "BART")!,
-];
+const POPULAR_TRANSIT: Route[] = TRANSIT_ROUTES;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
