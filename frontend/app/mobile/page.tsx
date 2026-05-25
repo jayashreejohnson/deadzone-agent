@@ -2,9 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-/* ─────────────────────────────────────────────────────────
-   Scroll-triggered fade-in
-───────────────────────────────────────────────────────── */
+/* ── Fade-in ─────────────────────────────────────────────── */
 function useFadeIn(threshold = 0.12) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -21,22 +19,18 @@ function useFadeIn(threshold = 0.12) {
   return { ref, visible };
 }
 
-/* ─────────────────────────────────────────────────────────
-   Scroll arrow — brightens in-viewport, scrollTo safe for
-   Next.js App Router
-───────────────────────────────────────────────────────── */
+/* ── Scroll arrow — lives inside each panel at the bottom ── */
 const NAV_H = 62;
 
 function ScrollArrow({ targetId }: { targetId: string }) {
-  const ref  = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
-
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
       ([e]) => setInView(e.isIntersecting),
-      { threshold: 0.6 }
+      { threshold: 0.5 }
     );
     io.observe(el);
     return () => io.disconnect();
@@ -45,18 +39,21 @@ function ScrollArrow({ targetId }: { targetId: string }) {
   function jump() {
     const t = document.getElementById(targetId);
     if (!t) return;
-    window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - NAV_H, behavior: "smooth" });
+    window.scrollTo({
+      top: t.getBoundingClientRect().top + window.scrollY - NAV_H,
+      behavior: "smooth",
+    });
   }
 
   return (
-    <div ref={ref} className="flex justify-center" style={{ padding: "3.5rem 0" }}>
+    <div ref={ref} className="flex justify-center" style={{ padding: "6px 0 20px" }}>
       <button
         onClick={jump}
         aria-label="Next section"
         style={{
-          background: "none", border: "none", cursor: "pointer", padding: "0.75rem",
-          opacity: inView ? 0.75 : 0.18,
-          transition: "opacity 0.5s ease",
+          background: "none", border: "none", cursor: "pointer", padding: "0.5rem",
+          opacity: inView ? 0.85 : 0.15,
+          transition: "opacity 0.4s ease",
         }}
       >
         <svg width="34" height="34" viewBox="0 0 34 34" fill="none" className="animate-bounce">
@@ -68,53 +65,101 @@ function ScrollArrow({ targetId }: { targetId: string }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────
-   Phone frame  (290 × 590)
-───────────────────────────────────────────────────────── */
-function Phone({ children }: { children: React.ReactNode }) {
+/* ── Phone frame — height-aware ──────────────────────────── */
+function Phone({ children, height = 560 }: { children: React.ReactNode; height?: number }) {
+  const sc = height / 590;
+  const w  = Math.round(290 * sc);
   return (
-    <div className="relative mx-auto select-none" style={{ width: 290, height: 590 }}>
+    <div className="relative mx-auto select-none" style={{ width: w, height }}>
       <div
         className="absolute inset-0 overflow-hidden"
         style={{
-          borderRadius: 50,
+          borderRadius: Math.round(50 * sc),
           background: "#0c0c18",
           border: "3px solid #252535",
           boxShadow: "0 0 0 1px #111, 0 40px 100px rgba(0,0,0,.9), inset 0 0 0 1px #2a2a3c",
         }}
       >
         <div className="absolute z-20"
-          style={{ top: 16, left: "50%", transform: "translateX(-50%)", width: 96, height: 26, background: "#000", borderRadius: 13 }} />
+          style={{ top: 16, left: "50%", transform: "translateX(-50%)",
+            width: Math.round(96 * sc), height: 26, background: "#000", borderRadius: 13 }} />
         <div className="absolute inset-0 overflow-hidden" style={{ paddingTop: 48 }}>
           {children}
         </div>
         <div className="absolute inset-0 pointer-events-none"
-          style={{ borderRadius: 50, background: "linear-gradient(135deg, rgba(255,255,255,.045) 0%, transparent 52%)" }} />
+          style={{ borderRadius: Math.round(50 * sc),
+            background: "linear-gradient(135deg, rgba(255,255,255,.045) 0%, transparent 52%)" }} />
       </div>
-      <div className="absolute rounded-l-sm" style={{ left: -4, top: 100, width: 3, height: 38, background: "#202030" }} />
-      <div className="absolute rounded-l-sm" style={{ left: -4, top: 150, width: 3, height: 38, background: "#202030" }} />
-      <div className="absolute rounded-r-sm" style={{ right: -4, top: 122, width: 3, height: 62, background: "#202030" }} />
+      <div className="absolute rounded-l-sm"
+        style={{ left: -4, top: Math.round(100 * sc), width: 3, height: Math.round(38 * sc), background: "#202030" }} />
+      <div className="absolute rounded-l-sm"
+        style={{ left: -4, top: Math.round(150 * sc), width: 3, height: Math.round(38 * sc), background: "#202030" }} />
+      <div className="absolute rounded-r-sm"
+        style={{ right: -4, top: Math.round(122 * sc), width: 3, height: Math.round(62 * sc), background: "#202030" }} />
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────────────────
-   Screen 1 — GPS Auto-Detection
-───────────────────────────────────────────────────────── */
+/* ── CarPlay widget ──────────────────────────────────────── */
+function CarPlayWidget() {
+  return (
+    <div className="select-none" style={{
+      width: 232, borderRadius: 14, overflow: "hidden",
+      background: "#0c0c18", border: "3px solid #252535",
+      boxShadow: "0 20px 60px rgba(0,0,0,.8), inset 0 0 0 1px #2a2a3c",
+    }}>
+      <div style={{ background: "#070b18", padding: "14px 16px", fontFamily: "'Space Grotesk', sans-serif" }}>
+        {/* header */}
+        <div className="flex items-center justify-between mb-3" style={{ fontSize: 10, color: "#334155" }}>
+          <span>🚗 Chicago → Detroit</span>
+          <span>3h 20 min</span>
+        </div>
+
+        {/* countdown card */}
+        <div className="flex items-center gap-3 mb-3 px-3 py-2.5 rounded-xl"
+          style={{ background: "rgba(167,139,250,.08)", border: "1px solid rgba(167,139,250,.2)" }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: "rgba(167,139,250,.12)" }}>
+            <span style={{ fontSize: 18 }}>📡</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div style={{ fontSize: 10, color: "#a78bfa", fontWeight: 600, marginBottom: 2 }}>Dead zone in</div>
+            <div style={{ fontSize: 26, color: "#fff", fontWeight: 700, lineHeight: 1 }}>3:00</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 10, color: "#22c55e" }}>Pack ready</div>
+            <div style={{ fontSize: 14, color: "#22c55e", fontWeight: 700 }}>✓</div>
+          </div>
+        </div>
+
+        {/* voice banner */}
+        <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg"
+          style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
+          <span style={{ fontSize: 13 }}>🔊</span>
+          <span style={{ fontSize: 9, color: "#475569", fontStyle: "italic", lineHeight: 1.4 }}>
+            "Dead zone in 3 minutes. Your offline pack is ready."
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Screen 1 — GPS Auto-Detection ───────────────────────── */
 function GPSScreen() {
   return (
     <div className="h-full flex flex-col" style={{ background: "#060b14", fontFamily: "'Space Grotesk', sans-serif" }}>
       <div className="flex justify-between px-4 pt-1 pb-1" style={{ fontSize: 11, color: "#555" }}>
         <span>9:41</span><span>●●● 87%</span>
       </div>
-      <div className="relative mx-3 rounded-2xl overflow-hidden" style={{ background: "#0a1828", height: 218 }}>
+      <div className="relative mx-3 rounded-2xl overflow-hidden" style={{ background: "#0a1828", height: 200 }}>
         <svg className="absolute inset-0 w-full h-full">
-          <polyline points="28,178 80,130 136,88 190,58 232,36"
+          <polyline points="28,168 80,122 136,82 190,52 232,32"
             stroke="#00d4ff" strokeWidth="2.5" fill="none" strokeDasharray="5 3" opacity=".7" />
-          <circle cx="232" cy="36" r="22" fill="#ef4444" opacity=".14" />
-          <circle cx="232" cy="36" r="22" stroke="#ef4444" strokeWidth="1.5" fill="none" opacity=".7" />
-          <circle cx="80" cy="130" r="5.5" fill="#00d4ff" />
-          <circle cx="80" cy="130" r="5" fill="none" stroke="#00d4ff" strokeWidth="1.2" opacity=".5">
+          <circle cx="232" cy="32" r="20" fill="#ef4444" opacity=".14" />
+          <circle cx="232" cy="32" r="20" stroke="#ef4444" strokeWidth="1.5" fill="none" opacity=".7" />
+          <circle cx="80" cy="122" r="5.5" fill="#00d4ff" />
+          <circle cx="80" cy="122" r="5" fill="none" stroke="#00d4ff" strokeWidth="1.2" opacity=".5">
             <animate attributeName="r" values="8;18;8" dur="2.4s" repeatCount="indefinite" />
             <animate attributeName="opacity" values=".55;0;.55" dur="2.4s" repeatCount="indefinite" />
           </circle>
@@ -146,23 +191,18 @@ function GPSScreen() {
   );
 }
 
-/* ─────────────────────────────────────────────────────────
-   Screen 2 — Countdown + CarPlay + Voice
-───────────────────────────────────────────────────────── */
+/* ── Screen 2 — Countdown (phone half of the dual panel) ─── */
 function CountdownScreen() {
   return (
-    <div className="h-full flex flex-col items-center"
+    <div className="h-full flex flex-col items-center relative"
       style={{ background: "linear-gradient(160deg, #090e1e 0%, #18082e 50%, #090e1e 100%)", fontFamily: "'Space Grotesk', sans-serif" }}>
-      {/* lock screen time */}
-      <div className="mt-12 text-center">
-        <div style={{ fontSize: 60, fontWeight: 200, color: "#fff", lineHeight: 1 }}>10:47</div>
-        <div style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>Tuesday, May 24</div>
+      <div className="mt-10 text-center">
+        <div style={{ fontSize: 56, fontWeight: 200, color: "#fff", lineHeight: 1 }}>10:47</div>
+        <div style={{ fontSize: 12, color: "#64748b", marginTop: 5 }}>Tuesday, May 24</div>
       </div>
-
-      {/* phone notification */}
-      <div className="absolute bottom-32 left-3 right-3 rounded-2xl p-3.5"
+      <div className="absolute bottom-28 left-3 right-3 rounded-2xl p-3.5"
         style={{ background: "rgba(14,16,30,.9)", backdropFilter: "blur(18px)", border: "1px solid rgba(255,255,255,.07)" }}>
-        <div className="flex items-center gap-2 mb-2.5">
+        <div className="flex items-center gap-2 mb-2">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(0,212,255,.1)", border: "1px solid rgba(0,212,255,.18)" }}>
             <span style={{ fontSize: 16 }}>📡</span>
@@ -173,19 +213,12 @@ function CountdownScreen() {
         <div style={{ fontSize: 14, color: "#f1f5f9", fontWeight: 700, marginBottom: 3 }}>Dead zone in 3 min</div>
         <div style={{ fontSize: 12, color: "#64748b" }}>Your offline pack is ready. Tap to view.</div>
       </div>
-
-      {/* surface pills */}
-      <div className="absolute bottom-12 left-3 right-3 flex gap-2 justify-center">
-        {[
-          { icon: "📱", label: "Lock screen" },
-          { icon: "🚗", label: "CarPlay" },
-          { icon: "🔊", label: "Voice" },
-          { icon: "⌚", label: "Watch" },
-        ].map((s) => (
+      <div className="absolute bottom-10 left-3 right-3 flex gap-2 justify-center">
+        {[{ icon: "📱", label: "Lock screen" }, { icon: "🚗", label: "CarPlay" },
+          { icon: "🔊", label: "Voice" }, { icon: "⌚", label: "Watch" }].map((s) => (
           <div key={s.label} className="flex items-center gap-1 px-2 py-1 rounded-lg"
             style={{ background: "rgba(0,212,255,.06)", border: "1px solid rgba(0,212,255,.12)", fontSize: 10, color: "#64748b" }}>
             <span>{s.icon}</span>
-            <span className="hidden sm:inline">{s.label}</span>
           </div>
         ))}
       </div>
@@ -193,9 +226,7 @@ function CountdownScreen() {
   );
 }
 
-/* ─────────────────────────────────────────────────────────
-   Screen 3 — Contact Alerts + Location Pin
-───────────────────────────────────────────────────────── */
+/* ── Screen 3 — Contact Alerts ───────────────────────────── */
 function ContactScreen() {
   const contacts = [
     { name: "Mom",       checked: true,  msg: "Hey Mom, going dark near [location]…" },
@@ -212,8 +243,6 @@ function ContactScreen() {
       </div>
       <div className="rounded-t-3xl px-4 pt-3 pb-4" style={{ background: "#0e1420", border: "1px solid #1a2535" }}>
         <div className="w-9 h-1 rounded-full mx-auto mb-3" style={{ background: "#2a3044" }} />
-
-        {/* location pin badge */}
         <div className="flex items-center gap-2 mb-3 px-2 py-1.5 rounded-xl"
           style={{ background: "#0a1a10", border: "1px solid #142b1a" }}>
           <span style={{ fontSize: 13 }}>📍</span>
@@ -222,10 +251,8 @@ function ContactScreen() {
             <div style={{ fontSize: 10, color: "#334155" }}>Times Square, New York · shared with message</div>
           </div>
         </div>
-
         <div style={{ fontSize: 14, color: "#f1f5f9", fontWeight: 700, marginBottom: 2 }}>Notify before you go dark?</div>
         <div style={{ fontSize: 11, color: "#475569", marginBottom: 10 }}>5 people messaged in the last hour</div>
-
         <div className="space-y-2 mb-4">
           {contacts.map((c) => (
             <div key={c.name} className="flex items-start gap-3">
@@ -248,46 +275,39 @@ function ContactScreen() {
             </div>
           ))}
         </div>
-
         <div className="flex gap-2">
           <button className="flex-1 py-2 rounded-xl font-bold"
-            style={{ background: "#00d4ff", color: "#000", fontSize: 12 }}>
-            Notify 3 contacts
-          </button>
+            style={{ background: "#00d4ff", color: "#000", fontSize: 12 }}>Notify 3 contacts</button>
           <button className="px-4 py-2 rounded-xl"
-            style={{ background: "#1a2535", color: "#475569", fontSize: 12 }}>
-            Skip
-          </button>
+            style={{ background: "#1a2535", color: "#475569", fontSize: 12 }}>Skip</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────────────────
-   Screen 4 — Traffic Detection + Offline Maps
-───────────────────────────────────────────────────────── */
+/* ── Screen 4 — Traffic + Offline Maps ───────────────────── */
 function TrafficScreen() {
   return (
     <div className="h-full flex flex-col" style={{ background: "#060b14", fontFamily: "'Space Grotesk', sans-serif" }}>
       <div className="flex justify-between px-4 pt-1 pb-1" style={{ fontSize: 11, color: "#555" }}>
         <span>9:41</span><span>●●● 87%</span>
       </div>
-      <div className="relative mx-3 rounded-2xl overflow-hidden" style={{ background: "#0a1828", height: 162 }}>
+      <div className="relative mx-3 rounded-2xl overflow-hidden" style={{ background: "#0a1828", height: 148 }}>
         <svg className="absolute inset-0 w-full h-full">
-          <polyline points="20,130 62,106 106,92" stroke="#ef4444" strokeWidth="5" fill="none" opacity=".65" />
-          <polyline points="106,92 154,64 206,38" stroke="#00d4ff" strokeWidth="2.5" fill="none" strokeDasharray="4 3" opacity=".5" />
-          <polyline points="106,92 128,124 178,134 220,86 206,38" stroke="#22c55e" strokeWidth="2" fill="none" strokeDasharray="4 3" opacity=".55" />
-          <circle cx="62" cy="106" r="5.5" fill="#00d4ff" />
+          <polyline points="20,120 62,96 106,82" stroke="#ef4444" strokeWidth="5" fill="none" opacity=".65" />
+          <polyline points="106,82 154,56 206,30" stroke="#00d4ff" strokeWidth="2.5" fill="none" strokeDasharray="4 3" opacity=".5" />
+          <polyline points="106,82 128,114 178,124 220,76 206,30" stroke="#22c55e" strokeWidth="2" fill="none" strokeDasharray="4 3" opacity=".55" />
+          <circle cx="62" cy="96" r="5.5" fill="#00d4ff" />
         </svg>
         <div className="absolute top-3 left-3" style={{ fontSize: 11, color: "#f87171" }}>⚠ Heavy traffic · I-94 E</div>
         <div className="absolute bottom-3 right-3" style={{ fontSize: 11, color: "#22c55e" }}>Alt route →</div>
       </div>
-      <div className="px-3 mt-2.5 space-y-2">
+      <div className="px-3 mt-2 space-y-2">
         <div className="rounded-2xl px-3.5 py-2.5 flex items-center justify-between" style={{ background: "#0d1e30" }}>
           <div>
             <div style={{ fontSize: 11, color: "#475569" }}>Current speed</div>
-            <div style={{ fontSize: 26, color: "#ef4444", fontWeight: 700, lineHeight: 1.1 }}>8 mph</div>
+            <div style={{ fontSize: 24, color: "#ef4444", fontWeight: 700, lineHeight: 1.1 }}>8 mph</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: "#475569" }}>Dead zone ETA</div>
@@ -306,7 +326,6 @@ function TrafficScreen() {
               style={{ background: "#1a2535", color: "#475569", fontSize: 12 }}>Stay</button>
           </div>
         </div>
-        {/* offline maps card */}
         <div className="rounded-2xl px-3.5 py-2.5 flex items-center gap-3"
           style={{ background: "#0d1020", border: "1px solid #1a1a35" }}>
           <span style={{ fontSize: 18 }}>🗺</span>
@@ -320,9 +339,7 @@ function TrafficScreen() {
   );
 }
 
-/* ─────────────────────────────────────────────────────────
-   Screen 5 — AI Content Pre-fetch
-───────────────────────────────────────────────────────── */
+/* ── Screen 5 — AI Content Pre-fetch ─────────────────────── */
 function ContentScreen() {
   return (
     <div className="h-full flex flex-col items-center justify-center relative overflow-hidden"
@@ -352,28 +369,23 @@ function ContentScreen() {
   );
 }
 
-/* ─────────────────────────────────────────────────────────
-   Screen 6 — Seamless Re-emergence
-───────────────────────────────────────────────────────── */
+/* ── Screen 6 — Seamless Re-emergence ────────────────────── */
 function SeamlessScreen() {
   const events = [
-    { icon: "💬", label: "3 messages delivered",          color: "#a78bfa" },
+    { icon: "💬", label: "3 messages delivered",            color: "#a78bfa" },
     { icon: "✉️", label: "\"I'm back\" sent to 3 contacts", color: "#00d4ff" },
-    { icon: "🗺",  label: "Navigation resumed",             color: "#22c55e" },
-    { icon: "🎧", label: "Podcast resumed · 24:18",         color: "#f97316" },
-    { icon: "📰", label: "Articles refreshed to live",      color: "#38bdf8" },
+    { icon: "🗺",  label: "Navigation resumed",              color: "#22c55e" },
+    { icon: "🎧", label: "Podcast resumed · 24:18",          color: "#f97316" },
+    { icon: "📰", label: "Articles refreshed to live",       color: "#38bdf8" },
   ];
   return (
     <div className="h-full flex flex-col" style={{ background: "#060b14", fontFamily: "'Space Grotesk', sans-serif" }}>
       <div className="flex justify-between px-4 pt-1 pb-1" style={{ fontSize: 11, color: "#555" }}>
         <span>9:49</span><span>●●● 87%</span>
       </div>
-
-      {/* signal restored banner */}
-      <div className="mx-3 rounded-2xl px-4 py-3 mb-3"
+      <div className="mx-3 rounded-2xl px-4 py-3 mb-2"
         style={{ background: "#091a0f", border: "1px solid #14301a" }}>
-        <div className="flex items-center gap-2 mb-1.5">
-          {/* signal bars filling up */}
+        <div className="flex items-center gap-2 mb-1">
           <div className="flex items-end gap-0.5" style={{ height: 14 }}>
             {[4, 7, 10, 13].map((h, i) => (
               <div key={i} style={{ width: 3, height: h, background: "#22c55e", borderRadius: 1, opacity: 0.9 }} />
@@ -383,14 +395,10 @@ function SeamlessScreen() {
         </div>
         <div style={{ fontSize: 11, color: "#334155" }}>You were offline for 8 min 32 sec</div>
       </div>
-
-      {/* sync events */}
       <div className="px-3 space-y-1.5">
-        <div style={{ fontSize: 11, color: "#334155", marginBottom: 4, paddingLeft: 2 }}>
-          Syncing automatically…
-        </div>
+        <div style={{ fontSize: 11, color: "#334155", marginBottom: 4, paddingLeft: 2 }}>Syncing automatically…</div>
         {events.map((e) => (
-          <div key={e.label} className="rounded-xl px-3 py-2.5 flex items-center gap-3"
+          <div key={e.label} className="rounded-xl px-3 py-2 flex items-center gap-3"
             style={{ background: "#0d1420" }}>
             <span style={{ fontSize: 16 }}>{e.icon}</span>
             <span style={{ fontSize: 12, color: "#cbd5e1", flex: 1 }}>{e.label}</span>
@@ -398,8 +406,6 @@ function SeamlessScreen() {
           </div>
         ))}
       </div>
-
-      {/* all caught up */}
       <div className="mt-auto mx-3 mb-3 rounded-xl px-3 py-2.5 text-center"
         style={{ background: "rgba(0,212,255,.05)", border: "1px solid rgba(0,212,255,.12)" }}>
         <span style={{ fontSize: 12, color: "#00d4ff", fontWeight: 600 }}>
@@ -410,10 +416,18 @@ function SeamlessScreen() {
   );
 }
 
-/* ─────────────────────────────────────────────────────────
-   Feature data
-───────────────────────────────────────────────────────── */
-const FEATURES = [
+/* ── Feature data ────────────────────────────────────────── */
+type Feature = {
+  num: string;
+  title: string;
+  tagline: string;
+  description: string;
+  accent: string;
+  screen: React.ReactNode;
+  extraFrame?: React.ReactNode;
+};
+
+const FEATURES: Feature[] = [
   {
     num: "01",
     title: "GPS Auto-Detection",
@@ -428,16 +442,17 @@ const FEATURES = [
     title: "Dead Zone Countdown",
     tagline: "Every surface. At the right moment.",
     description:
-      "Three minutes before you lose signal, DeadZone reaches every screen you have with you. Your phone lock screen receives a notification confirming how long the blackout lasts and that your pack is ready. Your CarPlay or Android Auto dashboard displays the same countdown, updating continuously as your speed and route conditions change. Your cabin speakers announce the alert aloud so your hands stay on the wheel and your eyes stay on the road. If you are wearing an Apple Watch, a gentle haptic tap at your wrist gives you one last moment before you go dark. None of these require you to touch anything. The alert finds you wherever you are.",
+      "Three minutes before you lose signal, DeadZone reaches every screen you have with you. Your phone lock screen receives a notification confirming how long the blackout lasts and that your pack is ready. Your CarPlay or Android Auto dashboard displays the same countdown, updating continuously as your speed and route conditions change. Your cabin speakers announce the alert aloud so your hands stay on the wheel and your eyes stay on the road. If you are wearing an Apple Watch, a gentle haptic tap at your wrist gives you one last moment before you go dark. None of these require you to touch anything.",
     accent: "#a78bfa",
     screen: <CountdownScreen />,
+    extraFrame: <CarPlayWidget />,
   },
   {
     num: "03",
     title: "Contact Alerts",
     tagline: "Nobody wonders where you went.",
     description:
-      "Before you go underground, DeadZone handles two things that matter most when you disappear mid-conversation. First, it checks who you have been actively messaging and offers to send each of them a personalised update. You write the message templates once in settings — Mom gets one message, your partner gets another, work gets a professional version — and DeadZone fills in your exact location and estimated return time automatically every time it fires. A checklist lets you choose who receives it each time, with a customisable time window from the last hour to the entire day. Second, and just as critically, it drops a precise GPS location pin to your selected contacts the instant before signal drops. If something unexpected happens in the tunnel, the people who matter know exactly where you went in. If you do not act before the dead zone arrives, DeadZone falls back to SMS automatically, because SMS reaches signal levels where data cannot.",
+      "Before you go underground, DeadZone handles two things that matter most when you disappear mid-conversation. First, it checks who you have been actively messaging and offers to send each of them a personalised update. You write the message templates once in settings — Mom gets one message, your partner gets another, work gets a professional version — and DeadZone fills in your exact location and estimated return time automatically every time it fires. Second, it drops a precise GPS location pin to your selected contacts the instant before signal drops. If you do not act before the dead zone arrives, DeadZone falls back to SMS automatically, because SMS reaches signal levels where data cannot.",
     accent: "#00d4ff",
     screen: <ContactScreen />,
   },
@@ -446,7 +461,7 @@ const FEATURES = [
     title: "Traffic Detection",
     tagline: "Reroutes you above. Navigates you below.",
     description:
-      "Your phone already knows your speed at every moment of the drive. When DeadZone detects you have slowed to a crawl, it immediately recalculates your dead zone ETA, adjusts the timing of your pack build accordingly, and checks whether an alternate route would give you more signal window before you go underground. The rerouting suggestion surfaces before you have thought to look for one. At the same time, DeadZone downloads the map tiles covering the next stretch of your route while you still have data. When you enter the dead zone, your navigation does not freeze. The blue dot keeps moving, turn-by-turn directions continue, and your position tracks accurately at zero signal. You come out the other side knowing exactly where you are and how far you have left to go.",
+      "Your phone already knows your speed at every moment of the drive. When DeadZone detects you have slowed to a crawl, it immediately recalculates your dead zone ETA, adjusts the timing of your pack build, and checks whether an alternate route would give you more signal window. At the same time, DeadZone downloads the map tiles covering the next stretch of your route while you still have data. When you enter the dead zone, your navigation does not freeze. The blue dot keeps moving, turn-by-turn directions continue, and your position tracks accurately at zero signal.",
     accent: "#22c55e",
     screen: <TrafficScreen />,
   },
@@ -455,7 +470,7 @@ const FEATURES = [
     title: "AI Content Pre-fetch",
     tagline: "Never freeze on a reel mid-tunnel.",
     description:
-      "The real problem with saving content offline is that you never know what you want until you want it. The most satisfying thing to watch on the subway is always something you have not seen before. DeadZone monitors what you are currently watching, reading, and listening to, then quietly stages the next stretch of fresh content before the signal drops. Reels keep playing. Articles open instantly. Your podcast continues from exactly where it was. You did not save anything. You did not have to. You just stop noticing the tunnels.",
+      "The real problem with saving content offline is that you never know what you want until you want it. DeadZone monitors what you are currently watching, reading, and listening to, then quietly stages the next stretch of fresh content before the signal drops. Reels keep playing. Articles open instantly. Your podcast continues from exactly where it was. You did not save anything. You did not have to. You just stop noticing the tunnels.",
     accent: "#f97316",
     screen: <ContentScreen />,
   },
@@ -464,27 +479,33 @@ const FEATURES = [
     title: "Seamless",
     tagline: "The app never looked like it stopped.",
     description:
-      "Everything else on this page is about going dark. Seamless is about what happens when you come back. The moment your phone detects signal, DeadZone triggers a quiet, automatic sequence. Messages that queued while you were underground deliver instantly. A short confirmation goes out to everyone you notified, letting them know you are back before they have had a chance to wonder. Your navigation session resumes from your current position, not from where you entered the tunnel. Your podcast picks up from the exact second it paused. Articles you were reading refresh to their live versions. Your feed continues from where it was staged. There is no moment of catching up, no backlog to sort through, no calls to return before you explain yourself. You surface and everything is already where it should be.",
+      "Everything else on this page is about going dark. Seamless is about what happens when you come back. The moment your phone detects signal, DeadZone triggers a quiet, automatic sequence. Messages that queued deliver instantly. A short confirmation goes to everyone you notified. Your navigation session resumes from your current position. Your podcast picks up from the exact second it paused. Articles refresh to their live versions. There is no moment of catching up, no backlog to sort through. You surface and everything is already where it should be.",
     accent: "#00d4ff",
     screen: <SeamlessScreen />,
   },
-] as const;
+];
 
-/* ─────────────────────────────────────────────────────────
-   Feature row
-───────────────────────────────────────────────────────── */
-function FeatureRow({ feature, flip }: { feature: (typeof FEATURES)[number]; flip: boolean }) {
+/* ── Feature row ─────────────────────────────────────────── */
+function FeatureRow({ feature, flip }: { feature: Feature; flip: boolean }) {
   const { ref, visible } = useFadeIn();
+  const hasExtra = !!feature.extraFrame;
+
   return (
     <div
       ref={ref}
-      className={`flex flex-col items-center gap-14 lg:gap-24 transition-all duration-700
+      className={`flex flex-col items-center gap-12 lg:gap-20 transition-all duration-700
         ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}
         ${flip ? "lg:flex-row-reverse" : "lg:flex-row"}`}
     >
-      <div className="flex-shrink-0">
-        <Phone>{feature.screen}</Phone>
+      {/* Frame(s) */}
+      <div className={`flex-shrink-0 ${hasExtra ? "flex flex-col sm:flex-row items-center gap-4" : ""}`}>
+        <Phone height={hasExtra ? 490 : 560}>{feature.screen}</Phone>
+        {hasExtra && (
+          <div className="self-center">{feature.extraFrame}</div>
+        )}
       </div>
+
+      {/* Text */}
       <div className="flex-1 text-center lg:text-left">
         <div className="text-xs font-mono mb-4" style={{ color: feature.accent, letterSpacing: "0.2em" }}>
           {feature.num}
@@ -503,13 +524,12 @@ function FeatureRow({ feature, flip }: { feature: (typeof FEATURES)[number]; fli
   );
 }
 
-/* ─────────────────────────────────────────────────────────
-   Page
-───────────────────────────────────────────────────────── */
+/* ── Page ────────────────────────────────────────────────── */
 export default function MobilePage() {
   return (
     <main style={{ minHeight: "100vh", background: "#050810", fontFamily: "'Space Grotesk', sans-serif", color: "#e2e8f0" }}>
 
+      {/* Nav */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4"
         style={{ borderBottom: "1px solid rgba(0,212,255,.06)", background: "rgba(5,8,16,.94)", backdropFilter: "blur(18px)" }}>
         <Link href="/" className="flex items-center gap-2 text-sm" style={{ color: "#475569" }}>
@@ -519,37 +539,50 @@ export default function MobilePage() {
         <div style={{ width: 88 }} />
       </nav>
 
-      <section id="hero" className="max-w-3xl mx-auto px-6 pt-24 pb-4 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-10 text-xs font-medium"
-          style={{ background: "rgba(167,139,250,.07)", border: "1px solid rgba(167,139,250,.18)", color: "#a78bfa" }}>
-          <span>📱</span><span>Coming to iOS and Android</span>
+      {/* Hero — full viewport height, arrow pinned to bottom */}
+      <section id="hero" className="flex flex-col" style={{ minHeight: "calc(100vh - 62px)" }}>
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center max-w-3xl mx-auto w-full">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-10 text-xs font-medium"
+            style={{ background: "rgba(167,139,250,.07)", border: "1px solid rgba(167,139,250,.18)", color: "#a78bfa" }}>
+            <span>📱</span><span>Coming to iOS and Android</span>
+          </div>
+          <h1 className="text-5xl sm:text-6xl font-bold mb-8 leading-tight" style={{ letterSpacing: "-0.03em" }}>
+            Six features.
+            <br />
+            <span style={{ color: "#00d4ff" }}>Zero signal required.</span>
+          </h1>
+          <p className="text-xl mx-auto" style={{ color: "#475569", lineHeight: 1.8, maxWidth: 500 }}>
+            DeadZone on mobile becomes an ambient layer aware of where you are going,
+            who you are talking to, and what you want to read before you go dark.
+          </p>
         </div>
-        <h1 className="text-5xl sm:text-6xl font-bold mb-8 leading-tight" style={{ letterSpacing: "-0.03em" }}>
-          Six features.
-          <br />
-          <span style={{ color: "#00d4ff" }}>Zero signal required.</span>
-        </h1>
-        <p className="text-xl mx-auto" style={{ color: "#475569", lineHeight: 1.8, maxWidth: 500 }}>
-          DeadZone on mobile becomes an ambient layer aware of where you are going,
-          who you are talking to, and what you want to read before you go dark.
-        </p>
+        <ScrollArrow targetId="section-01" />
       </section>
 
-      <ScrollArrow targetId="section-01" />
-
-      <section className="max-w-5xl mx-auto px-6 pb-8">
+      {/* Feature sections — each is one full viewport panel */}
+      <div className="max-w-5xl mx-auto px-6">
         {FEATURES.map((f, i) => (
-          <div key={f.num}>
-            <div id={`section-${f.num}`} className="py-10">
-              <FeatureRow feature={f} flip={i % 2 !== 0} />
+          <div
+            key={f.num}
+            id={`section-${f.num}`}
+            className="flex flex-col"
+            style={{ minHeight: "100vh" }}
+          >
+            {/* Content fills available space, centered vertically */}
+            <div className="flex-1 flex items-center py-4">
+              <div className="w-full">
+                <FeatureRow feature={f} flip={i % 2 !== 0} />
+              </div>
             </div>
+            {/* Arrow at bottom — always visible when section is in view */}
             {i < FEATURES.length - 1 && (
               <ScrollArrow targetId={`section-${FEATURES[i + 1].num}`} />
             )}
           </div>
         ))}
-      </section>
+      </div>
 
+      {/* Footer */}
       <footer className="border-t text-center py-20" style={{ borderColor: "rgba(255,255,255,.04)" }}>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 text-xs"
           style={{ background: "rgba(0,212,255,.05)", border: "1px solid rgba(0,212,255,.1)", color: "#00d4ff" }}>
