@@ -134,6 +134,12 @@ Rules:
 - The summary and snippets MUST be specific to the location and route mentioned in the query.
 - Use realistic government, news, or traffic URLs for the relevant US state/region.
 - Do NOT mention the Adirondacks, Lake George, I-87, or NY unless the query explicitly refers to those.
+- For emergency/rescue queries: include real county sheriff phone numbers and SAR team URLs for the region.
+- For mountain/pass weather queries: include elevation-specific forecast data and storm alert agencies (NWS, CAIC, etc.).
+- For road closure/CDOT queries: include state DOT URLs (cotrip.org, nevadadot.com, caltrans.ca.gov, etc.) and live camera links.
+- For gas/fuel/services queries: include last services before the dead zone, with realistic mileage distances.
+- For transit queries: include the real agency URL (mta.info, bart.gov, transitapp.com) and service alert language.
+- Prioritize actionable, safety-relevant content over general interest articles.
 """
 
 
@@ -168,23 +174,52 @@ def _generic_stub(query: str) -> dict:
     """Last-resort stub when both Nimble and the LLM are unavailable.
     Returns minimal, non-location-specific placeholder content."""
     q = query.lower()
-    if "weather" in q:
+    # Emergency / search & rescue / mountain safety
+    if any(kw in q for kw in ["emergency", "search rescue", "sheriff", "911", "sar", "rescue"]):
+        summary = "For mountain emergencies, dial 911. Many mountain counties have dedicated search and rescue teams. Pre-save the county sheriff number before entering remote areas without signal."
+        sources = [
+            {"url": "https://www.nasar.org/", "title": "National Association for Search and Rescue", "snippet": "Find your local SAR team and pre-trip planning checklists."},
+            {"url": "https://www.911.gov/", "title": "911.gov — Emergency Services", "snippet": "911 is the universal emergency number. Works even without cell service on many carriers."},
+            {"url": "https://www.nps.gov/subjects/emergency/index.htm", "title": "NPS — Emergency Preparedness", "snippet": "National Park Service emergency contacts and preparedness guides."},
+        ]
+    elif "avalanche" in q or "rockslide" in q or "cdot" in q:
+        summary = "Check CDOT or your state DOT for live road closure updates before entering mountain passes. Avalanche advisories are issued by the Colorado Avalanche Information Center."
+        sources = [
+            {"url": "https://cotrip.org/", "title": "COTrip — Colorado Road Conditions", "snippet": "Live camera feeds and closure notices for Colorado mountain passes."},
+            {"url": "https://avalanche.state.co.us/", "title": "Colorado Avalanche Information Center", "snippet": "Daily avalanche forecasts for Colorado's mountain zones."},
+            {"url": "https://www.511.org/", "title": "511 — Road Conditions", "snippet": "State road condition hotlines accessible at 511."},
+        ]
+    elif "mountain" in q or "elevation" in q or "high elevation" in q or "pass" in q:
+        summary = "High-elevation areas experience rapid weather changes. Afternoon thunderstorms are common above 10,000 ft. Check forecasts for your specific pass elevation."
+        sources = [
+            {"url": "https://forecast.weather.gov/", "title": "National Weather Service — Mountain Forecast", "snippet": "Zone-specific mountain forecasts updated every 6 hours."},
+            {"url": "https://www.mountain-forecast.com/", "title": "Mountain-Forecast.com", "snippet": "Elevation-specific forecasts for named mountain peaks and passes."},
+        ]
+    elif "weather" in q:
         summary = "Conditions along your route are currently favorable. Mild temperatures and light winds expected with no precipitation."
         sources = [
             {"url": "https://forecast.weather.gov/", "title": "National Weather Service", "snippet": "No severe weather alerts in effect for this region."},
             {"url": "https://weather.com/", "title": "Weather.com Route Forecast", "snippet": "Clear skies expected. Visibility above 10 miles."},
         ]
-    elif "road" in q or "traffic" in q or "construction" in q:
+    elif any(kw in q for kw in ["transit", "service alert", "delay", "subway", "bart", "train"]):
+        summary = "Check the transit agency app for real-time service alerts before boarding. Most agencies send push notifications for delays and service changes."
+        sources = [
+            {"url": "https://www.mta.info/", "title": "MTA Service Status", "snippet": "Real-time alerts for NYC subway, bus, and commuter rail lines."},
+            {"url": "https://www.bart.gov/schedules/advisories", "title": "BART Service Advisories", "snippet": "Live BART delay and service alert board."},
+            {"url": "https://511.org/", "title": "511 Transit", "snippet": "Regional transit service information and alerts."},
+        ]
+    elif any(kw in q for kw in ["road", "traffic", "construction", "closure", "ndot", "udot"]):
         summary = "No major incidents or construction delays reported along your route at this time. Roads are clear."
         sources = [
             {"url": "https://www.google.com/maps/", "title": "Google Maps — Live Traffic", "snippet": "Normal traffic flow along route corridor."},
             {"url": "https://511.org/", "title": "511 Traffic Information", "snippet": "No active road closures or major delays reported."},
         ]
-    elif "poi" in q or "interest" in q or "stop" in q or "food" in q or "gas" in q:
-        summary = "Rest stops and services are available at upcoming exits. Gas stations, food, and restroom facilities accessible within 5 miles of your route."
+    elif any(kw in q for kw in ["gas", "fuel", "station", "poi", "service", "rest stop", "food"]):
+        summary = "Rest stops and services are available at upcoming exits. Fill up before entering remote areas — gas stations can be 50+ miles apart on rural highways."
         sources = [
-            {"url": "https://www.yelp.com/", "title": "Yelp — Nearby Restaurants & Services", "snippet": "Multiple dining and fuel options available along route."},
-            {"url": "https://www.tripadvisor.com/", "title": "TripAdvisor — Points of Interest", "snippet": "Attractions and rest areas within reach of your route."},
+            {"url": "https://www.gasbuddy.com/", "title": "GasBuddy — Find Cheap Gas", "snippet": "Locate the nearest open gas stations along your route."},
+            {"url": "https://www.yelp.com/", "title": "Yelp — Nearby Services", "snippet": "Multiple dining and fuel options available along route."},
+            {"url": "https://www.tripadvisor.com/", "title": "TripAdvisor — Rest Areas", "snippet": "Rest areas and attractions within reach of your route."},
         ]
     else:
         summary = "No major local incidents reported along your route. Check local news for the latest regional updates."

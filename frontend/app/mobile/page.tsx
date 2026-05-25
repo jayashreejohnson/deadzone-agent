@@ -130,7 +130,7 @@ function CarPlayFrame() {
       <div className="flex items-center justify-between px-3 py-1.5"
         style={{ background: "#060a14", borderBottom: "1px solid rgba(255,255,255,.04)", fontSize: 10 }}>
         <span style={{ color: "#475569", fontWeight: 600 }}>10:47</span>
-        <span style={{ color: "#334155" }}>Chicago → Detroit · I-94</span>
+        <span style={{ color: "#334155" }}>Ouray → Durango · US-550</span>
         <span style={{ color: "#475569" }}>●●○</span>
       </div>
 
@@ -156,10 +156,10 @@ function CarPlayFrame() {
         <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full"
           style={{ background: "rgba(239,68,68,.13)", border: "1px solid rgba(239,68,68,.28)",
             fontSize: 9, color: "#f87171" }}>
-          ⚠ Dead zone · exit 218 · 18 mi
+          ⚠ Dead zone · Red Mountain Pass · 11 mi
         </div>
         <div className="absolute bottom-2 right-2"
-          style={{ fontSize: 9, color: "#334155" }}>I-94 E</div>
+          style={{ fontSize: 9, color: "#334155" }}>US-550 N</div>
       </div>
 
       {/* ── Countdown ── */}
@@ -358,7 +358,7 @@ function TrafficScreen() {
           <polyline points="106,82 128,114 178,124 220,76 206,30" stroke="#22c55e" strokeWidth="2" fill="none" strokeDasharray="4 3" opacity=".55" />
           <circle cx="62" cy="96" r="5.5" fill="#00d4ff" />
         </svg>
-        <div className="absolute top-3 left-3" style={{ fontSize: 11, color: "#f87171" }}>⚠ Heavy traffic · I-94 E</div>
+        <div className="absolute top-3 left-3" style={{ fontSize: 11, color: "#f87171" }}>⚠ Slow traffic · BQE</div>
         <div className="absolute bottom-3 right-3" style={{ fontSize: 11, color: "#22c55e" }}>Alt route →</div>
       </div>
       <div className="px-3 mt-2 space-y-2">
@@ -373,9 +373,9 @@ function TrafficScreen() {
           </div>
         </div>
         <div className="rounded-2xl px-3.5 py-2.5" style={{ background: "#091a0f", border: "1px solid #142b1a" }}>
-          <div style={{ fontSize: 12, color: "#22c55e", marginBottom: 2 }}>Alternate via I-90 E</div>
+          <div style={{ fontSize: 12, color: "#22c55e", marginBottom: 2 }}>Alternate via Atlantic Ave</div>
           <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 600, marginBottom: 8 }}>
-            Saves 14 min · dead zone ETA moves to 23 min
+            Saves 11 min · dead zone ETA moves to 21 min
           </div>
           <div className="flex gap-2">
             <button className="px-4 py-1.5 rounded-lg font-bold"
@@ -491,7 +491,7 @@ const FEATURES: Feature[] = [
     title: "GPS Auto-Detection",
     tagline: "It just knows.",
     description:
-      "DeadZone runs silently in the background the moment you start moving. It reads your speed and heading, identifies your route from GPS data alone, and begins monitoring signal quality at every point ahead of you. No app to open. No destination to type in. By the time a dead zone appears on the horizon, your offline pack is already being assembled behind the scenes, ready before you ever feel the signal drop.",
+      "DeadZone runs silently in the background the moment you start moving. For drivers, it reads your speed and heading and identifies your route from GPS alone. For transit riders, it recognises your subway line or rail corridor from your movement pattern. Either way — no app to open, no destination to type. By the time a dead zone appears on the horizon, whether it's a mountain pass or a subway tunnel, your offline pack is already being assembled behind the scenes.",
     accent: "#00d4ff",
     screen: <GPSScreen />,
   },
@@ -500,7 +500,7 @@ const FEATURES: Feature[] = [
     title: "Dead Zone Countdown",
     tagline: "Every surface. At the right moment.",
     description:
-      "Three minutes before you lose signal, DeadZone reaches every screen you have with you. Your phone lock screen confirms the blackout duration and that your pack is ready. CarPlay and Android Auto show the same live countdown while your cabin speakers announce it aloud so your hands stay on the wheel. An Apple Watch tap gives you one last moment before you go dark. None of this requires you to touch anything.",
+      "Three minutes before you lose signal, DeadZone reaches every screen you have. Your phone lock screen confirms the blackout duration and that your pack is ready. Drivers get a live countdown on CarPlay and Android Auto — spoken aloud through the cabin speakers so hands stay on the wheel. Transit riders get a tap on Apple Watch and an audio cue through headphones. One last clear moment before you go dark. None of this requires you to touch anything.",
     accent: "#a78bfa",
     screen: <CountdownScreen />,
     extraFrame: <CarPlayFrame />,

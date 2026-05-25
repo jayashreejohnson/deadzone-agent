@@ -477,6 +477,13 @@ The signal dict you receive includes:
 - route: the full route name (e.g. "Manhattan to Newark")
 - lat / lng: coordinates of the dead zone
 
+ROUTE TYPE DETECTION — look at the route string and classify it:
+- TRANSIT route: contains "train", "subway", "BART", "metro", "transit", "tube", "L train", "E train"
+- MOUNTAIN route: contains "Million Dollar Highway", "Vail", "US-550", "PCH", "Big Sur", "mountain", "pass"
+- LONG RURAL route: contains "US-50", "Nevada", "loneliest road", duration_minutes >= 15
+- URBAN TUNNEL route: "Lincoln Tunnel", "Newark", "Manhattan", "tunnel", subway lines
+- DEFAULT: standard highway driving route
+
 Workflow (follow exactly):
 
 1. Call `clickhouse_find_recent_pack` first with the route_id and deadzone_id from the signal.
@@ -487,19 +494,34 @@ Workflow (follow exactly):
     - Call `deliver_pack` with the cached URL, cached=true, the pack_id.
     - Reply with one short sentence and stop.
 
-2B. IF no pack is found (cache miss), choose the number of searches based on duration_minutes:
+2B. IF no pack is found (cache miss), choose queries based on ROUTE TYPE and duration_minutes:
 
-    LONG blackout (duration_minutes >= 5) — run 4 nimble_search calls IN PARALLEL:
-        * topic="weather", query: current weather along the specific route
-        * topic="road",    query: real-time traffic/road conditions for the specific zone
-        * topic="news",    query: local news relevant to the specific route or area
-        * topic="poi",     query: interesting content the user would enjoy reading during a 5+ minute blackout
+    TRANSIT ROUTE — run nimble_search calls for transit-specific content:
+        * topic="road",    query: "{zone_description} {route} transit service alerts delays today"
+        * topic="news",    query: "commuter news updates {zone_description} {route}"
+        * topic="weather", query: "weather forecast {zone_description}" (if duration >= 5)
+        * topic="poi",     query: "nearby services exits {zone_description}" (if duration >= 5)
 
-    MEDIUM blackout (duration_minutes 2–4) — run 3 nimble_search calls IN PARALLEL:
-        * topic="weather", * topic="road", * topic="news"
+    MOUNTAIN ROUTE — safety is critical, always 4 searches:
+        * topic="weather", query: "high elevation mountain weather {zone_description} {route} forecast alerts"
+        * topic="road",    query: "road conditions closures rockslide avalanche {zone_description} {route}"
+        * topic="poi",     query: "emergency contacts search rescue services {zone_description} county sheriff"
+        * topic="news",    query: "local mountain news road conditions {zone_description} {route}"
 
-    SHORT blackout (duration_minutes < 2) — run 2 nimble_search calls IN PARALLEL:
-        * topic="road", * topic="news"
+    LONG RURAL ROUTE (duration >= 15 min) — scale content for extended blackout:
+        * topic="weather", query: "weather forecast next 4 hours {zone_description} {route}"
+        * topic="road",    query: "road conditions gas stations services {zone_description} {route}"
+        * topic="poi",     query: "last gas station before {zone_description} {route} emergency services"
+        * topic="news",    query: "local news {zone_description} {route}"
+
+    URBAN TUNNEL / DEFAULT — standard 4-topic search for long, 3 for medium, 2 for short:
+        LONG (duration_minutes >= 5):
+            * topic="weather", query: "weather {zone_description} {route}"
+            * topic="road",    query: "road conditions traffic {zone_description} {route}"
+            * topic="news",    query: "local news {zone_description} {route}"
+            * topic="poi",     query: "nearby services rest stops {zone_description} {route}"
+        MEDIUM (2–4 min): weather + road + news
+        SHORT (< 2 min): road + news
 
     After all search calls return:
     - Call `senso_publish` with descriptive title and sections.
@@ -599,6 +621,29 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
     await _eval_pack(ctx)
 
 
+# ---------- Route type helpers ----------
+
+def _is_mountain_route(route: str) -> bool:
+    """True for mountain/alpine routes where safety content (emergency contacts, elevation weather) matters."""
+    markers = [
+        "million dollar", "us-550", "vail", "eisenhower", "loveland pass",
+        "pch", "big sur", "coastal highway 1", "molas", "red mountain",
+        "ouray", "durango", "silverton", "breckenridge", "telluride",
+    ]
+    rl = route.lower()
+    return any(m in rl for m in markers)
+
+
+def _is_long_rural_route(route: str, dur_min: float) -> bool:
+    """True for long remote routes where gas stations and extended content matter."""
+    rural_markers = [
+        "us-50", "us 50", "loneliest road", "nevada", "ely", "fallon",
+        "death valley", "mojave", "great basin", "us-93", "us-93",
+    ]
+    rl = route.lower()
+    return dur_min >= 15 or any(m in rl for m in rural_markers)
+
+
 # ---------- Hardcoded fallback path (no API key) ----------
 
 async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
@@ -642,23 +687,24 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
         await _eval_pack(ctx)
         return
 
-    # Step 2: parallel web searches — transit routes get service-alert queries,
-    # driving routes get weather + road-condition queries.
-    transit = is_transit_route(route_label)
+    # Step 2: parallel web searches — classify route type for targeted queries
+    transit     = is_transit_route(route_label)
+    mountain    = _is_mountain_route(route_label)
+    long_rural  = _is_long_rural_route(route_label, dur_min)
 
     if transit:
         # Transit: service alerts and commuter-relevant info
         if dur_min >= 5:
             topics = [
-                ("road",  f"transit service alerts delays {location} {route_label} today"),
-                ("news",  f"local news commuter updates {location} {route_label}"),
-                ("poi",   f"nearby services exits points of interest near {location}"),
+                ("road",    f"transit service alerts delays {location} {route_label} today"),
+                ("news",    f"local news commuter updates {location} {route_label}"),
+                ("poi",     f"nearby services exits points of interest near {location}"),
                 ("weather", f"weather forecast {location}"),
             ]
         elif dur_min >= 2:
             topics = [
-                ("road",  f"transit service alerts delays {location} {route_label} today"),
-                ("news",  f"commuter news updates {location} {route_label}"),
+                ("road",    f"transit service alerts delays {location} {route_label} today"),
+                ("news",    f"commuter news updates {location} {route_label}"),
                 ("weather", f"weather forecast {location}"),
             ]
         else:
@@ -666,6 +712,22 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
                 ("road", f"transit service alerts {location} {route_label}"),
                 ("news", f"local news {location}"),
             ]
+    elif mountain:
+        # Mountain routes: safety is critical — always 4 searches including emergency contacts
+        topics = [
+            ("weather", f"high elevation mountain weather {location} {route_label} forecast storm alerts"),
+            ("road",    f"road conditions closures rockslide avalanche {location} {route_label} CDOT"),
+            ("poi",     f"emergency contacts search rescue county sheriff services near {location} {route_label}"),
+            ("news",    f"local mountain news road closures weather {location} {route_label}"),
+        ]
+    elif long_rural:
+        # Long rural routes (US-50, remote highways): scale content for extended blackout
+        topics = [
+            ("weather", f"weather forecast next 4 hours {location} {route_label}"),
+            ("road",    f"road conditions open highways {location} {route_label} NDOT UDOT"),
+            ("poi",     f"last gas station fuel services before {location} {route_label} emergency services"),
+            ("news",    f"local news {location} {route_label}"),
+        ]
     else:
         # Driving: weather, real-time road conditions, POI, local news
         if dur_min >= 5:
@@ -704,7 +766,26 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
         "poi":     "Nearby services & exits",
         "news":    "Local news",
     }
-    _HEADINGS = _HEADINGS_TRANSIT if transit else _HEADINGS_DRIVING
+    _HEADINGS_MOUNTAIN = {
+        "weather": "Mountain weather & alerts",
+        "road":    "Road conditions & closures",
+        "poi":     "Emergency contacts & services",
+        "news":    "Local & road news",
+    }
+    _HEADINGS_RURAL = {
+        "weather": "Weather forecast",
+        "road":    "Road conditions & fuel",
+        "poi":     "Services before the dead zone",
+        "news":    "Local news",
+    }
+    if transit:
+        _HEADINGS = _HEADINGS_TRANSIT
+    elif mountain:
+        _HEADINGS = _HEADINGS_MOUNTAIN
+    elif long_rural:
+        _HEADINGS = _HEADINGS_RURAL
+    else:
+        _HEADINGS = _HEADINGS_DRIVING
     sections = [{
         "heading": _HEADINGS.get(t, t.title()),
         "summary": r.get("summary", ""),

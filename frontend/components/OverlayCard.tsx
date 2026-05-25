@@ -21,7 +21,7 @@ export function AlertCard({
         </div>
         <div>
           <h3 className="text-base font-semibold text-slate-100">Dead zone ahead</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Weak connectivity predicted</p>
+          <p className="text-xs text-slate-500 mt-0.5">Signal drops soon — we&apos;re preparing your pack</p>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3 mb-5">
@@ -74,8 +74,8 @@ export function PreparingCard() {
           />
         </div>
         <div>
-          <h3 className="text-base font-semibold text-slate-100">Building offline pack…</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Agents sourcing local intelligence</p>
+          <h3 className="text-base font-semibold text-slate-100">Building your offline pack…</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Gathering weather, road info & local news</p>
         </div>
       </div>
     </Shell>
@@ -93,8 +93,8 @@ export function CachedFoundCard() {
           ⚡
         </div>
         <div>
-          <h3 className="text-base font-semibold text-slate-100">Cached pack found</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Reusing prior route intelligence via x402</p>
+          <h3 className="text-base font-semibold text-slate-100">Saved pack found</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Reusing a recent pack for this route — instant delivery</p>
         </div>
       </div>
     </Shell>
@@ -118,7 +118,7 @@ export function ReadyCard({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-base font-semibold text-slate-100">Offline continuity ready</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Your journey is secured for the dead zone</p>
+          <p className="text-xs text-slate-500 mt-0.5">Downloaded and ready — no signal needed</p>
         </div>
         {evalScore !== undefined && scoreColor && (
           <div
@@ -140,9 +140,9 @@ export function ReadyCard({
         <span className="text-[9px] uppercase tracking-[0.18em] text-slate-600 shrink-0">Pack includes</span>
         {[
           { icon: "🌦", label: "Weather" },
-          { icon: "🛣", label: "Road conditions" },
+          { icon: "🛣", label: "Route conditions" },
           { icon: "📰", label: "Local news" },
-          { icon: "📡", label: "Nearby services" },
+          { icon: "📡", label: "Services & contacts" },
         ].map(({ icon, label }) => (
           <span
             key={label}
