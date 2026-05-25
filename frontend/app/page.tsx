@@ -105,6 +105,11 @@ export default function Page() {
 
   void initialTrip; // suppress unused warning
 
+  // ── Keep a ref to planState so the WS handler (which has a stale closure)
+  //    can read the current value without being in its dependency array.
+  const planStateRef = useRef<PlanState>("idle");
+  useEffect(() => { planStateRef.current = planState; }, [planState]);
+
   // ── Countdown timer ───────────────────────────────────────────
   useEffect(() => {
     if (planState !== "tripping" || countdownSeconds === null) return;
@@ -137,7 +142,9 @@ export default function Page() {
           const ev = JSON.parse(e.data) as Record<string, unknown> & { type: string };
           setEvents((prev) => [...prev.slice(-200), ev]);
 
-          if (ev.type === "zones_ready" && Array.isArray(ev.zones)) {
+          // Only accept zones_ready from WS when actively planning —
+          // ignore events from other users' concurrent scans while a trip is running.
+          if (ev.type === "zones_ready" && Array.isArray(ev.zones) && planStateRef.current !== "tripping") {
             const zones: DeadZone[] = (ev.zones as Record<string, unknown>[]).map((z) => ({
               id:               String(z.id || "zone"),
               name:             String(z.description || z.name || z.id || "Dead zone"),
@@ -508,7 +515,7 @@ export default function Page() {
               className="text-[10px] tracking-widest uppercase px-1.5 py-0.5 rounded"
               style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.2)" }}
             >
-              OPS
+              BETA
             </span>
           </div>
           <span className="text-xs text-slate-600 hidden md:block tracking-wide">
@@ -557,7 +564,7 @@ export default function Page() {
                   : { background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }
               }
             >
-              {u}
+              {u === "user_a" ? "Driver" : "Rider"}
             </button>
           ))}
 

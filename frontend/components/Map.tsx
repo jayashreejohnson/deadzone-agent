@@ -139,7 +139,7 @@ export default function Map({ dots, activeUser, deadZones, routePolyline, nextZo
             >
               <Tooltip permanent direction="top" offset={[0, -10]}>
                 <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 11 }}>
-                  {d.user}
+                  {d.user === "user_a" ? "Driver" : "Rider"}
                 </span>
               </Tooltip>
             </CircleMarker>

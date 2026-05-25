@@ -9,36 +9,36 @@ type Line = { bullet: string; color: string; label: string; sub?: string; glow?:
 
 function classify(e: AgentEvent): Line | null {
   if (e.type === "status") {
-    return { bullet: "?", color: "#f59e0b", label: (e.msg as string) || "Weak connectivity predicted ahead", glow: "rgba(245,158,11,0.4)" };
+    return { bullet: "⚡", color: "#f59e0b", label: (e.msg as string) || "Weak connectivity predicted ahead", glow: "rgba(245,158,11,0.4)" };
   }
   if (e.type === "tool" && e.name === "nimble") {
     const q = String(e.query ?? "").toLowerCase();
     if (q.includes("weather"))
-      return { bullet: "?", color: "#a78bfa", label: "Gathering weather intelligence",   glow: "rgba(167,139,250,0.4)" };
+      return { bullet: "🌦", color: "#a78bfa", label: "Gathering weather intelligence",   glow: "rgba(167,139,250,0.4)" };
     if (q.includes("road") || q.includes("traffic"))
-      return { bullet: "?", color: "#60a5fa", label: "Checking road conditions",          glow: "rgba(96,165,250,0.4)" };
+      return { bullet: "🛣", color: "#60a5fa", label: "Checking road conditions",          glow: "rgba(96,165,250,0.4)" };
     if (q.includes("news"))
-      return { bullet: "?", color: "#a78bfa", label: "Scanning local news",               glow: "rgba(167,139,250,0.4)" };
-    return   { bullet: "?", color: "#a78bfa", label: "Searching nearby services",         glow: "rgba(167,139,250,0.4)" };
+      return { bullet: "📰", color: "#a78bfa", label: "Scanning local news",               glow: "rgba(167,139,250,0.4)" };
+    return   { bullet: "📡", color: "#a78bfa", label: "Searching nearby services",         glow: "rgba(167,139,250,0.4)" };
   }
   if (e.type === "tool" && e.name === "senso") {
-    return { bullet: "?", color: "#10b981", label: "Assembling continuity pack", glow: "rgba(16,185,129,0.4)" };
+    return { bullet: "📦", color: "#10b981", label: "Assembling continuity pack", glow: "rgba(16,185,129,0.4)" };
   }
   if (e.type === "payment") {
-    return { bullet: "?", color: "#c4b5fd", label: "x402 agent settlement", sub: `${e.from} ? ${e.to}  $${Number(e.amount).toFixed(2)}`, glow: "rgba(196,181,253,0.4)" };
+    return { bullet: "💳", color: "#c4b5fd", label: "x402 agent settlement", sub: `${e.from} → ${e.to}  $${Number(e.amount).toFixed(2)}`, glow: "rgba(196,181,253,0.4)" };
   }
   if (e.type === "pack_ready") {
-    return { bullet: "?", color: "#10b981", label: e.cached ? "Offline pack reused (cached)" : "Continuity pack assembled", glow: "rgba(16,185,129,0.5)" };
+    return { bullet: "✅", color: "#10b981", label: e.cached ? "Offline pack reused (cached)" : "Continuity pack assembled", glow: "rgba(16,185,129,0.5)" };
   }
   if (e.type === "eval_complete") {
     const score = e.score as number;
     const color = score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#ef4444";
-    const sla   = e.sla_pass ? "SLA ?" : "SLA ?";
+    const sla   = e.sla_pass ? "SLA ✓" : "SLA ✗";
     const cov   = `coverage ${Math.round((e.coverage as number) * 100)}%`;
-    return { bullet: "?", color, label: `Pack quality score: ${score}/100`, sub: `${cov} ? ${sla} ? ${e.build_ms}ms build`, glow: `${color}60` };
+    return { bullet: "🎯", color, label: `Pack quality score: ${score}/100`, sub: `${cov} · ${sla} · ${e.build_ms}ms build`, glow: `${color}60` };
   }
   if (e.type === "log") {
-    return { bullet: "?", color: e.level === "warn" ? "#fbbf24" : "#475569", label: (e.msg as string) || "" };
+    return { bullet: e.level === "warn" ? "⚠" : "·", color: e.level === "warn" ? "#fbbf24" : "#475569", label: (e.msg as string) || "" };
   }
   // Silent event types (shown in waterfall only)
   if (e.type === "tool_start" || e.type === "tool_end" || e.type === "trace_started") return null;
@@ -163,7 +163,7 @@ export default function LiveLogs({ events, onReplay, isReplaying, traceId }: {
           }}
         />
         <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-medium">
-          {isReplaying ? "Replaying?" : "Agent Log"}
+          {isReplaying ? "Replaying…" : "Agent Log"}
         </span>
 
         {/* Eval badge */}
@@ -204,7 +204,7 @@ export default function LiveLogs({ events, onReplay, isReplaying, traceId }: {
             style={{ color: showWaterfall ? "#00d4ff" : "#475569" }}
             title="Toggle execution waterfall"
           >
-            ?
+            ◎
           </button>
         )}
 
@@ -216,7 +216,7 @@ export default function LiveLogs({ events, onReplay, isReplaying, traceId }: {
             style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.2)" }}
             title={`Replay trace ${traceId}`}
           >
-            ?
+            ⏮
           </button>
         )}
       </div>
@@ -228,7 +228,7 @@ export default function LiveLogs({ events, onReplay, isReplaying, traceId }: {
           style={{ borderBottom: "1px solid rgba(0,212,255,0.07)", background: "rgba(0,0,0,0.2)" }}
         >
           <div className="text-[8px] uppercase tracking-[0.2em] text-slate-700 mb-1.5">
-            Execution Waterfall ? {maxTime}ms total
+            Execution Waterfall · {maxTime}ms total
           </div>
           {waterfallData.map((row) => (
             <WaterfallBar key={row.call_id} {...row} maxTime={maxTime} />

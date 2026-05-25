@@ -123,6 +123,14 @@ export default function Dashboard() {
 
       {/* Stats bar */}
       <div className="flex items-center gap-6 px-4 py-2.5">
+        {/* Context label — explains the agent economy to non-technical users */}
+        <div
+          className="shrink-0 text-[9px] uppercase tracking-[0.2em] pr-3 hidden sm:block"
+          style={{ color: "#334155", borderRight: "1px solid rgba(0,212,255,0.08)" }}
+          title="AI agents autonomously assemble offline continuity packs before you enter dead zones"
+        >
+          Nimble Network
+        </div>
         {stats.map((s) => (
           <StatPill key={s.label} {...s} />
         ))}
