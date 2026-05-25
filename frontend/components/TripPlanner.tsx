@@ -27,9 +27,9 @@ const DRIVING_ROUTES: Route[] = [
   { label: "Manhattan → Newark",                    api: "Manhattan to Newark",                                region: "Northeast", hint: "Lincoln Tunnel",                      severity: "high", mode: "driving" },
   { label: "Denver → Vail",                         api: "Denver to Vail",                                    region: "Mountain",  hint: "Eisenhower Tunnel + I-70 canyons",    severity: "high", mode: "driving" },
   { label: "Los Angeles → Las Vegas",               api: "Los Angeles to Las Vegas",                          region: "West",      hint: "Mojave Desert dead zones",             severity: "high", mode: "driving" },
-  { label: "Big Sur (Carmel → San Luis Obispo)",    api: "Carmel to San Luis Obispo via Highway 1 Big Sur",   region: "West",      hint: "PCH coastal cliffs, 90-mile gap",      severity: "high", mode: "driving" },
-  { label: "Route 50 Nevada (Ely → Fallon)",        api: "Ely to Fallon via US Route 50 Nevada",              region: "West",      hint: "The Loneliest Road — 250mi no signal", severity: "high", mode: "driving" },
-  { label: "Million Dollar Hwy (Ouray → Durango)",  api: "Ouray to Durango via US-550 Million Dollar Highway", region: "Mountain", hint: "11,000ft hairpin turns, mining canyons", severity: "high", mode: "driving" },
+  { label: "Big Sur — PCH",          api: "Carmel to San Luis Obispo via Highway 1 Big Sur",    region: "West",     hint: "PCH coastal cliffs, 90-mile gap",        severity: "high", mode: "driving" },
+  { label: "US-50 Nevada",           api: "Ely to Fallon via US Route 50 Nevada",               region: "West",     hint: "The Loneliest Road — 250mi no signal",   severity: "high", mode: "driving" },
+  { label: "Million Dollar Highway", api: "Ouray to Durango via US-550 Million Dollar Highway",  region: "Mountain", hint: "11,000ft hairpin turns, mining canyons",  severity: "high", mode: "driving" },
 ];
 
 // ── Transit routes — real lines, official MTA / agency colors ─────────────
@@ -65,6 +65,11 @@ const POPULAR_DRIVING: Route[] = DRIVING_ROUTES;
 const POPULAR_TRANSIT: Route[] = TRANSIT_ROUTES;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Strip leading non-ASCII junk (e.g. Korean chars from LLM) from zone names. */
+function cleanZoneName(name: string): string {
+  return name.replace(/^[^\x00-\x7F\s]+\s*/, "").trim() || name;
+}
 
 function getDefaultDepartureTime(): string {
   const d = new Date(Date.now() + 30 * 60 * 1000);
@@ -340,8 +345,8 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
               }}
             >
               <RouteIcon route={selected} />
-              <span className="flex-1 text-slate-100 text-sm font-medium">{selected.label}</span>
-              <span className="text-[11px] text-slate-500 hidden sm:inline">{selected.hint}</span>
+              <span className="flex-1 min-w-0 text-slate-100 text-sm font-medium truncate">{selected.label}</span>
+              <span className="text-[11px] text-slate-500 hidden sm:inline shrink-0">{selected.hint}</span>
               {!isLocked && (
                 <button
                   onClick={clearSelection}
@@ -504,7 +509,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
                   {idx + 1}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="text-slate-100 text-sm font-medium truncate">{zone.name}</div>
+                  <div className="text-slate-100 text-sm font-medium truncate">{cleanZoneName(zone.name)}</div>
                   {zone.duration_minutes && (
                     <div className="text-[11px] text-slate-500 mt-0.5">
                       {zone.duration_minutes} min blackout
