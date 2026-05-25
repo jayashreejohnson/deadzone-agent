@@ -24,9 +24,12 @@ type Route = {
 
 // ── Driving routes ─────────────────────────────────────────────────────────
 const DRIVING_ROUTES: Route[] = [
-  { label: "Manhattan → Newark",      api: "Manhattan to Newark",      region: "Northeast", hint: "Lincoln Tunnel",                   severity: "high", mode: "driving" },
-  { label: "Denver → Vail",           api: "Denver to Vail",           region: "Mountain",  hint: "Eisenhower Tunnel + I-70 canyons", severity: "high", mode: "driving" },
-  { label: "Los Angeles → Las Vegas", api: "Los Angeles to Las Vegas", region: "West",      hint: "Mojave Desert dead zones",         severity: "high", mode: "driving" },
+  { label: "Manhattan → Newark",                    api: "Manhattan to Newark",                                region: "Northeast", hint: "Lincoln Tunnel",                      severity: "high", mode: "driving" },
+  { label: "Denver → Vail",                         api: "Denver to Vail",                                    region: "Mountain",  hint: "Eisenhower Tunnel + I-70 canyons",    severity: "high", mode: "driving" },
+  { label: "Los Angeles → Las Vegas",               api: "Los Angeles to Las Vegas",                          region: "West",      hint: "Mojave Desert dead zones",             severity: "high", mode: "driving" },
+  { label: "Big Sur (Carmel → San Luis Obispo)",    api: "Carmel to San Luis Obispo via Highway 1 Big Sur",   region: "West",      hint: "PCH coastal cliffs, 90-mile gap",      severity: "high", mode: "driving" },
+  { label: "Route 50 Nevada (Ely → Fallon)",        api: "Ely to Fallon via US Route 50 Nevada",              region: "West",      hint: "The Loneliest Road — 250mi no signal", severity: "high", mode: "driving" },
+  { label: "Million Dollar Hwy (Ouray → Durango)",  api: "Ouray to Durango via US-550 Million Dollar Highway", region: "Mountain", hint: "11,000ft hairpin turns, mining canyons", severity: "high", mode: "driving" },
 ];
 
 // ── Transit routes — real lines, official MTA / agency colors ─────────────
