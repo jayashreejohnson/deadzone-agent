@@ -2,52 +2,144 @@
 import { useState, useRef, useEffect } from "react";
 import type { DeadZone } from "@/lib/route";
 
-// ── Curated US routes ──────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 type Severity = "high" | "medium" | "low";
-type Route = {
-  label:    string;   // Display name  e.g. "Manhattan → Newark"
-  api:      string;   // Sent to /plan  e.g. "Manhattan to Newark"
-  region:   string;
-  hint:     string;   // Dead-zone characteristic
-  severity: Severity; // Dominant severity on this route
+type Mode = "driving" | "transit";
+
+type SubwayLine = {
+  code:      string;            // "E", "A", "1", "BART", etc.
+  color:     string;            // official hex
+  textColor: "white" | "black";
 };
 
-const ROUTES: Route[] = [
-  // Northeast — tunnel routes guarantee dead zones
-  { label: "Manhattan → Newark",          api: "Manhattan to Newark",          region: "Northeast", hint: "Lincoln Tunnel",                    severity: "high"   },
-  { label: "Washington DC → Baltimore",   api: "Washington DC to Baltimore",   region: "Northeast", hint: "Baltimore Harbor Tunnel",            severity: "high"   },
-  { label: "New York → Philadelphia",     api: "New York to Philadelphia",     region: "Northeast", hint: "NJ Turnpike underpasses",            severity: "medium" },
-  { label: "New York → Boston",           api: "New York to Boston",           region: "Northeast", hint: "I-95 CT/RI coverage gaps",           severity: "medium" },
-  // Southeast — mountain terrain & remote corridors
-  { label: "Atlanta → Charlotte",         api: "Atlanta to Charlotte",         region: "Southeast", hint: "Blue Ridge mountain gaps",           severity: "high"   },
-  { label: "Miami → Orlando",             api: "Miami to Orlando",             region: "Southeast", hint: "Everglades rural corridor",          severity: "medium" },
-  // Mountain — tunnels + canyon roads
-  { label: "Denver → Vail",               api: "Denver to Vail",               region: "Mountain",  hint: "Eisenhower Tunnel + I-70 canyons",  severity: "high"   },
-  { label: "Phoenix → Sedona",            api: "Phoenix to Sedona",            region: "Mountain",  hint: "AZ-89A mountain switchbacks",        severity: "high"   },
-  { label: "Salt Lake City → Moab",       api: "Salt Lake City to Moab",       region: "Mountain",  hint: "US-191 canyon country",              severity: "high"   },
-  // West — desert & coastal
-  { label: "Los Angeles → Las Vegas",     api: "Los Angeles to Las Vegas",     region: "West",      hint: "Mojave Desert dead zones",           severity: "high"   },
-  { label: "Los Angeles → San Diego",     api: "Los Angeles to San Diego",     region: "West",      hint: "Camp Pendleton corridor",            severity: "medium" },
-  { label: "San Francisco → Los Angeles", api: "San Francisco to Los Angeles", region: "West",      hint: "Coastal I-5 remote stretches",       severity: "medium" },
-  // Pacific NW — mountain passes
-  { label: "Seattle → Spokane",           api: "Seattle to Spokane",           region: "Pacific NW",hint: "Cascade Mountain passes",            severity: "high"   },
-  // South — rural highways
-  { label: "Dallas → Houston",            api: "Dallas to Houston",            region: "South",     hint: "Rural I-45 Texas Hill Country",      severity: "medium" },
-  // Transit — subway tunnels (complete blackouts underground)
-  { label: "NYC: Times Square → Brooklyn",      api: "Times Square to Atlantic Terminal Brooklyn via NYC Subway",         region: "Transit", hint: "East River subway tunnel",          severity: "high"   },
-  { label: "Boston: South Station → Harvard",   api: "South Station Boston to Harvard Square via Red Line Subway",        region: "Transit", hint: "Charles River underwater tunnel",    severity: "high"   },
-  { label: "SF: Embarcadero → SFO Airport",     api: "Embarcadero San Francisco to SFO Airport via BART",                region: "Transit", hint: "BART transbay tube under the Bay",  severity: "high"   },
+type Route = {
+  label:    string;
+  api:      string;
+  region:   string;
+  hint:     string;
+  severity: Severity;
+  mode:     Mode;
+  line?:    SubwayLine;
+};
+
+// ── Driving routes ─────────────────────────────────────────────────────────
+const DRIVING_ROUTES: Route[] = [
+  { label: "Manhattan → Newark",          api: "Manhattan to Newark",          region: "Northeast",  hint: "Lincoln Tunnel",                    severity: "high",   mode: "driving" },
+  { label: "Washington DC → Baltimore",   api: "Washington DC to Baltimore",   region: "Northeast",  hint: "Baltimore Harbor Tunnel",            severity: "high",   mode: "driving" },
+  { label: "New York → Philadelphia",     api: "New York to Philadelphia",     region: "Northeast",  hint: "NJ Turnpike underpasses",            severity: "medium", mode: "driving" },
+  { label: "New York → Boston",           api: "New York to Boston",           region: "Northeast",  hint: "I-95 CT/RI coverage gaps",           severity: "medium", mode: "driving" },
+  { label: "Atlanta → Charlotte",         api: "Atlanta to Charlotte",         region: "Southeast",  hint: "Blue Ridge mountain gaps",           severity: "high",   mode: "driving" },
+  { label: "Miami → Orlando",             api: "Miami to Orlando",             region: "Southeast",  hint: "Everglades rural corridor",          severity: "medium", mode: "driving" },
+  { label: "Denver → Vail",               api: "Denver to Vail",               region: "Mountain",   hint: "Eisenhower Tunnel + I-70 canyons",  severity: "high",   mode: "driving" },
+  { label: "Phoenix → Sedona",            api: "Phoenix to Sedona",            region: "Mountain",   hint: "AZ-89A mountain switchbacks",        severity: "high",   mode: "driving" },
+  { label: "Salt Lake City → Moab",       api: "Salt Lake City to Moab",       region: "Mountain",   hint: "US-191 canyon country",              severity: "high",   mode: "driving" },
+  { label: "Los Angeles → Las Vegas",     api: "Los Angeles to Las Vegas",     region: "West",       hint: "Mojave Desert dead zones",           severity: "high",   mode: "driving" },
+  { label: "Los Angeles → San Diego",     api: "Los Angeles to San Diego",     region: "West",       hint: "Camp Pendleton corridor",            severity: "medium", mode: "driving" },
+  { label: "San Francisco → Los Angeles", api: "San Francisco to Los Angeles", region: "West",       hint: "Coastal I-5 remote stretches",       severity: "medium", mode: "driving" },
+  { label: "Seattle → Spokane",           api: "Seattle to Spokane",           region: "Pacific NW", hint: "Cascade Mountain passes",            severity: "high",   mode: "driving" },
+  { label: "Dallas → Houston",            api: "Dallas to Houston",            region: "South",      hint: "Rural I-45 Texas Hill Country",      severity: "medium", mode: "driving" },
 ];
 
-const POPULAR: Route[] = [
-  ROUTES.find((r) => r.api === "Manhattan to Newark")!,
-  ROUTES.find((r) => r.api === "Times Square to Atlantic Terminal Brooklyn via NYC Subway")!,
-  ROUTES.find((r) => r.api === "Los Angeles to Las Vegas")!,
-  ROUTES.find((r) => r.api === "Denver to Vail")!,
-  ROUTES.find((r) => r.api === "Phoenix to Sedona")!,
+// ── Transit routes — real lines, official MTA / agency colors ─────────────
+const TRANSIT_ROUTES: Route[] = [
+  // ── New York City Subway ──────────────────────────────────────────────
+  {
+    label: "E: Jamaica → World Trade Center",
+    api:   "E train Jamaica Center to World Trade Center via NYC Subway",
+    region: "New York", hint: "Midtown tunnel + Lower Manhattan underground",
+    severity: "high", mode: "transit",
+    line: { code: "E", color: "#0039A6", textColor: "white" },
+  },
+  {
+    label: "A: Far Rockaway → Penn Station",
+    api:   "A train Far Rockaway to Penn Station via NYC Subway",
+    region: "New York", hint: "East River tunnel + Manhattan underground",
+    severity: "high", mode: "transit",
+    line: { code: "A", color: "#0039A6", textColor: "white" },
+  },
+  {
+    label: "1: Van Cortlandt Park → South Ferry",
+    api:   "1 train Van Cortlandt Park to South Ferry via NYC Subway",
+    region: "New York", hint: "Entire Manhattan stretch underground",
+    severity: "high", mode: "transit",
+    line: { code: "1", color: "#EE352E", textColor: "white" },
+  },
+  {
+    label: "L: Canarsie → 8th Ave",
+    api:   "L train Canarsie to 8th Avenue via NYC Subway",
+    region: "New York", hint: "Canarsie tunnel under East River",
+    severity: "high", mode: "transit",
+    line: { code: "L", color: "#A7A9AC", textColor: "black" },
+  },
+  {
+    label: "N: Astoria → Bay Ridge",
+    api:   "N train Astoria to Bay Ridge-95th Street via NYC Subway",
+    region: "New York", hint: "Manhattan Bridge + 4th Ave tunnel",
+    severity: "high", mode: "transit",
+    line: { code: "N", color: "#FCCC0A", textColor: "black" },
+  },
+  {
+    label: "7: Flushing → Hudson Yards",
+    api:   "7 train Flushing Main Street to Hudson Yards via NYC Subway",
+    region: "New York", hint: "Elevated in Queens → underground Midtown",
+    severity: "medium", mode: "transit",
+    line: { code: "7", color: "#B933AD", textColor: "white" },
+  },
+  // ── Boston MBTA ───────────────────────────────────────────────────────
+  {
+    label: "Red Line: Harvard → Braintree",
+    api:   "Red Line Harvard Square to Braintree via Boston MBTA",
+    region: "Boston", hint: "Charles River tunnel + downtown stations",
+    severity: "high", mode: "transit",
+    line: { code: "RL", color: "#DA291C", textColor: "white" },
+  },
+  {
+    label: "Green Line: Lechmere → Heath St",
+    api:   "Green Line Lechmere to Heath Street via Boston MBTA",
+    region: "Boston", hint: "Boylston Street subway tunnel",
+    severity: "medium", mode: "transit",
+    line: { code: "GL", color: "#00843D", textColor: "white" },
+  },
+  // ── SF BART ───────────────────────────────────────────────────────────
+  {
+    label: "BART: Embarcadero → SFO",
+    api:   "BART Embarcadero to SFO Airport via Bay Area Rapid Transit",
+    region: "San Francisco", hint: "Transbay tube under the Bay",
+    severity: "high", mode: "transit",
+    line: { code: "BART", color: "#009AC7", textColor: "white" },
+  },
+  // ── Chicago CTA ───────────────────────────────────────────────────────
+  {
+    label: "Blue Line: O'Hare → Forest Park",
+    api:   "Blue Line OHare to Forest Park via Chicago CTA",
+    region: "Chicago", hint: "O'Hare tunnel + State St subway loop",
+    severity: "high", mode: "transit",
+    line: { code: "BL", color: "#00A1DE", textColor: "white" },
+  },
+  // ── DC Metro ──────────────────────────────────────────────────────────
+  {
+    label: "Red Line: Shady Grove → Glenmont",
+    api:   "Red Line Shady Grove to Glenmont via DC Metro",
+    region: "Washington DC", hint: "Dupont Circle + Gallery Pl underground",
+    severity: "medium", mode: "transit",
+    line: { code: "RED", color: "#BF0D3E", textColor: "white" },
+  },
 ];
 
-const REGIONS = Array.from(new Set(ROUTES.map((r) => r.region)));
+// ── Popular picks ──────────────────────────────────────────────────────────
+const POPULAR_DRIVING: Route[] = [
+  DRIVING_ROUTES.find(r => r.api === "Manhattan to Newark")!,
+  DRIVING_ROUTES.find(r => r.api === "Los Angeles to Las Vegas")!,
+  DRIVING_ROUTES.find(r => r.api === "Denver to Vail")!,
+  DRIVING_ROUTES.find(r => r.api === "Phoenix to Sedona")!,
+];
+
+const POPULAR_TRANSIT: Route[] = [
+  TRANSIT_ROUTES.find(r => r.line?.code === "E")!,
+  TRANSIT_ROUTES.find(r => r.line?.code === "A")!,
+  TRANSIT_ROUTES.find(r => r.line?.code === "L")!,
+  TRANSIT_ROUTES.find(r => r.line?.code === "BART")!,
+];
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -89,6 +181,34 @@ function SeverityChip({ severity }: { severity?: string }) {
   );
 }
 
+/** Colored subway / transit line pill — e.g. [E] in MTA blue */
+function LinePill({ line }: { line: SubwayLine }) {
+  const wide = line.code.length > 2;
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded font-bold shrink-0"
+      style={{
+        height:    22,
+        minWidth:  22,
+        width:     wide ? "auto" : 22,
+        padding:   wide ? "0 5px" : 0,
+        fontSize:  wide ? 9 : 11,
+        background: line.color,
+        color:     line.textColor === "black" ? "#000" : "#fff",
+        letterSpacing: wide ? "0.04em" : 0,
+      }}
+    >
+      {line.code}
+    </span>
+  );
+}
+
+/** Left-side indicator — LinePill for transit, SeverityDot for driving */
+function RouteIcon({ route }: { route: Route }) {
+  if (route.line) return <LinePill line={route.line} />;
+  return <SeverityDot severity={route.severity} />;
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 type TripPlannerProps = {
@@ -99,12 +219,13 @@ type TripPlannerProps = {
 };
 
 export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, planState }: TripPlannerProps) {
-  const [selected, setSelected]         = useState<Route | null>(null);
-  const [query, setQuery]               = useState("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mode, setMode]                   = useState<Mode>("driving");
+  const [selected, setSelected]           = useState<Route | null>(null);
+  const [query, setQuery]                 = useState("");
+  const [dropdownOpen, setDropdownOpen]   = useState(false);
   const [departureTime, setDepartureTime] = useState(getDefaultDepartureTime);
-  const [loading, setLoading]           = useState(false);
-  const [error, setError]               = useState<string | null>(null);
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
   const [detectedZones, setDetectedZones] = useState<DeadZone[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,23 +233,30 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
   // Close dropdown on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node))
         setDropdownOpen(false);
-      }
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Filter routes by query
+  // Active routes for current mode
+  const activeRoutes = mode === "driving" ? DRIVING_ROUTES : TRANSIT_ROUTES;
+  const popularRoutes = mode === "driving" ? POPULAR_DRIVING : POPULAR_TRANSIT;
+
+  // Filter + group by region
   const q = query.toLowerCase();
   const filtered = q
-    ? ROUTES.filter((r) => r.label.toLowerCase().includes(q) || r.hint.toLowerCase().includes(q) || r.region.toLowerCase().includes(q))
-    : ROUTES;
+    ? activeRoutes.filter(r =>
+        r.label.toLowerCase().includes(q) ||
+        r.hint.toLowerCase().includes(q) ||
+        r.region.toLowerCase().includes(q)
+      )
+    : activeRoutes;
 
-  // Group filtered routes by region (preserve region order)
-  const grouped = REGIONS.flatMap((region) => {
-    const routes = filtered.filter((r) => r.region === region);
+  const regions = Array.from(new Set(activeRoutes.map(r => r.region)));
+  const grouped = regions.flatMap(region => {
+    const routes = filtered.filter(r => r.region === region);
     return routes.length ? [{ region, routes }] : [];
   });
 
@@ -145,6 +273,11 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
     setQuery("");
     setDetectedZones([]);
     setError(null);
+  }
+
+  function switchMode(m: Mode) {
+    setMode(m);
+    clearSelection();
   }
 
   async function handlePlan() {
@@ -189,21 +322,21 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
     }
   }
 
-  const isReady   = planState === "ready" && detectedZones.length > 0;
-  const isLocked  = loading || isReady;
+  const isReady  = planState === "ready" && detectedZones.length > 0;
+  const isLocked = loading || isReady;
 
   return (
     <div
       className="w-full max-w-lg mx-auto rounded-2xl p-6 animate-[fadeInUp_0.4s_ease-out]"
       style={{
-        background:    "rgba(5, 8, 16, 0.92)",
-        backdropFilter:"blur(24px)",
-        border:        "1px solid rgba(0, 212, 255, 0.2)",
-        boxShadow:     "0 0 60px -10px rgba(0, 212, 255, 0.18), 0 32px 64px -24px rgba(0,0,0,0.8)",
+        background:     "rgba(5, 8, 16, 0.92)",
+        backdropFilter: "blur(24px)",
+        border:         "1px solid rgba(0, 212, 255, 0.2)",
+        boxShadow:      "0 0 60px -10px rgba(0, 212, 255, 0.18), 0 32px 64px -24px rgba(0,0,0,0.8)",
       }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
+      {/* ── Header ── */}
+      <div className="flex items-center gap-3 mb-4">
         <div
           className="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
           style={{ background: "rgba(0,212,255,0.1)", border: "1px solid rgba(0,212,255,0.25)" }}
@@ -212,17 +345,43 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
         </div>
         <div>
           <h2 className="text-base font-semibold text-slate-100 tracking-tight">Route Dead Zone Scan</h2>
-          <p className="text-[11px] text-slate-500 tracking-wide">Select a US route — AI predicts coverage gaps</p>
+          <p className="text-[11px] text-slate-500 tracking-wide">Select a route — AI predicts coverage gaps</p>
         </div>
       </div>
 
+      {/* ── Mode tabs: Driving / Transit ── */}
+      {!isLocked && (
+        <div
+          className="flex rounded-lg p-0.5 mb-5"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+        >
+          {(["driving", "transit"] as Mode[]).map(m => (
+            <button
+              key={m}
+              onClick={() => switchMode(m)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-sm font-medium transition-all duration-150"
+              style={{
+                background: mode === m ? "rgba(0,212,255,0.12)" : "transparent",
+                color:      mode === m ? "#00d4ff" : "#475569",
+                border:     mode === m ? "1px solid rgba(0,212,255,0.25)" : "1px solid transparent",
+              }}
+            >
+              <span>{m === "driving" ? "🚗" : "🚇"}</span>
+              <span className="capitalize">{m}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-4">
-        {/* ── Quick-pick chips ───────────────────────────────── */}
+        {/* ── Popular chips ── */}
         {!isLocked && !selected && (
           <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] text-slate-600 mb-2">Popular routes</p>
+            <p className="text-[10px] uppercase tracking-[0.15em] text-slate-600 mb-2">
+              Popular {mode === "transit" ? "lines" : "routes"}
+            </p>
             <div className="flex flex-wrap gap-1.5">
-              {POPULAR.map((r) => (
+              {popularRoutes.map(r => (
                 <button
                   key={r.api}
                   onClick={() => pickRoute(r)}
@@ -234,7 +393,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
                     color:      "#94a3b8",
                   }}
                 >
-                  <SeverityDot severity={r.severity} />
+                  <RouteIcon route={r} />
                   {r.label}
                 </button>
               ))}
@@ -242,14 +401,14 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
           </div>
         )}
 
-        {/* ── Combobox ──────────────────────────────────────── */}
+        {/* ── Combobox ── */}
         <div ref={containerRef} className="relative">
           <label className="block text-[10px] uppercase tracking-[0.15em] text-slate-500 mb-1.5">
-            Route
+            {mode === "transit" ? "Line" : "Route"}
           </label>
 
           {selected ? (
-            /* ── Selected state ── */
+            /* Selected state */
             <div
               className="flex items-center gap-2 rounded-lg px-3.5 py-2.5"
               style={{
@@ -257,7 +416,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
                 border:     "1px solid rgba(0,212,255,0.35)",
               }}
             >
-              <SeverityDot severity={selected.severity} />
+              <RouteIcon route={selected} />
               <span className="flex-1 text-slate-100 text-sm font-medium">{selected.label}</span>
               <span className="text-[11px] text-slate-500 hidden sm:inline">{selected.hint}</span>
               {!isLocked && (
@@ -271,14 +430,14 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
               )}
             </div>
           ) : (
-            /* ── Search input ── */
+            /* Search input */
             <input
               type="text"
               value={query}
-              onChange={(e) => { setQuery(e.target.value); setDropdownOpen(true); }}
-              onFocus={(e) => { setDropdownOpen(true); e.currentTarget.style.borderColor = "rgba(0,212,255,0.5)"; }}
-              onBlur={(e)  => (e.currentTarget.style.borderColor = "rgba(0,212,255,0.18)")}
-              placeholder="Search US routes…"
+              onChange={e => { setQuery(e.target.value); setDropdownOpen(true); }}
+              onFocus={e => { setDropdownOpen(true); e.currentTarget.style.borderColor = "rgba(0,212,255,0.5)"; }}
+              onBlur={e  => (e.currentTarget.style.borderColor = "rgba(0,212,255,0.18)")}
+              placeholder={mode === "transit" ? "Search transit lines…" : "Search routes…"}
               disabled={isLocked}
               className="w-full rounded-lg px-3.5 py-2.5 text-slate-100 text-sm placeholder-slate-600
                          focus:outline-none disabled:opacity-40 transition-all duration-200"
@@ -290,22 +449,20 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
             />
           )}
 
-          {/* ── Dropdown ── */}
+          {/* Dropdown */}
           {dropdownOpen && !selected && !isLocked && (
             <div
               className="absolute z-50 w-full mt-1.5 rounded-xl overflow-y-auto"
               style={{
-                background:    "rgba(5, 8, 16, 0.97)",
-                backdropFilter:"blur(20px)",
-                border:        "1px solid rgba(0,212,255,0.18)",
-                boxShadow:     "0 16px 40px -8px rgba(0,0,0,0.7)",
-                maxHeight:     "260px",
+                background:     "rgba(5, 8, 16, 0.97)",
+                backdropFilter: "blur(20px)",
+                border:         "1px solid rgba(0,212,255,0.18)",
+                boxShadow:      "0 16px 40px -8px rgba(0,0,0,0.7)",
+                maxHeight:      "260px",
               }}
             >
               {grouped.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-slate-500 text-center">
-                  No matching routes
-                </div>
+                <div className="px-4 py-3 text-sm text-slate-500 text-center">No matching routes</div>
               ) : (
                 grouped.map(({ region, routes }) => (
                   <div key={region}>
@@ -315,17 +472,17 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
                     >
                       {region}
                     </div>
-                    {routes.map((r) => (
+                    {routes.map(r => (
                       <button
                         key={r.api}
-                        onMouseDown={(e) => { e.preventDefault(); pickRoute(r); }}
+                        onMouseDown={e => { e.preventDefault(); pickRoute(r); }}
                         className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left
                                    transition-colors duration-100 hover:bg-white/5"
                       >
-                        <SeverityDot severity={r.severity} />
+                        <RouteIcon route={r} />
                         <span className="flex-1 text-sm text-slate-200 font-medium">{r.label}</span>
                         <span className="text-[11px] text-slate-500 hidden sm:inline shrink-0">{r.hint}</span>
-                        <SeverityChip severity={r.severity} />
+                        {!r.line && <SeverityChip severity={r.severity} />}
                       </button>
                     ))}
                   </div>
@@ -335,7 +492,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
           )}
         </div>
 
-        {/* ── Departure time ────────────────────────────────── */}
+        {/* ── Departure time ── */}
         <div>
           <label className="block text-[10px] uppercase tracking-[0.15em] text-slate-500 mb-1.5">
             Departure Time
@@ -343,7 +500,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
           <input
             type="time"
             value={departureTime}
-            onChange={(e) => setDepartureTime(e.target.value)}
+            onChange={e => setDepartureTime(e.target.value)}
             disabled={isLocked}
             className="w-full rounded-lg px-3.5 py-2.5 text-slate-100 text-sm
                        focus:outline-none disabled:opacity-40 transition-all duration-200"
@@ -353,12 +510,12 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
               fontFamily:  "inherit",
               colorScheme: "dark",
             }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(0,212,255,0.5)")}
-            onBlur={(e)  => (e.currentTarget.style.borderColor = "rgba(0,212,255,0.18)")}
+            onFocus={e => (e.currentTarget.style.borderColor = "rgba(0,212,255,0.5)")}
+            onBlur={e  => (e.currentTarget.style.borderColor = "rgba(0,212,255,0.18)")}
           />
         </div>
 
-        {/* ── Error ─────────────────────────────────────────── */}
+        {/* ── Error ── */}
         {error && (
           <div className="text-red-300 text-sm rounded-lg px-3.5 py-2.5"
                style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
@@ -366,7 +523,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
           </div>
         )}
 
-        {/* ── Scan button ───────────────────────────────────── */}
+        {/* ── Scan button ── */}
         {!isReady && (
           <button
             onClick={handlePlan}
@@ -398,7 +555,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
         )}
       </div>
 
-      {/* ── Results ───────────────────────────────────────────── */}
+      {/* ── Results ── */}
       {isReady && detectedZones.length > 0 && (
         <div className="mt-5 space-y-3 animate-[fadeInUp_0.35s_ease-out]">
           <div className="flex items-center gap-3">
@@ -446,7 +603,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
               boxShadow:  "0 0 24px rgba(16,185,129,0.3)",
             }}
           >
-            🚗 Start Trip
+            {mode === "transit" ? "🚇" : "🚗"} Start Trip
           </button>
 
           <button
