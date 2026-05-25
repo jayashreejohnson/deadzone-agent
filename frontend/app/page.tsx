@@ -495,9 +495,9 @@ export default function Page() {
         />
       </div>
 
-      {/* ── Top navigation bar ────────────────────────────────── */}
+      {/* ── Top bar: mobile-vision banner + navigation ────────── */}
       <div
-        className="absolute top-0 left-0 right-0 z-[1100] px-4 py-2.5 flex items-center justify-between"
+        className="absolute top-0 left-0 right-0 z-[1100]"
         style={{
           background:    "rgba(5, 8, 16, 0.88)",
           backdropFilter:"blur(18px)",
@@ -505,6 +505,27 @@ export default function Page() {
           boxShadow:     "0 1px 40px rgba(0,0,0,0.4)",
         }}
       >
+        {/* Banner row — promotes the mobile vision */}
+        <a
+          href="/mobile"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 px-4 py-1.5 text-[11px] font-medium group transition-all hover:bg-white/[0.02]"
+          style={{
+            background: "linear-gradient(90deg, rgba(0,212,255,0.10) 0%, rgba(139,92,246,0.10) 100%)",
+            borderBottom: "1px solid rgba(0,212,255,0.10)",
+            color: "#7dd3fc",
+            letterSpacing: "0.02em",
+          }}
+        >
+          <span>📱</span>
+          <span className="hidden sm:inline">This is the live demo. Explore the full mobile experience we&apos;re planning</span>
+          <span className="sm:hidden">See the mobile vision</span>
+          <span className="transition-transform group-hover:translate-x-1" style={{ color: "#a78bfa" }}>→</span>
+        </a>
+
+      {/* Nav row */}
+      <div className="px-4 py-2.5 flex items-center justify-between">
         {/* Left — logo */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -552,17 +573,6 @@ export default function Page() {
 
         {/* Right — controls */}
         <div className="flex items-center gap-1.5">
-          {/* Mobile features teaser */}
-          <a
-            href="/mobile"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
-            style={{ background: "rgba(167,139,250,0.1)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.25)" }}
-          >
-            <span>📱</span>
-            <span>Coming to Mobile</span>
-          </a>
           {/* User switcher */}
           {(["user_a", "user_b"] as User[]).map((u) => (
             <button
@@ -648,6 +658,7 @@ export default function Page() {
           </button>
         </div>
       </div>
+      </div>
 
       {/* ── Trip planner — single stable instance, repositions modal→card ── */}
       {/* Keeping one component tree node ensures React never unmounts TripPlanner
@@ -685,7 +696,7 @@ export default function Page() {
         <div
           className="absolute left-4 z-[1200] transition-all duration-300"
           style={{
-            top:   "4.5rem",
+            top:   "6.5rem",
             right: logOpen ? `${LOG_W + 16}px` : "1rem",
           }}
         >
@@ -702,7 +713,7 @@ export default function Page() {
         <div
           className="absolute z-[1200] flex justify-center transition-all duration-300"
           style={{
-            top:   showCountdown ? "8rem" : "5rem",
+            top:   showCountdown ? "10rem" : "7rem",
             left:  "1rem",
             right: logOpen ? `${LOG_W + 16}px` : "1rem",
           }}
@@ -733,7 +744,7 @@ export default function Page() {
       )}
 
       {/* ── Toasts ────────────────────────────────────────────── */}
-      <div className="absolute top-16 z-[1300] flex flex-col gap-2" style={{ right: logOpen ? `${LOG_W + 12}px` : "1rem" }}>
+      <div className="absolute z-[1300] flex flex-col gap-2" style={{ top: "6rem", right: logOpen ? `${LOG_W + 12}px` : "1rem" }}>
         {toasts.map((t) => (
           <Toast
             key={t.id}
@@ -753,8 +764,9 @@ export default function Page() {
 
       {/* ── Agent log drawer (right side) ─────────────────────── */}
       <div
-        className="absolute top-11 bottom-11 right-0 z-[1050] flex flex-col"
+        className="absolute bottom-11 right-0 z-[1050] flex flex-col"
         style={{
+          top:       "5rem",
           width:     `${LOG_W}px`,
           background:"rgba(5, 8, 16, 0.94)",
           backdropFilter: "blur(18px)",
