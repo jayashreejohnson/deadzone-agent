@@ -18,6 +18,7 @@ from typing import Any
 
 from bus import emit
 from tools import nimble, senso, payments, clickhouse_db as db
+from tools.agent1 import is_transit_route
 from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import workflow, agent
 
@@ -288,6 +289,8 @@ async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
             "cached":     args["cached"],
             "pack_id":    ctx.pack_id,
             "deadzone_id": ctx.signal.get("deadzone_id", ""),
+            "route_id":   ctx.signal.get("route_id", ""),
+            "route":      ctx.signal.get("route", ""),
             "trace_id":   ctx.trace_id,
             "t_ms":       _now_ms(ctx),
         }
@@ -377,9 +380,13 @@ async def _eval_pack(ctx: _Ctx) -> None:
     sla_pass   = build_ms < eta_ms * 0.85
     complete   = "deliver_pack" in ctx.tools_called and not ctx.tool_errors
 
-    score = int(
+    # Penalty: each tool error deducts 5 points; errors cap score at 70
+    error_penalty = min(len(ctx.tool_errors) * 5, 30)
+
+    raw_score = int(
         (covered * 0.4 + (1.0 if sla_pass else 0.0) * 0.4 + (1.0 if complete else 0.0) * 0.2) * 100
     )
+    score = max(0, raw_score - error_penalty)
 
     ev = {
         "type":         "eval_complete",
@@ -563,12 +570,11 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
             })
 
         if ctx.delivered:
-            final = await client.chat.completions.create(
-                model=_MODEL, messages=messages, temperature=0,
-            )
+            zone_desc  = ctx.signal.get("zone_description") or ctx.signal.get("route", "your route")
+            cached_str = "cached pack reused" if ctx.cached else "fresh pack assembled"
             final_ev = {
                 "type": "log", "level": "info",
-                "msg":  f"agent: {final.choices[0].message.content or 'done'}",
+                "msg":  f"Delivering {cached_str} for {zone_desc}",
                 "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
             }
             await emit(final_ev)
@@ -636,35 +642,69 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
         await _eval_pack(ctx)
         return
 
-    # Step 2: parallel web searches — queries use zone name + route for relevant content
-    if dur_min >= 5:
-        topics = [
-            ("weather", f"weather forecast {location} driving {route_label}"),
-            ("road",    f"road conditions traffic {location} {route_label}"),
-            ("poi",     f"rest stops points of interest near {location} {route_label}"),
-            ("news",    f"local news {location} {route_label}"),
-        ]
-    elif dur_min >= 2:
-        topics = [
-            ("weather", f"weather forecast {location} {route_label}"),
-            ("road",    f"road conditions traffic {location} {route_label}"),
-            ("news",    f"local news {location} {route_label}"),
-        ]
+    # Step 2: parallel web searches — transit routes get service-alert queries,
+    # driving routes get weather + road-condition queries.
+    transit = is_transit_route(route_label)
+
+    if transit:
+        # Transit: service alerts and commuter-relevant info
+        if dur_min >= 5:
+            topics = [
+                ("road",  f"transit service alerts delays {location} {route_label} today"),
+                ("news",  f"local news commuter updates {location} {route_label}"),
+                ("poi",   f"nearby services exits points of interest near {location}"),
+                ("weather", f"weather forecast {location}"),
+            ]
+        elif dur_min >= 2:
+            topics = [
+                ("road",  f"transit service alerts delays {location} {route_label} today"),
+                ("news",  f"commuter news updates {location} {route_label}"),
+                ("weather", f"weather forecast {location}"),
+            ]
+        else:
+            topics = [
+                ("road", f"transit service alerts {location} {route_label}"),
+                ("news", f"local news {location}"),
+            ]
     else:
-        topics = [
-            ("road", f"road conditions traffic {location} {route_label}"),
-            ("news", f"local news {location} {route_label}"),
-        ]
+        # Driving: weather, real-time road conditions, POI, local news
+        if dur_min >= 5:
+            topics = [
+                ("weather", f"weather forecast {location} driving {route_label}"),
+                ("road",    f"road conditions traffic construction alerts {location} {route_label}"),
+                ("poi",     f"rest stops gas stations services near {location} {route_label}"),
+                ("news",    f"local news traffic incidents {location} {route_label}"),
+            ]
+        elif dur_min >= 2:
+            topics = [
+                ("weather", f"weather forecast {location} {route_label}"),
+                ("road",    f"road conditions traffic alerts {location} {route_label}"),
+                ("news",    f"local news {location} {route_label}"),
+            ]
+        else:
+            topics = [
+                ("road", f"road conditions traffic {location} {route_label}"),
+                ("news", f"local news {location} {route_label}"),
+            ]
 
     search_results = await asyncio.gather(*[
         _timed_dispatch("nimble_search", {"query": q, "topic": t}, ctx)
         for t, q in topics
     ])
 
-    _HEADINGS = {
-        "weather": "Weather", "road": "Road conditions",
-        "poi": "Points of interest", "news": "Local news",
+    _HEADINGS_DRIVING = {
+        "weather": "Weather",
+        "road":    "Road conditions",
+        "poi":     "Nearby services",
+        "news":    "Local news",
     }
+    _HEADINGS_TRANSIT = {
+        "weather": "Weather",
+        "road":    "Transit alerts & delays",
+        "poi":     "Nearby services & exits",
+        "news":    "Local news",
+    }
+    _HEADINGS = _HEADINGS_TRANSIT if transit else _HEADINGS_DRIVING
     sections = [{
         "heading": _HEADINGS.get(t, t.title()),
         "summary": r.get("summary", ""),
@@ -707,5 +747,15 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
     await _timed_dispatch("deliver_pack", {
         "url": url, "cached": False, "pack_id": ctx.pack_id,
     }, ctx)
+
+    # Emit a human-readable delivery confirmation using actual signal data
+    deliver_label = zone_desc or route_label
+    deliver_ev = {
+        "type": "log", "level": "info",
+        "msg":  f"Delivering fresh offline pack for {deliver_label}",
+        "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
+    }
+    await emit(deliver_ev)
+    db.append_trace_event(ctx.trace_id, deliver_ev)
 
     await _eval_pack(ctx)

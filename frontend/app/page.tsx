@@ -105,10 +105,11 @@ export default function Page() {
 
   void initialTrip; // suppress unused warning
 
-  // ── Keep a ref to planState so the WS handler (which has a stale closure)
-  //    can read the current value without being in its dependency array.
+  // ── Keep refs for WS handler (stale closures can't read current state/props)
   const planStateRef = useRef<PlanState>("idle");
   useEffect(() => { planStateRef.current = planState; }, [planState]);
+  const routeIdRef = useRef<string>(ROUTE_ID);
+  useEffect(() => { routeIdRef.current = routeId; }, [routeId]);
 
   // ── Countdown timer ───────────────────────────────────────────
   useEffect(() => {
@@ -180,16 +181,24 @@ export default function Page() {
               detail: `${ev.from} → ${ev.to}  $${Number(ev.amount).toFixed(2)}`,
             });
           } else if (ev.type === "pack_ready") {
-            const paidAmount  = ev.cached ? lastPaymentRef.current?.amount : undefined;
-            const deadzoneId  = String(ev.deadzone_id || routeId);
-            const pack = { url: String(ev.url), cached: !!ev.cached, paidAmount, html: null as string | null };
-            setLastPack(pack);
-            setOverlay({ kind: "ready", url: String(ev.url), cached: !!ev.cached, paidAmount });
-            setZonePackStatus((prev) => ({ ...prev, [deadzoneId]: ev.cached ? "cached" : "ready" }));
-            fetch(String(ev.url))
-              .then((r) => r.text())
-              .then((html) => setLastPack((p) => (p && p.url === ev.url ? { ...p, html } : p)))
-              .catch(() => {});
+            // Filter: only accept pack_ready events that belong to THIS session's route.
+            // The backend now emits route_id in every pack_ready event. If it doesn't
+            // match our current routeId, this pack came from another user's concurrent
+            // scan on the shared WS channel — discard it.
+            const evRouteId = String(ev.route_id || "");
+            const isOurPack = !evRouteId || evRouteId === routeIdRef.current;
+            if (isOurPack) {
+              const paidAmount  = ev.cached ? lastPaymentRef.current?.amount : undefined;
+              const deadzoneId  = String(ev.deadzone_id || routeIdRef.current);
+              const pack = { url: String(ev.url), cached: !!ev.cached, paidAmount, html: null as string | null };
+              setLastPack(pack);
+              setOverlay({ kind: "ready", url: String(ev.url), cached: !!ev.cached, paidAmount });
+              setZonePackStatus((prev) => ({ ...prev, [deadzoneId]: ev.cached ? "cached" : "ready" }));
+              fetch(String(ev.url))
+                .then((r) => r.text())
+                .then((html) => setLastPack((p) => (p && p.url === ev.url ? { ...p, html } : p)))
+                .catch(() => {});
+            }
           }
         } catch { /* Ignore malformed messages */ }
       };
@@ -327,6 +336,7 @@ export default function Page() {
     setCountdownSeconds(45);
     setNextZone(zones[0] || null);
     setZonePackStatus({});
+    setLastPack(null);       // clear stale pack so modal never shows wrong-route content
     const startPos = poly[0];
     setTrips({
       user_a: { pos: startPos, segIdx: 0, segT: 0, running: true,  insideZone: null, triggered: new Set() },

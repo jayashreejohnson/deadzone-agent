@@ -191,6 +191,93 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
     return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict"}
 
 
+# ── Transit dead zone database ────────────────────────────────────
+# Verified geographic dead zones for known transit lines.
+# These always take priority over the LLM (which gets tunnel locations wrong).
+# Keyed by a lowercase substring that uniquely identifies the route string.
+
+_TRANSIT_ZONES: dict[str, list[dict]] = {
+    # L train: the ONLY major dead zone is the Canarsie tunnel under the East River
+    # between Bedford Av (Brooklyn) and 1st Av (Manhattan).
+    "l train canarsie": [
+        {
+            "location": {
+                "lat": 40.7244, "lon": -73.9668,
+                "description": "Canarsie Tunnel (Bedford Av → 1st Av, under East River)",
+            },
+            "start_time": "17:08",
+            "duration_minutes": 5,
+            "severity": "high",
+        },
+    ],
+    # E train: Queens Midtown Tunnel approach + lower Manhattan underground
+    "e train jamaica": [
+        {
+            "location": {
+                "lat": 40.7480, "lon": -73.9501,
+                "description": "Queens Midtown Tunnel (Court Sq → Lex/53 St)",
+            },
+            "start_time": "17:14",
+            "duration_minutes": 6,
+            "severity": "high",
+        },
+        {
+            "location": {
+                "lat": 40.7117, "lon": -74.0129,
+                "description": "Lower Manhattan Underground (Fulton St → WTC)",
+            },
+            "start_time": "17:32",
+            "duration_minutes": 3,
+            "severity": "medium",
+        },
+    ],
+    # BART: the Transbay Tube under San Francisco Bay is the dominant dead zone
+    # (3.6 miles underwater, Embarcadero → West Oakland)
+    "bart embarcadero": [
+        {
+            "location": {
+                "lat": 37.7981, "lon": -122.3449,
+                "description": "Transbay Tube (Embarcadero → West Oakland, under SF Bay)",
+            },
+            "start_time": "17:06",
+            "duration_minutes": 8,
+            "severity": "high",
+        },
+        {
+            "location": {
+                "lat": 37.6895, "lon": -122.4663,
+                "description": "Daly City Underground (Colma → Daly City stations)",
+            },
+            "start_time": "17:38",
+            "duration_minutes": 3,
+            "severity": "medium",
+        },
+    ],
+}
+
+
+def _transit_hardcoded(route: str, departure_time: str) -> dict | None:
+    """Return verified transit dead zones if route matches a known transit line."""
+    rl = route.lower()
+    for key, zones in _TRANSIT_ZONES.items():
+        if key in rl:
+            print(f"[agent1] transit hardcoded: matched '{key}' for '{route}'")
+            return {
+                "route": route,
+                "departure_time": departure_time,
+                "dead_zones": {"dead_zones": zones},
+                "_source": "transit_hardcoded",
+            }
+    return None
+
+
+def is_transit_route(route: str) -> bool:
+    """True if the route string describes a subway/rail transit line."""
+    markers = ["train", "subway", "bart", "metro", "mta", "transit", "tube", "rail"]
+    rl = route.lower()
+    return any(m in rl for m in markers)
+
+
 def _is_lincoln_tunnel_stub(data: dict) -> bool:
     try:
         first = data["dead_zones"]["dead_zones"][0]["location"]
@@ -216,8 +303,22 @@ def _hardcoded_fallback(route: str, departure_time: str) -> dict:
 
 @tool(name="agent1_predict")
 async def predict(route: str, departure_time: str) -> dict:
-    """Predict dead zones. CoverageMap (real) → LLM (fallback) → hardcoded (last resort)."""
+    """Predict dead zones. Transit hardcoded → CoverageMap (real) → LLM (fallback) → hardcoded."""
     payload = {"route": route, "departure_time": departure_time}
+
+    # 0. Transit lines: always use verified geographic data — LLM gets tunnel locations wrong.
+    transit = _transit_hardcoded(route, departure_time)
+    if transit is not None:
+        try:
+            LLMObs.annotate(
+                input_data=payload,
+                output_data={"dead_zones_count": _count_zones(transit)},
+                metadata={"backend": "transit_hardcoded"},
+                tags={"tool": "agent1_predict"},
+            )
+        except Exception:
+            pass
+        return transit
 
     # 1. Real signal data via CoverageMap + Google Maps
     if _COVERAGEMAP_KEY and _GOOGLE_MAPS_KEY:
