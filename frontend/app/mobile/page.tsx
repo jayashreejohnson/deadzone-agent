@@ -100,47 +100,91 @@ function Phone({ children, height = 560 }: { children: React.ReactNode; height?:
   );
 }
 
-/* ── CarPlay widget ──────────────────────────────────────── */
-function CarPlayWidget() {
+/* ── CarPlay head-unit frame ─────────────────────────────── */
+function CarPlayFrame() {
   return (
     <div className="select-none" style={{
-      width: 232, borderRadius: 14, overflow: "hidden",
-      background: "#0c0c18", border: "3px solid #252535",
-      boxShadow: "0 20px 60px rgba(0,0,0,.8), inset 0 0 0 1px #2a2a3c",
+      width: 310,
+      borderRadius: 10,
+      overflow: "hidden",
+      border: "3px solid #252535",
+      boxShadow: "0 0 0 1px #111, 0 32px 80px rgba(0,0,0,.9), inset 0 0 0 1px #2a2a3c",
+      fontFamily: "'Space Grotesk', sans-serif",
     }}>
-      <div style={{ background: "#070b18", padding: "14px 16px", fontFamily: "'Space Grotesk', sans-serif" }}>
-        {/* header */}
-        <div className="flex items-center justify-between mb-3" style={{ fontSize: 10, color: "#334155" }}>
-          <span>🚗 Chicago → Detroit</span>
-          <span>3h 20 min</span>
-        </div>
 
-        {/* countdown card */}
-        <div className="flex items-center gap-3 mb-3 px-3 py-2.5 rounded-xl"
-          style={{ background: "rgba(167,139,250,.08)", border: "1px solid rgba(167,139,250,.2)" }}>
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: "rgba(167,139,250,.12)" }}>
-            <span style={{ fontSize: 18 }}>📡</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div style={{ fontSize: 10, color: "#a78bfa", fontWeight: 600, marginBottom: 2 }}>Dead zone in</div>
-            <div style={{ fontSize: 26, color: "#fff", fontWeight: 700, lineHeight: 1 }}>3:00</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10, color: "#22c55e" }}>Pack ready</div>
-            <div style={{ fontSize: 14, color: "#22c55e", fontWeight: 700 }}>✓</div>
-          </div>
-        </div>
+      {/* ── Status bar ── */}
+      <div className="flex items-center justify-between px-3 py-1.5"
+        style={{ background: "#060a14", borderBottom: "1px solid rgba(255,255,255,.04)", fontSize: 10 }}>
+        <span style={{ color: "#475569", fontWeight: 600 }}>10:47</span>
+        <span style={{ color: "#334155" }}>Chicago → Detroit · I-94</span>
+        <span style={{ color: "#475569" }}>●●○</span>
+      </div>
 
-        {/* voice banner */}
-        <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg"
-          style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
-          <span style={{ fontSize: 13 }}>🔊</span>
-          <span style={{ fontSize: 9, color: "#475569", fontStyle: "italic", lineHeight: 1.4 }}>
-            "Dead zone in 3 minutes. Your offline pack is ready."
-          </span>
+      {/* ── Map ── */}
+      <div className="relative" style={{ height: 118, background: "#0a1422" }}>
+        <svg className="absolute inset-0" width="310" height="118" viewBox="0 0 310 118">
+          {/* highway body */}
+          <path d="M 0 76 Q 80 73 155 70 Q 230 67 310 60"
+            stroke="#1a2d42" strokeWidth="20" fill="none" />
+          {/* centre line */}
+          <path d="M 0 76 Q 80 73 155 70 Q 230 67 310 60"
+            stroke="#243d5c" strokeWidth="1.5" fill="none" strokeDasharray="12 8" opacity=".7" />
+          {/* dead-zone glow */}
+          <circle cx="240" cy="65" r="16" fill="rgba(239,68,68,.1)" />
+          <circle cx="240" cy="65" r="6"  fill="#ef4444" opacity=".85" />
+          {/* dotted path: current → dead zone */}
+          <path d="M 90 74 Q 165 70 240 65"
+            stroke="#00d4ff" strokeWidth="1.5" fill="none" strokeDasharray="5 4" opacity=".5" />
+          {/* current position */}
+          <circle cx="90" cy="74" r="5.5" fill="#00d4ff" />
+          <circle cx="90" cy="74" r="10"  fill="none" stroke="#00d4ff" strokeWidth="1.5" opacity=".3" />
+        </svg>
+        <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full"
+          style={{ background: "rgba(239,68,68,.13)", border: "1px solid rgba(239,68,68,.28)",
+            fontSize: 9, color: "#f87171" }}>
+          ⚠ Dead zone · exit 218 · 18 mi
+        </div>
+        <div className="absolute bottom-2 right-2"
+          style={{ fontSize: 9, color: "#334155" }}>I-94 E</div>
+      </div>
+
+      {/* ── Countdown ── */}
+      <div className="flex items-center gap-3 px-3 py-3"
+        style={{ background: "rgba(167,139,250,.07)",
+          borderTop: "1px solid rgba(167,139,250,.1)",
+          borderBottom: "1px solid rgba(167,139,250,.1)" }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: "rgba(167,139,250,.14)", border: "1px solid rgba(167,139,250,.22)" }}>
+          <span style={{ fontSize: 22 }}>📡</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 10, color: "#a78bfa", fontWeight: 600, marginBottom: 1 }}>Dead zone in</div>
+          <div style={{ fontSize: 32, color: "#fff", fontWeight: 700, lineHeight: 1 }}>3:00</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 10, color: "#22c55e", marginBottom: 2 }}>Pack ready</div>
+          <div style={{ fontSize: 18, color: "#22c55e", fontWeight: 700 }}>✓</div>
         </div>
       </div>
+
+      {/* ── Voice + media controls ── */}
+      <div className="flex items-center gap-2 px-3 py-2.5"
+        style={{ background: "#070b15" }}>
+        <span style={{ fontSize: 15 }}>🔊</span>
+        <span style={{ fontSize: 9, color: "#475569", flex: 1, fontStyle: "italic", lineHeight: 1.4 }}>
+          "Dead zone in 3 minutes. Your offline pack is ready."
+        </span>
+        <div className="flex items-center gap-2">
+          {["⏮", "▶", "⏭"].map((ic, i) => (
+            <div key={ic} className="flex items-center justify-center rounded-lg"
+              style={{ width: 24, height: 24, background: "#0d1420",
+                fontSize: 11, color: i === 1 ? "#00d4ff" : "#334155" }}>
+              {ic}
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
   );
 }
@@ -445,7 +489,7 @@ const FEATURES: Feature[] = [
       "Three minutes before you lose signal, DeadZone reaches every screen you have with you. Your phone lock screen receives a notification confirming how long the blackout lasts and that your pack is ready. Your CarPlay or Android Auto dashboard displays the same countdown, updating continuously as your speed and route conditions change. Your cabin speakers announce the alert aloud so your hands stay on the wheel and your eyes stay on the road. If you are wearing an Apple Watch, a gentle haptic tap at your wrist gives you one last moment before you go dark. None of these require you to touch anything.",
     accent: "#a78bfa",
     screen: <CountdownScreen />,
-    extraFrame: <CarPlayWidget />,
+    extraFrame: <CarPlayFrame />,
   },
   {
     num: "03",
