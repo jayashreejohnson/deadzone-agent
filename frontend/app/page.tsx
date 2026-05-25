@@ -532,6 +532,17 @@ export default function Page() {
 
         {/* Right — controls */}
         <div className="flex items-center gap-1.5">
+          {/* Mobile features teaser */}
+          <a
+            href="/mobile"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
+            style={{ background: "rgba(167,139,250,0.1)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.25)" }}
+          >
+            <span>📱</span>
+            <span>Coming to Mobile</span>
+          </a>
           {/* User switcher */}
           {(["user_a", "user_b"] as User[]).map((u) => (
             <button
