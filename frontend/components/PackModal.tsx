@@ -1,8 +1,8 @@
 "use client";
 
 export default function PackModal({
-  url, html, cached, paidAmount, onClose,
-}: { url: string; html?: string | null; cached: boolean; paidAmount?: number; onClose: () => void }) {
+  url, html, cached, onClose,
+}: { url: string; html?: string | null; cached: boolean; onClose: () => void }) {
   // Prefer the cached HTML blob (works without network). Fall back to URL.
   const offline = !!html;
 
@@ -38,7 +38,7 @@ export default function PackModal({
                 className="px-2 py-0.5 text-[10px] font-semibold rounded-full tracking-wide"
                 style={{ background: "rgba(139,92,246,0.15)", color: "#c4b5fd", border: "1px solid rgba(139,92,246,0.3)" }}
               >
-                ⚡ instant · bought from agent_a · ${paidAmount?.toFixed(2) ?? "0.02"}
+                ⚡ instant delivery
               </span>
             ) : (
               <span

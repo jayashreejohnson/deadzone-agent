@@ -33,8 +33,7 @@ function classify(e: AgentEvent): Line | null {
     return { bullet: "📦", color: "#10b981", label: "Assembling continuity pack", glow: "rgba(16,185,129,0.4)" };
   }
   if (e.type === "payment") {
-    const amt = Number(e.amount ?? 0).toFixed(2);
-    return { bullet: "💸", color: "#f59e0b", label: `Pack purchased from ${String(e.to)} · $${amt}`, glow: "rgba(245,158,11,0.35)" };
+    return null; // internal cache settlement — not surfaced to users
   }
   if (e.type === "pack_ready") {
     return { bullet: "✅", color: "#10b981", label: e.cached ? "Offline pack reused (cached)" : "Continuity pack assembled", glow: "rgba(16,185,129,0.5)" };

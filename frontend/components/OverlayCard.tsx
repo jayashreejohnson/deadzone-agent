@@ -102,8 +102,8 @@ export function CachedFoundCard() {
 }
 
 export function ReadyCard({
-  cached, paidAmount, evalScore, slaPass, onOpen,
-}: { cached: boolean; paidAmount?: number; evalScore?: number; slaPass?: boolean; onOpen: () => void }) {
+  cached, evalScore, slaPass, onOpen,
+}: { cached: boolean; evalScore?: number; slaPass?: boolean; onOpen: () => void }) {
   const scoreColor = evalScore !== undefined
     ? (evalScore >= 80 ? "#10b981" : evalScore >= 60 ? "#f59e0b" : "#ef4444")
     : undefined;

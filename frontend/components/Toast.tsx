@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 
-type Variant = "payment" | "reconnecting" | "synced";
+type Variant = "reconnecting" | "synced";
 
 const CONFIG: Record<Variant, {
   icon:   string;
@@ -9,9 +9,8 @@ const CONFIG: Record<Variant, {
   sub:    string;
   accent: string;
 }> = {
-  payment:      { icon: "⚡", title: "Agent settlement",      sub: "x402 pack acquired.",             accent: "#8b5cf6" },
-  reconnecting: { icon: "📶", title: "Connectivity restored", sub: "Syncing live route data…",         accent: "#00d4ff" },
-  synced:       { icon: "✅", title: "Back online",           sub: "Real-time services resumed.",      accent: "#10b981" },
+  reconnecting: { icon: "📶", title: "Connectivity restored", sub: "Syncing live route data…",    accent: "#00d4ff" },
+  synced:       { icon: "✅", title: "Back online",           sub: "Real-time services resumed.", accent: "#10b981" },
 };
 
 export default function Toast({

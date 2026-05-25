@@ -26,10 +26,9 @@ type Overlay =
   | { kind: "alert"; deadzoneName: string; etaSeconds: number; confidence: number }
   | { kind: "preparing" }
   | { kind: "cached_found" }
-  | { kind: "ready"; url: string; cached: boolean; paidAmount?: number };
+  | { kind: "ready"; url: string; cached: boolean };
 
 type ToastItem =
-  | { id: number; variant: "payment"; detail: string }
   | { id: number; variant: "reconnecting" }
   | { id: number; variant: "synced" };
 
@@ -95,7 +94,7 @@ export default function Page() {
   const [offlineActive, setOfflineActive] = useState(false);
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [lastPack, setLastPack]           = useState<{
-    url: string; cached: boolean; paidAmount?: number; html?: string | null
+    url: string; cached: boolean; html?: string | null
   } | null>(null);
   const [traceId, setTraceId]             = useState<string | null>(null);
   const [evalData, setEvalData]           = useState<{ score: number; slaPass: boolean } | null>(null);
@@ -133,7 +132,6 @@ export default function Page() {
   useEffect(() => {
     let ws: WebSocket | null = null;
     let reconnect: ReturnType<typeof setTimeout> | undefined;
-    const lastPaymentRef = { current: null as { amount: number; from: string; to: string } | null };
 
     const connect = () => {
       ws = new WebSocket(WS_URL);
@@ -171,15 +169,9 @@ export default function Page() {
           }
 
           if (ev.type === "payment") {
-            const payment = { amount: Number(ev.amount), from: String(ev.from), to: String(ev.to) };
-            lastPaymentRef.current = payment;
             setOverlay((cur) =>
               cur.kind === "alert" || cur.kind === "preparing" ? { kind: "cached_found" } : cur
             );
-            pushToast({
-              id: _toastSeq++, variant: "payment",
-              detail: `${ev.from} → ${ev.to}  $${Number(ev.amount).toFixed(2)}`,
-            });
           } else if (ev.type === "pack_ready") {
             // Filter: only accept pack_ready events that belong to THIS session's route.
             // The backend now emits route_id in every pack_ready event. If it doesn't
@@ -188,11 +180,10 @@ export default function Page() {
             const evRouteId = String(ev.route_id || "");
             const isOurPack = !evRouteId || evRouteId === routeIdRef.current;
             if (isOurPack) {
-              const paidAmount  = ev.cached ? lastPaymentRef.current?.amount : undefined;
               const deadzoneId  = String(ev.deadzone_id || routeIdRef.current);
-              const pack = { url: String(ev.url), cached: !!ev.cached, paidAmount, html: null as string | null };
+              const pack = { url: String(ev.url), cached: !!ev.cached, html: null as string | null };
               setLastPack(pack);
-              setOverlay({ kind: "ready", url: String(ev.url), cached: !!ev.cached, paidAmount });
+              setOverlay({ kind: "ready", url: String(ev.url), cached: !!ev.cached });
               setZonePackStatus((prev) => ({ ...prev, [deadzoneId]: ev.cached ? "cached" : "ready" }));
               fetch(String(ev.url))
                 .then((r) => r.text())
@@ -732,7 +723,6 @@ export default function Page() {
             {overlay.kind === "ready" && (
               <ReadyCard
                 cached={overlay.cached}
-                paidAmount={overlay.paidAmount}
                 evalScore={evalData?.score}
                 slaPass={evalData?.slaPass}
                 onOpen={() => setPackModalOpen(true)}
@@ -800,7 +790,6 @@ export default function Page() {
           url={lastPack.url}
           html={lastPack.html}
           cached={lastPack.cached}
-          paidAmount={lastPack.paidAmount}
           onClose={() => setPackModalOpen(false)}
         />
       )}
