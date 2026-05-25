@@ -62,6 +62,23 @@ function ScrollArrow({ targetId }: { targetId: string }) {
   );
 }
 
+/* ── Mobile phone wrapper — scales full-size phone to 75% ── */
+// Renders Phone at its native 560px (so all screen content looks identical
+// to desktop) then shrinks it via CSS transform. No squashing.
+const MOBILE_SCALE = 0.75;
+const MOBILE_PHONE_W = Math.round(290 * MOBILE_SCALE); // 218
+const MOBILE_PHONE_H = Math.round(560 * MOBILE_SCALE); // 420
+
+function MobilePhone({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ width: MOBILE_PHONE_W, height: MOBILE_PHONE_H, position: "relative", flexShrink: 0 }}>
+      <div style={{ position: "absolute", top: 0, left: 0, transformOrigin: "top left", transform: `scale(${MOBILE_SCALE})` }}>
+        <Phone height={560}>{children}</Phone>
+      </div>
+    </div>
+  );
+}
+
 /* ── Phone frame — height-aware ──────────────────────────── */
 function Phone({ children, height = 560 }: { children: React.ReactNode; height?: number }) {
   const sc = height / 590;
@@ -623,7 +640,7 @@ export default function MobilePage() {
               style={{ height: PANEL_H, scrollSnapAlign: "start" }}
             >
               <div className="flex-1 flex items-center justify-center py-4 min-h-0">
-                <Phone height={420}>{f.screen}</Phone>
+                <MobilePhone>{f.screen}</MobilePhone>
               </div>
               <div className="text-center px-6 pb-2 shrink-0">
                 <div className="text-xs font-mono mb-1" style={{ color: f.accent, letterSpacing: "0.2em" }}>
