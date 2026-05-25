@@ -24,10 +24,11 @@ const NAV_H = 62;
 
 function ScrollArrow({ targetId }: { targetId: string }) {
   function jump() {
+    const container = document.getElementById("snap-container");
     const t = document.getElementById(targetId);
-    if (!t) return;
-    window.scrollTo({
-      top: t.getBoundingClientRect().top + window.scrollY - NAV_H,
+    if (!container || !t) return;
+    container.scrollTo({
+      top: container.scrollTop + t.getBoundingClientRect().top - container.getBoundingClientRect().top - NAV_H,
       behavior: "smooth",
     });
   }
@@ -533,33 +534,51 @@ function FeatureRow({ feature, flip }: { feature: Feature; flip: boolean }) {
   return (
     <div
       ref={ref}
-      className={`flex flex-col items-center gap-8 lg:gap-20 transition-all duration-700
-        ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}
-        ${flip ? "lg:flex-row-reverse" : "lg:flex-row"}`}
+      className={`h-full transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
     >
-      {/* Frame(s) */}
-      <div className={`flex-shrink-0 ${hasExtra ? "flex flex-col sm:flex-row items-center gap-4" : ""}`}>
-        <Phone height={hasExtra ? 490 : 560}>{feature.screen}</Phone>
-        {hasExtra && (
-          <div className="self-center hidden sm:block">{feature.extraFrame}</div>
-        )}
+
+      {/* ── Mobile layout: phone on top, title + tagline below ── */}
+      <div className="flex flex-col items-center justify-between h-full lg:hidden">
+        <div className="flex-1 flex items-center justify-center py-4">
+          <Phone height={320}>{feature.screen}</Phone>
+        </div>
+        <div className="text-center pb-2">
+          <div className="text-xs font-mono mb-2" style={{ color: feature.accent, letterSpacing: "0.2em" }}>
+            {feature.num}
+          </div>
+          <h2 className="text-3xl font-bold mb-2 leading-tight" style={{ letterSpacing: "-0.02em" }}>
+            {feature.title}
+          </h2>
+          <p className="text-base font-medium" style={{ color: feature.accent }}>
+            {feature.tagline}
+          </p>
+        </div>
       </div>
 
-      {/* Text */}
-      <div className="flex-1 text-center lg:text-left">
-        <div className="text-xs font-mono mb-4" style={{ color: feature.accent, letterSpacing: "0.2em" }}>
-          {feature.num}
+      {/* ── Desktop layout: side-by-side (unchanged) ── */}
+      <div className={`hidden lg:flex items-center gap-20 ${flip ? "flex-row-reverse" : "flex-row"}`}>
+        <div className={`flex-shrink-0 ${hasExtra ? "flex flex-row items-center gap-4" : ""}`}>
+          <Phone height={hasExtra ? 490 : 560}>{feature.screen}</Phone>
+          {hasExtra && (
+            <div className="self-center">{feature.extraFrame}</div>
+          )}
         </div>
-        <h2 className="text-4xl font-bold mb-4 leading-tight" style={{ letterSpacing: "-0.02em" }}>
-          {feature.title}
-        </h2>
-        <p className="text-lg font-medium mb-6" style={{ color: feature.accent }}>
-          {feature.tagline}
-        </p>
-        <p className="text-base leading-relaxed max-w-md mx-auto lg:mx-0 line-clamp-6 lg:line-clamp-none" style={{ color: "#64748b" }}>
-          {feature.description}
-        </p>
+        <div className="flex-1 text-left">
+          <div className="text-xs font-mono mb-4" style={{ color: feature.accent, letterSpacing: "0.2em" }}>
+            {feature.num}
+          </div>
+          <h2 className="text-4xl font-bold mb-4 leading-tight" style={{ letterSpacing: "-0.02em" }}>
+            {feature.title}
+          </h2>
+          <p className="text-lg font-medium mb-6" style={{ color: feature.accent }}>
+            {feature.tagline}
+          </p>
+          <p className="text-base leading-relaxed max-w-md" style={{ color: "#64748b" }}>
+            {feature.description}
+          </p>
+        </div>
       </div>
+
     </div>
   );
 }
@@ -567,11 +586,22 @@ function FeatureRow({ feature, flip }: { feature: Feature; flip: boolean }) {
 /* ── Page ────────────────────────────────────────────────── */
 export default function MobilePage() {
   return (
-    <main style={{ minHeight: "100vh", background: "#050810", fontFamily: "'Space Grotesk', sans-serif", color: "#e2e8f0" }}>
+    <div
+      id="snap-container"
+      style={{
+        height: "100vh",
+        overflowY: "scroll",
+        scrollSnapType: "y mandatory",
+        scrollPaddingTop: NAV_H,
+        background: "#050810",
+        fontFamily: "'Space Grotesk', sans-serif",
+        color: "#e2e8f0",
+      }}
+    >
 
-      {/* Nav */}
+      {/* Nav — sticky inside the snap container */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: "1px solid rgba(0,212,255,.06)", background: "rgba(5,8,16,.94)", backdropFilter: "blur(18px)" }}>
+        style={{ height: NAV_H, borderBottom: "1px solid rgba(0,212,255,.06)", background: "rgba(5,8,16,.94)", backdropFilter: "blur(18px)" }}>
         <Link href="/" className="flex items-center gap-2 text-sm" style={{ color: "#475569" }}>
           <span>←</span><span>Back to app</span>
         </Link>
@@ -579,8 +609,12 @@ export default function MobilePage() {
         <div style={{ width: 88 }} />
       </nav>
 
-      {/* Hero — full viewport height, arrow pinned to bottom */}
-      <section id="hero" className="flex flex-col" style={{ minHeight: "calc(100vh - 62px)" }}>
+      {/* Hero — snaps to fill one screen */}
+      <section
+        id="hero"
+        className="flex flex-col"
+        style={{ height: `calc(100vh - ${NAV_H}px)`, scrollSnapAlign: "start" }}
+      >
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center max-w-3xl mx-auto w-full">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-10 text-xs font-medium"
             style={{ background: "rgba(167,139,250,.07)", border: "1px solid rgba(167,139,250,.18)", color: "#a78bfa" }}>
@@ -599,31 +633,31 @@ export default function MobilePage() {
         <ScrollArrow targetId="section-01" />
       </section>
 
-      {/* Feature sections — each is one full viewport panel */}
-      <div className="max-w-5xl mx-auto px-6">
-        {FEATURES.map((f, i) => (
-          <div
-            key={f.num}
-            id={`section-${f.num}`}
-            className="flex flex-col"
-            style={{ minHeight: "calc(100vh - 62px)" }}
-          >
-            {/* Content fills available space, centered vertically */}
-            <div className="flex-1 flex items-center py-4">
-              <div className="w-full">
-                <FeatureRow feature={f} flip={i % 2 !== 0} />
-              </div>
+      {/* Feature sections — each snaps to one screen */}
+      {FEATURES.map((f, i) => (
+        <div
+          key={f.num}
+          id={`section-${f.num}`}
+          className="flex flex-col max-w-5xl mx-auto px-6 w-full"
+          style={{ height: `calc(100vh - ${NAV_H}px)`, scrollSnapAlign: "start", overflow: "hidden" }}
+        >
+          <div className="flex-1 flex items-center overflow-hidden">
+            <div className="w-full h-full">
+              <FeatureRow feature={f} flip={i % 2 !== 0} />
             </div>
-            {/* Arrow at bottom — always visible when section is in view */}
-            {i < FEATURES.length - 1 && (
-              <ScrollArrow targetId={`section-${FEATURES[i + 1].num}`} />
-            )}
           </div>
-        ))}
-      </div>
+          {i < FEATURES.length - 1 && (
+            <ScrollArrow targetId={`section-${FEATURES[i + 1].num}`} />
+          )}
+        </div>
+      ))}
 
-      {/* Footer */}
-      <footer className="border-t text-center py-20" style={{ borderColor: "rgba(255,255,255,.04)" }}>
+      {/* Footer — its own snap panel */}
+      <footer
+        id="section-footer"
+        className="border-t text-center flex flex-col items-center justify-center"
+        style={{ height: `calc(100vh - ${NAV_H}px)`, scrollSnapAlign: "start", borderColor: "rgba(255,255,255,.04)" }}
+      >
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 text-xs"
           style={{ background: "rgba(0,212,255,.05)", border: "1px solid rgba(0,212,255,.1)", color: "#00d4ff" }}>
           Built at Agentic Engineering Hack · Datadog NYC 2026
@@ -632,6 +666,6 @@ export default function MobilePage() {
         <Link href="/" className="text-sm" style={{ color: "#00d4ff" }}>Try the live demo</Link>
       </footer>
 
-    </main>
+    </div>
   );
 }
