@@ -30,7 +30,7 @@ function ScrollArrow({ targetId }: { targetId: string }) {
     if (!el) return;
     const io = new IntersectionObserver(
       ([e]) => setInView(e.isIntersecting),
-      { threshold: 0.5 }
+      { threshold: 0.1 }
     );
     io.observe(el);
     return () => io.disconnect();
@@ -486,7 +486,7 @@ const FEATURES: Feature[] = [
     title: "Dead Zone Countdown",
     tagline: "Every surface. At the right moment.",
     description:
-      "Three minutes before you lose signal, DeadZone reaches every screen you have with you. Your phone lock screen receives a notification confirming how long the blackout lasts and that your pack is ready. Your CarPlay or Android Auto dashboard displays the same countdown, updating continuously as your speed and route conditions change. Your cabin speakers announce the alert aloud so your hands stay on the wheel and your eyes stay on the road. If you are wearing an Apple Watch, a gentle haptic tap at your wrist gives you one last moment before you go dark. None of these require you to touch anything.",
+      "Three minutes before you lose signal, DeadZone reaches every screen you have with you. Your phone lock screen confirms the blackout duration and that your pack is ready. CarPlay and Android Auto show the same live countdown while your cabin speakers announce it aloud so your hands stay on the wheel. An Apple Watch tap gives you one last moment before you go dark. None of this requires you to touch anything.",
     accent: "#a78bfa",
     screen: <CountdownScreen />,
     extraFrame: <CarPlayFrame />,
