@@ -23,19 +23,6 @@ function useFadeIn(threshold = 0.12) {
 const NAV_H = 62;
 
 function ScrollArrow({ targetId }: { targetId: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => setInView(e.isIntersecting),
-      { threshold: 0.1 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
   function jump() {
     const t = document.getElementById(targetId);
     if (!t) return;
@@ -46,18 +33,27 @@ function ScrollArrow({ targetId }: { targetId: string }) {
   }
 
   return (
-    <div ref={ref} className="flex justify-center" style={{ padding: "6px 0 20px" }}>
+    <div className="flex justify-center" style={{ padding: "12px 0 28px" }}>
       <button
         onClick={jump}
         aria-label="Next section"
         style={{
-          background: "none", border: "none", cursor: "pointer", padding: "0.5rem",
-          opacity: inView ? 0.85 : 0.15,
-          transition: "opacity 0.4s ease",
+          background: "rgba(148,163,184,0.07)",
+          border: "1px solid rgba(148,163,184,0.15)",
+          borderRadius: "50%",
+          cursor: "pointer",
+          padding: "0.65rem",
+          opacity: 0.8,
+          transition: "opacity 0.2s ease, transform 0.2s ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 48,
+          height: 48,
         }}
       >
-        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" className="animate-bounce">
-          <path d="M8 13l9 9 9-9" stroke="#94a3b8" strokeWidth="2"
+        <svg width="24" height="24" viewBox="0 0 34 34" fill="none" className="animate-bounce">
+          <path d="M8 13l9 9 9-9" stroke="#94a3b8" strokeWidth="2.5"
             strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
@@ -537,7 +533,7 @@ function FeatureRow({ feature, flip }: { feature: Feature; flip: boolean }) {
   return (
     <div
       ref={ref}
-      className={`flex flex-col items-center gap-12 lg:gap-20 transition-all duration-700
+      className={`flex flex-col items-center gap-8 lg:gap-20 transition-all duration-700
         ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}
         ${flip ? "lg:flex-row-reverse" : "lg:flex-row"}`}
     >
@@ -545,7 +541,7 @@ function FeatureRow({ feature, flip }: { feature: Feature; flip: boolean }) {
       <div className={`flex-shrink-0 ${hasExtra ? "flex flex-col sm:flex-row items-center gap-4" : ""}`}>
         <Phone height={hasExtra ? 490 : 560}>{feature.screen}</Phone>
         {hasExtra && (
-          <div className="self-center">{feature.extraFrame}</div>
+          <div className="self-center hidden sm:block">{feature.extraFrame}</div>
         )}
       </div>
 
@@ -560,7 +556,7 @@ function FeatureRow({ feature, flip }: { feature: Feature; flip: boolean }) {
         <p className="text-lg font-medium mb-6" style={{ color: feature.accent }}>
           {feature.tagline}
         </p>
-        <p className="text-base leading-relaxed max-w-md mx-auto lg:mx-0" style={{ color: "#64748b" }}>
+        <p className="text-base leading-relaxed max-w-md mx-auto lg:mx-0 line-clamp-6 lg:line-clamp-none" style={{ color: "#64748b" }}>
           {feature.description}
         </p>
       </div>
