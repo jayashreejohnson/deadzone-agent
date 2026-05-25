@@ -496,7 +496,7 @@ const FEATURES: Feature[] = [
     title: "Contact Alerts",
     tagline: "Nobody wonders where you went.",
     description:
-      "Before you go underground, DeadZone handles two things that matter most when you disappear mid-conversation. First, it checks who you have been actively messaging and offers to send each of them a personalised update. You write the message templates once in settings — Mom gets one message, your partner gets another, work gets a professional version — and DeadZone fills in your exact location and estimated return time automatically every time it fires. Second, it drops a precise GPS location pin to your selected contacts the instant before signal drops. If you do not act before the dead zone arrives, DeadZone falls back to SMS automatically, because SMS reaches signal levels where data cannot.",
+      "Before you go underground, DeadZone handles the two things that matter most when you disappear mid-conversation. First, it checks who you have been actively messaging and offers to send each of them a personalised update. You write your message templates once in settings and forget about them. Mom gets one message, your partner gets another, and work gets the professional version. DeadZone fills in your exact location and estimated return time automatically, every single time it fires. Second, it drops a precise GPS location pin to your selected contacts the instant before signal drops. If you do not act before the dead zone arrives, DeadZone falls back to SMS automatically, because SMS reaches signal levels where data simply cannot.",
     accent: "#00d4ff",
     screen: <ContactScreen />,
   },
@@ -520,10 +520,10 @@ const FEATURES: Feature[] = [
   },
   {
     num: "06",
-    title: "Seamless",
+    title: "Seamless Recovery",
     tagline: "The app never looked like it stopped.",
     description:
-      "Everything else on this page is about going dark. Seamless is about what happens when you come back. The moment your phone detects signal, DeadZone triggers a quiet, automatic sequence. Messages that queued deliver instantly. A short confirmation goes to everyone you notified. Your navigation session resumes from your current position. Your podcast picks up from the exact second it paused. Articles refresh to their live versions. There is no moment of catching up, no backlog to sort through. You surface and everything is already where it should be.",
+      "Everything else on this page is about going dark. Seamless Recovery is about what happens when you come back. The moment your phone detects signal, DeadZone triggers a quiet, automatic sequence. Messages that queued deliver instantly. A short confirmation goes to everyone you notified. Your navigation session resumes from your current position. Your podcast picks up from the exact second it paused. Articles refresh to their live versions. There is no moment of catching up, no backlog to sort through. You surface and everything is already where it should be.",
     accent: "#00d4ff",
     screen: <SeamlessScreen />,
   },
