@@ -65,9 +65,9 @@ export default function Dashboard() {
   }, []);
 
   const stats: StatDef[] = [
-    { icon: "⚡", label: "packs built", value: data?.packs_built ?? "—",                                color: "#00d4ff" },
-    { icon: "💾", label: "cached",      value: data?.packs_sold  ?? "—",                                color: "#8b5cf6" },
-    { icon: "⏱", label: "avg build",   value: data ? `${Number(data.avg_build_ms).toFixed(0)}ms` : "—", color: "#f59e0b" },
+    { icon: "⚡", label: "trips covered", value: data?.packs_built ?? "—",                                color: "#00d4ff" },
+    { icon: "💾", label: "instant packs", value: data?.packs_sold  ?? "—",                                color: "#8b5cf6" },
+    { icon: "⏱", label: "avg ready",   value: data ? `${Number(data.avg_build_ms).toFixed(0)}ms` : "—", color: "#f59e0b" },
   ];
 
   const actionColor = (a: string) =>
@@ -126,9 +126,9 @@ export default function Dashboard() {
         <div
           className="shrink-0 text-[9px] uppercase tracking-[0.2em] pr-3 hidden sm:block"
           style={{ color: "#334155", borderRight: "1px solid rgba(0,212,255,0.08)" }}
-          title="AI agents autonomously assemble offline continuity packs before you enter dead zones"
+          title="AI pre-loads offline content before your signal drops — so you're never caught off-guard"
         >
-          Nimble Network
+          Signal Guard
         </div>
         {stats.map((s) => (
           <StatPill key={s.label} {...s} />

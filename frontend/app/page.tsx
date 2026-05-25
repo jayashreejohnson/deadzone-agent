@@ -541,7 +541,7 @@ export default function Page() {
             </span>
           </div>
           <span className="text-xs text-slate-600 hidden md:block tracking-wide">
-            live · autonomous
+            live · always ready
           </span>
           {/* WS status dot */}
           <span

@@ -245,9 +245,9 @@ export default function LiveLogs({ events, onReplay, isReplaying, traceId }: {
       >
         {lines.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 pb-8">
-            <div className="text-3xl opacity-30">??</div>
+            <div className="text-3xl opacity-30">📡</div>
             <div className="text-[11px] text-slate-600 tracking-widest uppercase text-center">
-              awaiting agent activity
+              ready to scan your route
             </div>
           </div>
         ) : (
