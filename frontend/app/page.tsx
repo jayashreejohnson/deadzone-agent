@@ -387,8 +387,13 @@ export default function Page() {
   const showPlannerCard   = planState === "ready";
   const showPlanner       = showPlannerModal || showPlannerCard;
   const showCountdown  = planState === "tripping" && nextZone !== null && countdownSeconds !== null;
+  // Derive pack status from overlay state so CountdownBanner and ReadyCard
+  // are always in sync — avoids the desync where overlay shows "ready" but
+  // banner still shows "building pack" (caused by deadzone_id mismatches).
   const currentPackStatus: "preparing" | "ready" | "cached" =
-    nextZone ? (zonePackStatus[nextZone.id] || "preparing") : "preparing";
+    overlay.kind === "ready"        ? (overlay.cached ? "cached" : "ready")
+    : overlay.kind === "cached_found" ? "cached"
+    : nextZone ? (zonePackStatus[nextZone.id] || "preparing") : "preparing";
 
   // ── LOG_DRAWER_WIDTH ─────────────────────────────────────────
   // Replay handler
@@ -425,17 +430,20 @@ export default function Page() {
   }
 
   function handleTripComplete() {
-    // Show 'back online' toast then slide back to the planner
+    // Show 'back online' toast, then land on the "ready" compact card
+    // so the map stays visible with the route still plotted.
+    // The user can re-plan from there without a jarring full-screen reset.
     pushToast({ id: _toastSeq++, variant: "synced" });
     setTimeout(() => {
       const poly = routePolylineRef.current;
       const start = poly[0] || DEFAULT_ROUTE_POLYLINE[0];
-      setPlanState("idle");
+      // Stay in "ready" — compact card, map visible, zones still shown.
+      // User must explicitly click "Re-plan" in TripPlanner to go idle.
+      setPlanState("ready");
       setOverlay({ kind: "none" });
       setOfflineActive(false);
       setCountdownSeconds(null);
       setNextZone(null);
-      setEvalData(null);
       setTrips({
         user_a: { pos: start, segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
         user_b: { pos: start, segIdx: 0, segT: 0, running: false, insideZone: null, triggered: new Set() },
@@ -443,11 +451,13 @@ export default function Page() {
     }, 3500);
   }
 
-  // Auto-resume trip 5 s after ReadyCard appears
+  // Resume the trip animation 5 s after ReadyCard appears, but keep the card
+  // visible so the user can still tap "Open Continuity Pack" to read resources.
+  // The overlay dismisses naturally when the next zone entry triggers a new alert.
   useEffect(() => {
     if (overlay.kind !== "ready" || planState !== "tripping") return;
     const timer = setTimeout(() => {
-      setOverlay({ kind: "none" });
+      // Only resume the animation — do NOT close the ReadyCard.
       setTrips((prev) => {
         const t = prev.user_a;
         return t.running ? prev : { ...prev, user_a: { ...t, running: true } };
