@@ -13,20 +13,28 @@ function classify(e: AgentEvent): Line | null {
   }
   if (e.type === "tool" && e.name === "nimble") {
     const q = String(e.query ?? "").toLowerCase();
-    if (q.includes("weather"))
-      return { bullet: "🌦", color: "#a78bfa", label: "Gathering weather intelligence",   glow: "rgba(167,139,250,0.4)" };
-    if (q.includes("road") || q.includes("traffic"))
+    if (q.includes("weather") || q.includes("forecast") || q.includes("elevation"))
+      return { bullet: "🌦", color: "#a78bfa", label: "Fetching weather forecast",         glow: "rgba(167,139,250,0.4)" };
+    if (q.includes("emergency") || q.includes("rescue") || q.includes("sheriff") || q.includes("sar"))
+      return { bullet: "🆘", color: "#ef4444", label: "Pulling emergency contacts",        glow: "rgba(239,68,68,0.35)" };
+    if (q.includes("avalanche") || q.includes("rockslide") || q.includes("cdot") || q.includes("closure"))
+      return { bullet: "⛰", color: "#f59e0b", label: "Checking mountain road conditions", glow: "rgba(245,158,11,0.4)" };
+    if (q.includes("transit") || q.includes("service alert") || q.includes("delay") || q.includes("subway") || q.includes("bart"))
+      return { bullet: "🚇", color: "#60a5fa", label: "Checking transit service alerts",   glow: "rgba(96,165,250,0.4)" };
+    if (q.includes("road") || q.includes("traffic") || q.includes("highway"))
       return { bullet: "🛣", color: "#60a5fa", label: "Checking road conditions",          glow: "rgba(96,165,250,0.4)" };
+    if (q.includes("gas") || q.includes("fuel") || q.includes("last") || q.includes("station"))
+      return { bullet: "⛽", color: "#f59e0b", label: "Finding fuel & services ahead",     glow: "rgba(245,158,11,0.4)" };
     if (q.includes("news"))
       return { bullet: "📰", color: "#a78bfa", label: "Scanning local news",               glow: "rgba(167,139,250,0.4)" };
-    return   { bullet: "📡", color: "#a78bfa", label: "Searching nearby services",         glow: "rgba(167,139,250,0.4)" };
+    return   { bullet: "📍", color: "#a78bfa", label: "Finding nearby services",           glow: "rgba(167,139,250,0.4)" };
   }
   if (e.type === "tool" && e.name === "senso") {
     return { bullet: "📦", color: "#10b981", label: "Assembling continuity pack", glow: "rgba(16,185,129,0.4)" };
   }
   if (e.type === "payment") {
-    // Payment is infrastructure detail — hidden from the user-facing log.
-    return null;
+    const amt = Number(e.amount ?? 0).toFixed(2);
+    return { bullet: "💸", color: "#f59e0b", label: `Pack purchased from ${String(e.to)} · $${amt}`, glow: "rgba(245,158,11,0.35)" };
   }
   if (e.type === "pack_ready") {
     return { bullet: "✅", color: "#10b981", label: e.cached ? "Offline pack reused (cached)" : "Continuity pack assembled", glow: "rgba(16,185,129,0.5)" };
@@ -63,7 +71,7 @@ const TOOL_LABEL: Record<string, string> = {
   clickhouse_find_recent_pack:    "cache lookup",
   clickhouse_save_pack:           "save pack",
   clickhouse_log_event:           "log",
-  payments_pay:                   "x402 pay",
+  payments_pay:                   "agent pay",
   deliver_pack:                   "deliver",
 };
 

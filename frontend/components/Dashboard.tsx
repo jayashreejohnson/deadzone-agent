@@ -65,9 +65,10 @@ export default function Dashboard() {
   }, []);
 
   const stats: StatDef[] = [
-    { icon: "⚡", label: "trips covered", value: data?.packs_built ?? "—",                                color: "#00d4ff" },
-    { icon: "💾", label: "instant packs", value: data?.packs_sold  ?? "—",                                color: "#8b5cf6" },
-    { icon: "⏱", label: "avg ready",   value: data ? `${Number(data.avg_build_ms).toFixed(0)}ms` : "—", color: "#f59e0b" },
+    { icon: "⚡", label: "trips covered", value: data?.packs_built ?? "—",                                          color: "#00d4ff" },
+    { icon: "💾", label: "instant packs", value: data?.packs_sold  ?? "—",                                          color: "#8b5cf6" },
+    { icon: "⏱", label: "avg ready",      value: data ? `${Number(data.avg_build_ms).toFixed(0)}ms` : "—",         color: "#f59e0b" },
+    { icon: "💸", label: "agents paid",    value: data ? `$${Number(data.total_paid_usd).toFixed(2)}` : "—",        color: "#10b981" },
   ];
 
   const actionColor = (a: string) =>

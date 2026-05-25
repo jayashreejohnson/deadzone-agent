@@ -333,7 +333,7 @@ export default function Page() {
     setEvents([]);
     setShowOfflineOverlay(false);
     setOfflineZone(null);
-    setCountdownSeconds(45);
+    setCountdownSeconds(20);
     setNextZone(zones[0] || null);
     setZonePackStatus({});
     setLastPack(null);       // clear stale pack so modal never shows wrong-route content
@@ -360,7 +360,7 @@ export default function Page() {
     if (planState === "idle") {
       setPlanState("tripping");
       setNextZone(plannedZones[0] || null);
-      setCountdownSeconds(45);
+      setCountdownSeconds(20);
     }
   }
   function resetTrip(u: User) {

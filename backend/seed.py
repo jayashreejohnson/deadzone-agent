@@ -104,23 +104,117 @@ def seed_if_empty() -> None:
         )
 
     # Demo: pre-built pack for user_a's route. user_b will buy this during the demo.
-    # NOTE: this pack URL points at the static-fallback HTML format. We write a real file
-    # so the modal can iframe it even before user_a triggers a fresh build.
-    import os, uuid, html
+    # Written using the same dark-themed HTML template as senso.py so it looks identical
+    # to a freshly built pack when opened in the modal.
+    import os, uuid
     here = os.path.dirname(os.path.abspath(__file__))
     packs_dir = os.path.join(here, "static", "packs")
     os.makedirs(packs_dir, exist_ok=True)
     fname = f"seed_{uuid.uuid4().hex[:8]}.html"
     fpath = os.path.join(packs_dir, fname)
+
+    # Import the HTML renderer from senso so the seed looks identical to a real pack
+    from tools.senso import _render_html
+    seed_sections = [
+        {
+            "heading": "Weather",
+            "summary": (
+                "Clear skies over Manhattan and Weehawken. Temperature 58°F, light southwest winds at 8 mph. "
+                "Partly cloudy in Newark with temperatures dropping to 54°F by evening. "
+                "No precipitation forecast for the next 6 hours. Visibility 10+ miles throughout the corridor."
+            ),
+            "sources": [
+                {
+                    "url": "https://forecast.weather.gov/MapClick.php?CityName=Newark&state=NJ",
+                    "title": "NWS Newark, NJ — Hourly Forecast",
+                    "snippet": "Clear skies tonight. Low around 52°F. West wind 5 to 10 mph.",
+                    "reachable": True,
+                },
+                {
+                    "url": "https://weather.com/weather/today/l/40.7621,-74.0312",
+                    "title": "Weather.com — Lincoln Tunnel Area",
+                    "snippet": "Comfortable conditions. No alerts in effect for Hudson County.",
+                    "reachable": True,
+                },
+            ],
+        },
+        {
+            "heading": "Road conditions",
+            "summary": (
+                "Lincoln Tunnel operating normally — all three tubes open. "
+                "NJ Turnpike Extension (I-495) flowing freely after the exit helix. "
+                "NJ Route 3 westbound: moderate volume near Secaucus, clearing through Rutherford. "
+                "Port Authority reports no incidents or unplanned closures in effect."
+            ),
+            "sources": [
+                {
+                    "url": "https://www.511nj.org/",
+                    "title": "511NJ — Live Traffic & Road Conditions",
+                    "snippet": "No major incidents on I-495, NJ-3, or the NJ Turnpike Extension as of this report.",
+                    "reachable": True,
+                },
+                {
+                    "url": "https://www.panynj.gov/bridges-tunnels/en/lincoln-tunnel.html",
+                    "title": "Port Authority — Lincoln Tunnel Status",
+                    "snippet": "All tunnels open. Normal peak-period delays expected. Toll cashless only.",
+                    "reachable": True,
+                },
+            ],
+        },
+        {
+            "heading": "Nearby services & contacts",
+            "summary": (
+                "Port Authority Police (NJ side): (201) 216-7000. Port Authority Police (NY side): (212) 435-7272. "
+                "Nearest emergency room: Hackensack University Medical Center, 2.4 miles from the tunnel exit via NJ-3 W. "
+                "Vince Lombardi Service Area (ExxonMobil, Burger King, Starbucks) is 0.6 miles north on NJ Turnpike after exit."
+            ),
+            "sources": [
+                {
+                    "url": "https://www.panynj.gov/bridges-tunnels/en/contact-us.html",
+                    "title": "Port Authority Emergency Contacts",
+                    "snippet": "24/7 police dispatch for all PA tunnels and bridges. Non-emergency: (212) 435-7000.",
+                    "reachable": True,
+                },
+                {
+                    "url": "https://www.njturnpike.com/content/njturnpike/en/travelers/service-areas.html",
+                    "title": "NJ Turnpike Service Areas — Vince Lombardi",
+                    "snippet": "Full-service area 0.6 mi from Lincoln Tunnel exit. Fuel, food, and restrooms available 24 hours.",
+                    "reachable": True,
+                },
+            ],
+        },
+        {
+            "heading": "Local news",
+            "summary": (
+                "NJ Transit reports normal service on all rail lines serving the Newark–New York corridor. "
+                "PATH train running on schedule between Journal Square and 33rd Street. "
+                "No weekend closures affecting the Lincoln Tunnel corridor this week. "
+                "Hudson County reports routine road-striping work on NJ-3 scheduled for overnight hours only."
+            ),
+            "sources": [
+                {
+                    "url": "https://www.njtransit.com/service-alerts",
+                    "title": "NJ Transit — Service Alerts",
+                    "snippet": "No major service disruptions on Northeast Corridor or Morris & Essex lines.",
+                    "reachable": True,
+                },
+                {
+                    "url": "https://www.northjersey.com/",
+                    "title": "NorthJersey.com — Local News",
+                    "snippet": "No major traffic incidents or road closures reported in Hudson or Bergen counties today.",
+                    "reachable": True,
+                },
+            ],
+        },
+    ]
+
+    seed_html = _render_html(
+        title="Offline pack: Lincoln Tunnel",
+        route_id="manhattan_to_newark",
+        sections=seed_sections,
+    )
     with open(fpath, "w", encoding="utf-8") as f:
-        f.write(f"""<!doctype html><html><head><meta charset='utf-8'>
-<title>Offline pack: nyc_to_burlington (seeded)</title>
-<style>body{{font-family:system-ui;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.55}}</style>
-</head><body>
-<h1>Offline pack: nyc_to_burlington <span style='background:#eef;padding:2px 8px;border-radius:8px;font-size:0.75rem;color:#44c'>seeded</span></h1>
-<p>Pre-seeded pack used by the cache-hit demo path. Once user_a triggers a real build,
-this seed is superseded by the freshly-published pack.</p>
-</body></html>""")
+        f.write(seed_html)
 
     # Place this seed pack OUTSIDE the cache window so user_a still builds fresh on
     # their first signal, then user_b gets a cache-hit on user_a's NEW pack.
