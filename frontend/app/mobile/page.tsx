@@ -3,9 +3,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 /* ─────────────────────────────────────────────────────────
-   Scroll-triggered fade-in hook
+   Scroll-triggered fade-in
 ───────────────────────────────────────────────────────── */
-function useFadeIn(threshold = 0.15) {
+function useFadeIn(threshold = 0.12) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -22,99 +22,142 @@ function useFadeIn(threshold = 0.15) {
 }
 
 /* ─────────────────────────────────────────────────────────
-   Phone frame wrapper
+   Scroll arrow — click to jump to next section
+───────────────────────────────────────────────────────── */
+function ScrollArrow({ targetId }: { targetId: string }) {
+  return (
+    <div className="flex justify-center" style={{ padding: "3rem 0" }}>
+      <button
+        onClick={() =>
+          document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "0.5rem",
+          opacity: 0.28,
+          transition: "opacity 0.25s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.72")}
+        onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.28")}
+        aria-label="Scroll to next section"
+      >
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          className="animate-bounce"
+        >
+          <path
+            d="M7 12l9 9 9-9"
+            stroke="#94a3b8"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   Phone frame  (290 × 590)
 ───────────────────────────────────────────────────────── */
 function Phone({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative mx-auto select-none" style={{ width: 256, height: 524 }}>
-      {/* outer shell */}
+    <div className="relative mx-auto select-none" style={{ width: 290, height: 590 }}>
       <div
         className="absolute inset-0 overflow-hidden"
         style={{
-          borderRadius: 44,
+          borderRadius: 50,
           background: "#0c0c18",
           border: "3px solid #252535",
           boxShadow:
-            "0 0 0 1px #111, 0 32px 80px rgba(0,0,0,.85), inset 0 0 0 1px #2a2a3c",
+            "0 0 0 1px #111, 0 40px 100px rgba(0,0,0,.9), inset 0 0 0 1px #2a2a3c",
         }}
       >
         {/* dynamic island */}
         <div
           className="absolute z-20"
           style={{
-            top: 14, left: "50%", transform: "translateX(-50%)",
-            width: 88, height: 24, background: "#000", borderRadius: 12,
+            top: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 96,
+            height: 26,
+            background: "#000",
+            borderRadius: 13,
           }}
         />
         {/* screen */}
-        <div className="absolute inset-0 overflow-hidden" style={{ paddingTop: 44 }}>
+        <div className="absolute inset-0 overflow-hidden" style={{ paddingTop: 48 }}>
           {children}
         </div>
         {/* glass glare */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            borderRadius: 44,
-            background: "linear-gradient(135deg, rgba(255,255,255,.04) 0%, transparent 50%)",
+            borderRadius: 50,
+            background:
+              "linear-gradient(135deg, rgba(255,255,255,.045) 0%, transparent 52%)",
           }}
         />
       </div>
-      {/* volume buttons */}
-      <div className="absolute rounded-l-sm" style={{ left: -4, top: 90,  width: 3, height: 34, background: "#202030" }} />
-      <div className="absolute rounded-l-sm" style={{ left: -4, top: 134, width: 3, height: 34, background: "#202030" }} />
-      {/* power button */}
-      <div className="absolute rounded-r-sm" style={{ right: -4, top: 108, width: 3, height: 56, background: "#202030" }} />
+      {/* volume */}
+      <div className="absolute rounded-l-sm" style={{ left: -4, top: 100, width: 3, height: 38, background: "#202030" }} />
+      <div className="absolute rounded-l-sm" style={{ left: -4, top: 150, width: 3, height: 38, background: "#202030" }} />
+      {/* power */}
+      <div className="absolute rounded-r-sm" style={{ right: -4, top: 122, width: 3, height: 62, background: "#202030" }} />
     </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────
-   Screen 1 — GPS Auto-Detection
+   Screen 1  GPS Auto-Detection
 ───────────────────────────────────────────────────────── */
 function GPSScreen() {
   return (
     <div className="h-full flex flex-col" style={{ background: "#060b14", fontFamily: "'Space Grotesk', sans-serif" }}>
-      <div className="flex justify-between px-4 pt-1 pb-1" style={{ fontSize: 10, color: "#666" }}>
+      <div className="flex justify-between px-4 pt-1 pb-1" style={{ fontSize: 11, color: "#555" }}>
         <span>9:41</span><span>●●● 87%</span>
       </div>
-      {/* mini map */}
-      <div className="relative mx-3 rounded-2xl overflow-hidden" style={{ background: "#0a1828", height: 190 }}>
+      {/* map */}
+      <div className="relative mx-3 rounded-2xl overflow-hidden" style={{ background: "#0a1828", height: 218 }}>
         <svg className="absolute inset-0 w-full h-full">
-          {/* route line */}
-          <polyline points="28,158 75,118 128,82 180,54 218,34"
+          <polyline points="28,178 80,130 136,88 190,58 232,36"
             stroke="#00d4ff" strokeWidth="2.5" fill="none" strokeDasharray="5 3" opacity=".7" />
-          {/* dead zone */}
-          <circle cx="218" cy="34" r="20" fill="#ef4444" opacity=".15" />
-          <circle cx="218" cy="34" r="20" stroke="#ef4444" strokeWidth="1.5" fill="none" opacity=".7" />
-          {/* position dot + pulse */}
-          <circle cx="75" cy="118" r="5" fill="#00d4ff" />
-          <circle cx="75" cy="118" r="5" fill="none" stroke="#00d4ff" strokeWidth="1" opacity=".5">
-            <animate attributeName="r" values="7;16;7" dur="2.2s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values=".6;0;.6" dur="2.2s" repeatCount="indefinite" />
+          <circle cx="232" cy="36" r="22" fill="#ef4444" opacity=".14" />
+          <circle cx="232" cy="36" r="22" stroke="#ef4444" strokeWidth="1.5" fill="none" opacity=".7" />
+          <circle cx="80" cy="130" r="5.5" fill="#00d4ff" />
+          <circle cx="80" cy="130" r="5" fill="none" stroke="#00d4ff" strokeWidth="1.2" opacity=".5">
+            <animate attributeName="r" values="8;18;8" dur="2.4s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values=".55;0;.55" dur="2.4s" repeatCount="indefinite" />
           </circle>
         </svg>
-        <div className="absolute top-2.5 left-3 flex items-center gap-1.5" style={{ fontSize: 10, color: "#22c55e" }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
+        <div className="absolute top-3 left-3 flex items-center gap-1.5" style={{ fontSize: 11, color: "#22c55e" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
           Monitoring active
         </div>
-        <div className="absolute top-2.5 right-3" style={{ fontSize: 10, color: "#64748b" }}>Chicago → Detroit</div>
+        <div className="absolute top-3 right-3" style={{ fontSize: 11, color: "#475569" }}>Chicago to Detroit</div>
       </div>
       {/* cards */}
-      <div className="px-3 mt-3 space-y-2">
-        <div className="rounded-2xl px-3 py-2.5 flex items-center gap-3"
-          style={{ background: "#0d1e30" }}>
-          <span style={{ fontSize: 20 }}>📍</span>
+      <div className="px-3 mt-3 space-y-2.5">
+        <div className="rounded-2xl px-3.5 py-3 flex items-center gap-3" style={{ background: "#0d1e30" }}>
+          <span style={{ fontSize: 22 }}>📍</span>
           <div>
-            <div style={{ fontSize: 10, color: "#64748b" }}>Background · no battery drain</div>
-            <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 600 }}>Route auto-detected</div>
+            <div style={{ fontSize: 11, color: "#475569" }}>Running in background</div>
+            <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 600 }}>Route auto-detected</div>
           </div>
         </div>
-        <div className="rounded-2xl px-3 py-2.5 flex items-center gap-3"
+        <div className="rounded-2xl px-3.5 py-3 flex items-center gap-3"
           style={{ background: "#180e0e", border: "1px solid #3f1515" }}>
-          <span style={{ fontSize: 20 }}>⚠️</span>
+          <span style={{ fontSize: 22 }}>⚠️</span>
           <div>
-            <div style={{ fontSize: 10, color: "#f87171" }}>Dead zone · 18 min away</div>
-            <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 600 }}>Building your pack now…</div>
+            <div style={{ fontSize: 11, color: "#f87171" }}>Dead zone ahead · 18 min</div>
+            <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 600 }}>Building your pack now…</div>
           </div>
         </div>
       </div>
@@ -123,7 +166,7 @@ function GPSScreen() {
 }
 
 /* ─────────────────────────────────────────────────────────
-   Screen 2 — Push Notification (lock screen)
+   Screen 2  Dead Zone Countdown
 ───────────────────────────────────────────────────────── */
 function NotificationScreen() {
   return (
@@ -134,32 +177,32 @@ function NotificationScreen() {
         fontFamily: "'Space Grotesk', sans-serif",
       }}
     >
-      <div className="mt-10 text-center">
-        <div style={{ fontSize: 54, fontWeight: 200, color: "#fff", lineHeight: 1 }}>10:47</div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Tuesday, May 24</div>
+      <div className="mt-12 text-center">
+        <div style={{ fontSize: 60, fontWeight: 200, color: "#fff", lineHeight: 1 }}>10:47</div>
+        <div style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>Tuesday, May 24</div>
       </div>
-      {/* notification card */}
+      {/* notification */}
       <div
-        className="absolute bottom-14 left-3 right-3 rounded-2xl p-3"
+        className="absolute bottom-14 left-3 right-3 rounded-2xl p-3.5"
         style={{
-          background: "rgba(15,18,32,.88)",
-          backdropFilter: "blur(16px)",
+          background: "rgba(14,16,30,.9)",
+          backdropFilter: "blur(18px)",
           border: "1px solid rgba(255,255,255,.07)",
         }}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: "rgba(0,212,255,.12)", border: "1px solid rgba(0,212,255,.2)" }}>
-            <span style={{ fontSize: 14 }}>📡</span>
+        <div className="flex items-center gap-2 mb-2.5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{ background: "rgba(0,212,255,.1)", border: "1px solid rgba(0,212,255,.18)" }}>
+            <span style={{ fontSize: 16 }}>📡</span>
           </div>
-          <span style={{ fontSize: 11, color: "#94a3b8" }}>DeadZone</span>
-          <span style={{ fontSize: 10, color: "#475569", marginLeft: "auto" }}>now</span>
+          <span style={{ fontSize: 12, color: "#64748b" }}>DeadZone</span>
+          <span style={{ fontSize: 11, color: "#334155", marginLeft: "auto" }}>now</span>
         </div>
-        <div style={{ fontSize: 13, color: "#f1f5f9", fontWeight: 700, marginBottom: 2 }}>
+        <div style={{ fontSize: 14, color: "#f1f5f9", fontWeight: 700, marginBottom: 3 }}>
           Dead zone in 3 min
         </div>
-        <div style={{ fontSize: 12, color: "#94a3b8" }}>
-          Your offline pack is ready ✓ — tap to view
+        <div style={{ fontSize: 12, color: "#64748b" }}>
+          Your offline pack is ready. Tap to view.
         </div>
       </div>
     </div>
@@ -167,7 +210,7 @@ function NotificationScreen() {
 }
 
 /* ─────────────────────────────────────────────────────────
-   Screen 3 — Smart Contact Alerts
+   Screen 3  Smart Contact Alerts
 ───────────────────────────────────────────────────────── */
 function ContactScreen() {
   const contacts = [
@@ -180,42 +223,48 @@ function ContactScreen() {
   return (
     <div className="h-full flex flex-col" style={{ background: "#060b14", fontFamily: "'Space Grotesk', sans-serif" }}>
       <div className="flex-1" style={{ background: "linear-gradient(180deg, #0d1a2a 0%, #060b14 100%)" }}>
-        <div className="w-full h-full opacity-20"
-          style={{ background: "radial-gradient(circle at 65% 35%, #00d4ff30, transparent)" }} />
+        <div className="w-full h-full"
+          style={{ background: "radial-gradient(circle at 65% 35%, rgba(0,212,255,.06), transparent)" }} />
       </div>
       {/* bottom sheet */}
-      <div className="rounded-t-3xl px-4 pt-3 pb-4" style={{ background: "#0e1420", border: "1px solid #1a2535" }}>
-        <div className="w-8 h-1 rounded-full mx-auto mb-3" style={{ background: "#2a3044" }} />
-        <div style={{ fontSize: 15, color: "#f1f5f9", fontWeight: 700, marginBottom: 2 }}>Notify before you go dark?</div>
-        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>Messaged 5 people in the last hour</div>
-        <div className="space-y-2 mb-4">
+      <div className="rounded-t-3xl px-4 pt-3 pb-5" style={{ background: "#0e1420", border: "1px solid #1a2535" }}>
+        <div className="w-9 h-1 rounded-full mx-auto mb-4" style={{ background: "#2a3044" }} />
+        <div style={{ fontSize: 15, color: "#f1f5f9", fontWeight: 700, marginBottom: 3 }}>
+          Notify before you go dark?
+        </div>
+        <div style={{ fontSize: 12, color: "#475569", marginBottom: 12 }}>
+          You messaged 5 people in the last hour
+        </div>
+        <div className="space-y-2.5 mb-4">
           {contacts.map((c) => (
-            <div key={c.name} className="flex items-center gap-2.5">
+            <div key={c.name} className="flex items-center gap-3">
               <div
                 className="flex-shrink-0 w-4 h-4 rounded flex items-center justify-center"
                 style={{
-                  background:  c.checked ? "#00d4ff"                      : "transparent",
-                  border:      c.checked ? "none"                          : "1.5px solid #334155",
+                  background: c.checked ? "#00d4ff" : "transparent",
+                  border:     c.checked ? "none"    : "1.5px solid #334155",
                 }}
               >
                 {c.checked && <span style={{ fontSize: 9, color: "#000", fontWeight: 800 }}>✓</span>}
               </div>
-              <span style={{ fontSize: 13, color: c.checked ? "#e2e8f0" : "#475569" }}>{c.name}</span>
+              <span style={{ fontSize: 13, color: c.checked ? "#e2e8f0" : "#334155" }}>{c.name}</span>
             </div>
           ))}
         </div>
-        {/* time window */}
-        <div className="flex items-center gap-2 mb-3">
-          <span style={{ fontSize: 11, color: "#64748b" }}>Time window:</span>
-          <span className="px-2 py-0.5 rounded-lg" style={{ background: "#1a2535", color: "#94a3b8", fontSize: 11 }}>Last hour ▾</span>
+        <div className="flex items-center gap-2 mb-4">
+          <span style={{ fontSize: 12, color: "#475569" }}>Time window:</span>
+          <span className="px-2 py-0.5 rounded-lg"
+            style={{ background: "#1a2535", color: "#64748b", fontSize: 12 }}>
+            Last hour ▾
+          </span>
         </div>
         <div className="flex gap-2">
-          <button className="flex-1 py-2 rounded-xl font-bold"
-            style={{ background: "#00d4ff", color: "#000", fontSize: 12 }}>
+          <button className="flex-1 py-2.5 rounded-xl font-bold"
+            style={{ background: "#00d4ff", color: "#000", fontSize: 13 }}>
             Notify 3 contacts
           </button>
-          <button className="px-4 py-2 rounded-xl"
-            style={{ background: "#1a2535", color: "#64748b", fontSize: 12 }}>
+          <button className="px-4 py-2.5 rounded-xl"
+            style={{ background: "#1a2535", color: "#475569", fontSize: 13 }}>
             Skip
           </button>
         </div>
@@ -225,51 +274,51 @@ function ContactScreen() {
 }
 
 /* ─────────────────────────────────────────────────────────
-   Screen 4 — Traffic Detection
+   Screen 4  Traffic Detection
 ───────────────────────────────────────────────────────── */
 function TrafficScreen() {
   return (
     <div className="h-full flex flex-col" style={{ background: "#060b14", fontFamily: "'Space Grotesk', sans-serif" }}>
-      <div className="flex justify-between px-4 pt-1 pb-1" style={{ fontSize: 10, color: "#666" }}>
+      <div className="flex justify-between px-4 pt-1 pb-1" style={{ fontSize: 11, color: "#555" }}>
         <span>9:41</span><span>●●● 87%</span>
       </div>
-      {/* mini map */}
-      <div className="relative mx-3 rounded-2xl overflow-hidden" style={{ background: "#0a1828", height: 156 }}>
+      {/* map */}
+      <div className="relative mx-3 rounded-2xl overflow-hidden" style={{ background: "#0a1828", height: 178 }}>
         <svg className="absolute inset-0 w-full h-full">
-          {/* congested segment */}
-          <polyline points="20,130 58,108 98,96" stroke="#ef4444" strokeWidth="5" fill="none" opacity=".6" />
-          {/* normal route */}
-          <polyline points="98,96 148,66 198,40" stroke="#00d4ff" strokeWidth="2.5" fill="none" strokeDasharray="4 3" opacity=".5" />
-          {/* alternate */}
-          <polyline points="98,96 118,128 168,138 210,88 198,40" stroke="#22c55e" strokeWidth="2" fill="none" strokeDasharray="4 3" opacity=".55" />
-          <circle cx="58" cy="108" r="5" fill="#00d4ff" />
+          <polyline points="20,148 62,120 106,104"
+            stroke="#ef4444" strokeWidth="5" fill="none" opacity=".65" />
+          <polyline points="106,104 154,72 206,44"
+            stroke="#00d4ff" strokeWidth="2.5" fill="none" strokeDasharray="4 3" opacity=".5" />
+          <polyline points="106,104 128,140 178,150 220,96 206,44"
+            stroke="#22c55e" strokeWidth="2" fill="none" strokeDasharray="4 3" opacity=".55" />
+          <circle cx="62" cy="120" r="5.5" fill="#00d4ff" />
         </svg>
-        <div className="absolute top-2 left-3" style={{ fontSize: 10, color: "#f87171" }}>⚠ Heavy traffic · I-94 E</div>
-        <div className="absolute bottom-2 right-3" style={{ fontSize: 10, color: "#22c55e" }}>Alt route →</div>
+        <div className="absolute top-3 left-3" style={{ fontSize: 11, color: "#f87171" }}>⚠ Heavy traffic · I-94 E</div>
+        <div className="absolute bottom-3 right-3" style={{ fontSize: 11, color: "#22c55e" }}>Alt route →</div>
       </div>
-      {/* speed + reroute */}
-      <div className="px-3 mt-3 space-y-2">
-        <div className="rounded-2xl px-3 py-2.5 flex items-center justify-between"
+      {/* info */}
+      <div className="px-3 mt-3 space-y-2.5">
+        <div className="rounded-2xl px-3.5 py-3 flex items-center justify-between"
           style={{ background: "#0d1e30" }}>
           <div>
-            <div style={{ fontSize: 10, color: "#64748b" }}>Current speed</div>
-            <div style={{ fontSize: 26, color: "#ef4444", fontWeight: 700, lineHeight: 1.1 }}>8 mph</div>
+            <div style={{ fontSize: 11, color: "#475569" }}>Current speed</div>
+            <div style={{ fontSize: 28, color: "#ef4444", fontWeight: 700, lineHeight: 1.1 }}>8 mph</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 10, color: "#64748b" }}>Dead zone ETA</div>
-            <div style={{ fontSize: 20, color: "#f59e0b", fontWeight: 700 }}>9 min</div>
+            <div style={{ fontSize: 11, color: "#475569" }}>Dead zone ETA</div>
+            <div style={{ fontSize: 22, color: "#f59e0b", fontWeight: 700 }}>9 min</div>
           </div>
         </div>
-        <div className="rounded-2xl px-3 py-2.5" style={{ background: "#091a0f", border: "1px solid #142b1a" }}>
-          <div style={{ fontSize: 11, color: "#22c55e", marginBottom: 2 }}>Alternate via I-90 E</div>
-          <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 600, marginBottom: 8 }}>
-            Saves 14 min · dead zone ETA jumps to 23 min
+        <div className="rounded-2xl px-3.5 py-3" style={{ background: "#091a0f", border: "1px solid #142b1a" }}>
+          <div style={{ fontSize: 12, color: "#22c55e", marginBottom: 3 }}>Alternate via I-90 E</div>
+          <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 600, marginBottom: 10 }}>
+            Saves 14 min · dead zone ETA moves to 23 min
           </div>
           <div className="flex gap-2">
-            <button className="px-3 py-1 rounded-lg font-bold"
-              style={{ background: "#22c55e", color: "#000", fontSize: 11 }}>Reroute</button>
-            <button className="px-3 py-1 rounded-lg"
-              style={{ background: "#1a2535", color: "#64748b", fontSize: 11 }}>Stay</button>
+            <button className="px-4 py-1.5 rounded-lg font-bold"
+              style={{ background: "#22c55e", color: "#000", fontSize: 12 }}>Reroute</button>
+            <button className="px-4 py-1.5 rounded-lg"
+              style={{ background: "#1a2535", color: "#475569", fontSize: 12 }}>Stay</button>
           </div>
         </div>
       </div>
@@ -278,46 +327,56 @@ function TrafficScreen() {
 }
 
 /* ─────────────────────────────────────────────────────────
-   Screen 5 — AI Content Pre-fetch
+   Screen 5  AI Content Pre-fetch
 ───────────────────────────────────────────────────────── */
 function ContentScreen() {
   return (
-    <div className="h-full flex flex-col items-center justify-center relative overflow-hidden"
-      style={{ background: "#000", fontFamily: "'Space Grotesk', sans-serif" }}>
+    <div
+      className="h-full flex flex-col items-center justify-center relative overflow-hidden"
+      style={{ background: "#000", fontFamily: "'Space Grotesk', sans-serif" }}
+    >
       <div className="absolute inset-0"
-        style={{ background: "linear-gradient(180deg, #050510 0%, #080515 50%, #050510 100%)" }} />
-      {/* no signal badge */}
-      <div className="absolute top-3 right-4 flex items-center gap-1.5 px-2 py-1 rounded-full"
-        style={{ background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.2)", fontSize: 10, color: "#f87171" }}>
-        <span>📵</span><span>No Signal</span>
-      </div>
-      {/* reel playing indicator */}
-      <div className="absolute inset-0 flex items-center justify-center"
-        style={{ fontSize: 56, color: "rgba(255,255,255,.06)" }}>▶</div>
-      {/* pre-fetch card */}
+        style={{ background: "linear-gradient(180deg, #050510 0%, #080518 50%, #050510 100%)" }} />
+      {/* no signal */}
       <div
-        className="relative z-10 mx-4 rounded-2xl p-4 text-center"
+        className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full"
         style={{
-          background: "rgba(0,16,8,.92)",
-          border: "1px solid rgba(34,197,94,.18)",
-          backdropFilter: "blur(10px)",
+          background: "rgba(239,68,68,.1)",
+          border: "1px solid rgba(239,68,68,.18)",
+          fontSize: 11, color: "#f87171",
         }}
       >
-        <div style={{ fontSize: 13, color: "#22c55e", fontWeight: 700, marginBottom: 6 }}>
-          ✓  Content pre-fetched
+        <span>📵</span><span>No Signal</span>
+      </div>
+      {/* ghost play icon */}
+      <div className="absolute inset-0 flex items-center justify-center"
+        style={{ fontSize: 64, color: "rgba(255,255,255,.04)" }}>▶</div>
+      {/* card */}
+      <div
+        className="relative z-10 mx-5 rounded-2xl p-5 text-center"
+        style={{
+          background: "rgba(0,14,6,.92)",
+          border: "1px solid rgba(34,197,94,.16)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <div style={{ fontSize: 13, color: "#22c55e", fontWeight: 700, marginBottom: 8 }}>
+          Content pre-fetched
         </div>
-        <div style={{ fontSize: 32, color: "#fff", fontWeight: 700, lineHeight: 1 }}>22 min</div>
-        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>staged for your 20-min tunnel</div>
-        <div className="flex justify-center gap-4" style={{ fontSize: 11 }}>
+        <div style={{ fontSize: 36, color: "#fff", fontWeight: 700, lineHeight: 1 }}>22 min</div>
+        <div style={{ fontSize: 12, color: "#475569", marginBottom: 14 }}>
+          staged for your 20-min tunnel
+        </div>
+        <div className="flex justify-center gap-4" style={{ fontSize: 12 }}>
           <span style={{ color: "#f97316" }}>4 reels</span>
-          <span style={{ color: "#333" }}>·</span>
+          <span style={{ color: "#1e293b" }}>·</span>
           <span style={{ color: "#a78bfa" }}>3 articles</span>
-          <span style={{ color: "#333" }}>·</span>
+          <span style={{ color: "#1e293b" }}>·</span>
           <span style={{ color: "#38bdf8" }}>1 episode</span>
         </div>
       </div>
-      <div className="absolute bottom-4 left-0 right-0 text-center"
-        style={{ fontSize: 10, color: "#1e293b" }}>
+      <div className="absolute bottom-5 left-0 right-0 text-center"
+        style={{ fontSize: 11, color: "#0f172a" }}>
         feed continues as if you never lost signal
       </div>
     </div>
@@ -325,48 +384,51 @@ function ContentScreen() {
 }
 
 /* ─────────────────────────────────────────────────────────
-   Screen 6 — SMS Fallback
+   Screen 6  SMS Fallback
 ───────────────────────────────────────────────────────── */
 function SMSScreen() {
   return (
     <div className="h-full flex flex-col" style={{ background: "#08080f", fontFamily: "'Space Grotesk', sans-serif" }}>
-      {/* messages header */}
       <div className="px-4 pt-2 pb-3" style={{ borderBottom: "1px solid #111820" }}>
-        <div style={{ fontSize: 11, color: "#475569", marginBottom: 1 }}>← Messages</div>
-        <div style={{ fontSize: 15, color: "#f1f5f9", fontWeight: 600 }}>Mom</div>
+        <div style={{ fontSize: 12, color: "#334155", marginBottom: 2 }}>Messages</div>
+        <div style={{ fontSize: 16, color: "#f1f5f9", fontWeight: 600 }}>Mom</div>
       </div>
       {/* thread */}
-      <div className="flex-1 px-4 pt-4 flex flex-col justify-end pb-2">
+      <div className="flex-1 px-4 pt-5 flex flex-col justify-end pb-3">
         {/* incoming */}
-        <div className="mb-3 self-start" style={{ maxWidth: "72%" }}>
-          <div className="rounded-2xl rounded-tl-sm px-3 py-2"
-            style={{ background: "#1a1a2a", fontSize: 12, color: "#cbd5e1" }}>
+        <div className="mb-4 self-start" style={{ maxWidth: "72%" }}>
+          <div className="rounded-2xl rounded-tl-sm px-3.5 py-2.5"
+            style={{ background: "#1a1a2a", fontSize: 13, color: "#cbd5e1" }}>
             Are you almost here?
           </div>
-          <div style={{ fontSize: 10, color: "#334155", marginTop: 3, marginLeft: 4 }}>3:47 PM</div>
+          <div style={{ fontSize: 10, color: "#1e293b", marginTop: 3, marginLeft: 4 }}>3:47 PM</div>
         </div>
         {/* auto-sent */}
-        <div className="self-end" style={{ maxWidth: "82%" }}>
-          <div className="rounded-2xl rounded-tr-sm px-3 py-2.5"
+        <div className="self-end" style={{ maxWidth: "84%" }}>
+          <div
+            className="rounded-2xl rounded-tr-sm px-3.5 py-3"
             style={{
-              background: "rgba(0,212,255,.08)",
-              border: "1px solid rgba(0,212,255,.18)",
-              fontSize: 12,
+              background: "rgba(0,212,255,.07)",
+              border: "1px solid rgba(0,212,255,.16)",
+              fontSize: 13,
               color: "#e2e8f0",
-              lineHeight: 1.45,
-            }}>
-            Going dark near Lincoln Tunnel — back around 5:42pm.
+              lineHeight: 1.5,
+            }}
+          >
+            Going dark near Lincoln Tunnel. Back around 5:42pm.
           </div>
-          <div className="flex items-center justify-end gap-2 mt-1.5">
-            <span style={{ fontSize: 9, color: "rgba(0,212,255,.5)" }}>Sent by DeadZone</span>
-            <span style={{ fontSize: 10, color: "#334155" }}>Delivered ✓</span>
+          <div className="flex items-center justify-end gap-2 mt-2">
+            <span style={{ fontSize: 10, color: "rgba(0,212,255,.4)" }}>Sent by DeadZone</span>
+            <span style={{ fontSize: 10, color: "#1e293b" }}>Delivered</span>
           </div>
         </div>
       </div>
-      {/* SOS indicator */}
-      <div className="flex items-center justify-center gap-1.5 py-3"
-        style={{ borderTop: "1px solid #111820", fontSize: 11, color: "#ef4444" }}>
-        <span>📵</span><span>SOS Only — no data</span>
+      {/* SOS */}
+      <div
+        className="flex items-center justify-center gap-2 py-3"
+        style={{ borderTop: "1px solid #0f0f1a", fontSize: 12, color: "#7f1d1d" }}
+      >
+        <span>📵</span><span>SOS Only</span>
       </div>
     </div>
   );
@@ -381,7 +443,7 @@ const FEATURES = [
     title: "GPS Auto-Detection",
     tagline: "It just knows.",
     description:
-      "DeadZone runs silently in the background. The moment you start moving, it detects your route, monitors signal strength ahead, and starts building your pack — no tapping, no setup.",
+      "DeadZone runs silently in the background the moment you start moving. It reads your speed and heading, identifies your route from GPS data alone, and begins monitoring signal quality at every point ahead of you. No app to open. No destination to type in. By the time a dead zone appears on the horizon, your offline pack is already being assembled.",
     accent: "#00d4ff",
     screen: <GPSScreen />,
   },
@@ -390,7 +452,7 @@ const FEATURES = [
     title: "Dead Zone Countdown",
     tagline: "A heads-up before you disappear.",
     description:
-      "A lock screen notification lands while you still have full signal. Your pack is already built and waiting. You go underground knowing you're covered.",
+      "Three minutes before you lose signal, a notification appears on your lock screen. It confirms exactly how long the blackout lasts and tells you your offline pack is ready. You can tap to preview it, or ignore the notification entirely and keep driving. Either way, you arrive underground with everything already staged.",
     accent: "#a78bfa",
     screen: <NotificationScreen />,
   },
@@ -399,7 +461,7 @@ const FEATURES = [
     title: "Smart Contact Alerts",
     tagline: "Nobody wonders where you went.",
     description:
-      "Before you go dark, DeadZone checks who you've been talking to and asks if you'd like to let them know. A checklist, a customisable time window, and a hardcoded list for the people who matter most.",
+      "Going dark mid-conversation is one of the most frustrating parts of losing signal. DeadZone checks who you have been actively messaging and, before you go underground, offers to send them a quick update. Choose from a checklist of recent contacts, set a custom time window from the last hour to the entire day, or keep a permanent list of people who should always be notified. One tap handles all of them.",
     accent: "#00d4ff",
     screen: <ContactScreen />,
   },
@@ -408,7 +470,7 @@ const FEATURES = [
     title: "Traffic Detection",
     tagline: "Your speed tells the whole story.",
     description:
-      "Phone sensors detect when you're crawling. Dead zone ETAs recalculate in real time, and faster alternate routes surface automatically — all before you've thought to check.",
+      "Your phone already tracks your speed at every moment of the drive. When DeadZone detects you have slowed to a crawl, it immediately recalculates when you will reach the dead zone, adjusts the timing on your pack, and checks whether an alternate route would give you more signal time before you go underground. The suggestion surfaces before you have thought to look for one.",
     accent: "#22c55e",
     screen: <TrafficScreen />,
   },
@@ -417,7 +479,7 @@ const FEATURES = [
     title: "AI Content Pre-fetch",
     tagline: "Never freeze on a reel mid-tunnel.",
     description:
-      "Four minutes before you lose signal, DeadZone stages the next 20 minutes of your feed — fresh reels, articles you'd actually read, the next podcast episode. You didn't save anything. You didn't have to.",
+      "The real problem with saving content offline is that you never know what you want until you want it. The most satisfying thing to watch on the subway is always something you have not seen before. DeadZone monitors what you are currently watching, reading, and listening to, then quietly stages the next stretch of fresh content before the signal drops. Reels keep playing. Articles open instantly. The podcast continues. You just stop noticing the tunnels.",
     accent: "#f97316",
     screen: <ContentScreen />,
   },
@@ -426,7 +488,7 @@ const FEATURES = [
     title: "SMS Fallback",
     tagline: "Last resort. Fully automatic.",
     description:
-      "When data drops completely, critical messages go out via SMS — the one protocol that survives anything. No action needed from you. You emerge, your phone already handled it.",
+      "Data and LTE vanish deep underground, but SMS survives at signal levels where nothing else can reach. When DeadZone detects a complete data outage, it automatically sends a short message to anyone you were recently in contact with, letting them know you are temporarily unreachable and giving them an estimated time you will be back. No input needed. When you surface, your conversations pick up exactly where they left off.",
     accent: "#ec4899",
     screen: <SMSScreen />,
   },
@@ -446,32 +508,33 @@ function FeatureRow({
   return (
     <div
       ref={ref}
-      className={`flex flex-col items-center gap-12 lg:gap-20 transition-all duration-700
+      className={`flex flex-col items-center gap-14 lg:gap-24 transition-all duration-700
         ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}
         ${flip ? "lg:flex-row-reverse" : "lg:flex-row"}`}
     >
-      {/* phone */}
       <div className="flex-shrink-0">
         <Phone>{feature.screen}</Phone>
       </div>
-      {/* text */}
       <div className="flex-1 text-center lg:text-left">
         <div
-          className="text-xs font-mono tracking-[0.2em] mb-4"
-          style={{ color: feature.accent }}
+          className="text-xs font-mono mb-4"
+          style={{ color: feature.accent, letterSpacing: "0.2em" }}
         >
           {feature.num}
         </div>
         <h2
-          className="text-3xl sm:text-4xl font-bold mb-3 leading-tight"
+          className="text-4xl font-bold mb-4 leading-tight"
           style={{ letterSpacing: "-0.02em" }}
         >
           {feature.title}
         </h2>
-        <p className="text-lg font-medium mb-5" style={{ color: feature.accent }}>
+        <p className="text-lg font-medium mb-6" style={{ color: feature.accent }}>
           {feature.tagline}
         </p>
-        <p className="text-base leading-relaxed max-w-md mx-auto lg:mx-0" style={{ color: "#94a3b8" }}>
+        <p
+          className="text-base leading-relaxed max-w-md mx-auto lg:mx-0"
+          style={{ color: "#64748b" }}
+        >
           {feature.description}
         </p>
       </div>
@@ -496,15 +559,15 @@ export default function MobilePage() {
       <nav
         className="sticky top-0 z-50 flex items-center justify-between px-6 py-4"
         style={{
-          borderBottom: "1px solid rgba(0,212,255,.07)",
-          background: "rgba(5,8,16,.92)",
-          backdropFilter: "blur(16px)",
+          borderBottom: "1px solid rgba(0,212,255,.06)",
+          background: "rgba(5,8,16,.94)",
+          backdropFilter: "blur(18px)",
         }}
       >
         <Link
           href="/"
-          className="flex items-center gap-2 text-sm transition-colors"
-          style={{ color: "#64748b" }}
+          className="flex items-center gap-2 text-sm"
+          style={{ color: "#475569", transition: "color .2s" }}
         >
           <span>←</span>
           <span>Back to app</span>
@@ -512,25 +575,27 @@ export default function MobilePage() {
         <span className="text-sm font-semibold tracking-tight" style={{ color: "#00d4ff" }}>
           DeadZone
         </span>
-        {/* spacer keeps title centred */}
         <div style={{ width: 88 }} />
       </nav>
 
       {/* hero */}
-      <section className="max-w-3xl mx-auto px-6 pt-24 pb-28 text-center">
+      <section
+        id="hero"
+        className="max-w-3xl mx-auto px-6 pt-24 pb-4 text-center"
+      >
         <div
-          className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-8 text-xs font-medium"
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-10 text-xs font-medium"
           style={{
-            background: "rgba(167,139,250,.08)",
-            border: "1px solid rgba(167,139,250,.2)",
+            background: "rgba(167,139,250,.07)",
+            border: "1px solid rgba(167,139,250,.18)",
             color: "#a78bfa",
           }}
         >
           <span>📱</span>
-          <span>Coming to iOS &amp; Android</span>
+          <span>Coming to iOS and Android</span>
         </div>
         <h1
-          className="text-5xl sm:text-6xl font-bold mb-6 leading-tight"
+          className="text-5xl sm:text-6xl font-bold mb-8 leading-tight"
           style={{ letterSpacing: "-0.03em" }}
         >
           Six features.
@@ -539,17 +604,27 @@ export default function MobilePage() {
         </h1>
         <p
           className="text-xl mx-auto"
-          style={{ color: "#64748b", lineHeight: 1.75, maxWidth: 480 }}
+          style={{ color: "#475569", lineHeight: 1.8, maxWidth: 500 }}
         >
-          DeadZone on mobile becomes an ambient layer — aware of where you&apos;re
-          going, who you&apos;re talking to, and what you want to read before you go dark.
+          DeadZone on mobile becomes an ambient layer — aware of where you are going,
+          who you are talking to, and what you want to read before you go dark.
         </p>
       </section>
 
+      {/* arrow from hero to first feature */}
+      <ScrollArrow targetId="section-01" />
+
       {/* feature rows */}
-      <section className="max-w-5xl mx-auto px-6 pb-36 space-y-36">
+      <section className="max-w-5xl mx-auto px-6 pb-8">
         {FEATURES.map((f, i) => (
-          <FeatureRow key={f.num} feature={f} flip={i % 2 !== 0} />
+          <div key={f.num}>
+            <div id={`section-${f.num}`} className="py-10">
+              <FeatureRow feature={f} flip={i % 2 !== 0} />
+            </div>
+            {i < FEATURES.length - 1 && (
+              <ScrollArrow targetId={`section-${FEATURES[i + 1].num}`} />
+            )}
+          </div>
         ))}
       </section>
 
@@ -561,22 +636,22 @@ export default function MobilePage() {
         <div
           className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 text-xs"
           style={{
-            background: "rgba(0,212,255,.06)",
-            border: "1px solid rgba(0,212,255,.12)",
+            background: "rgba(0,212,255,.05)",
+            border: "1px solid rgba(0,212,255,.1)",
             color: "#00d4ff",
           }}
         >
           Built at Agentic Engineering Hack · Datadog NYC 2026
         </div>
-        <p className="mb-6" style={{ color: "#334155", fontSize: 14 }}>
+        <p className="mb-8" style={{ color: "#1e293b", fontSize: 14 }}>
           The web demo is live. The phone is next.
         </p>
         <Link
           href="/"
-          className="text-sm transition-colors"
+          className="text-sm"
           style={{ color: "#00d4ff" }}
         >
-          ← Try the live demo
+          Try the live demo
         </Link>
       </footer>
     </main>
