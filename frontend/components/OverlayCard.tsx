@@ -124,12 +124,34 @@ export function ReadyCard({
           <div
             className="shrink-0 flex flex-col items-center justify-center w-12 h-12 rounded-xl"
             style={{ background: `${scoreColor}12`, border: `1px solid ${scoreColor}30` }}
-            title={`Quality score ${evalScore}/100 ? SLA ${slaPass ? "passed" : "missed"}`}
+            title={`Quality score ${evalScore}/100 · SLA ${slaPass ? "passed" : "missed"}`}
           >
             <span className="text-sm font-bold tabular-nums" style={{ color: scoreColor }}>{evalScore}</span>
             <span className="text-[8px] uppercase tracking-wider" style={{ color: scoreColor }}>score</span>
           </div>
         )}
+      </div>
+
+      {/* Pack contents summary */}
+      <div
+        className="flex items-center gap-2 flex-wrap mb-4 px-3 py-2 rounded-xl"
+        style={{ background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.12)" }}
+      >
+        <span className="text-[9px] uppercase tracking-[0.18em] text-slate-600 shrink-0">Pack includes</span>
+        {[
+          { icon: "🌦", label: "Weather" },
+          { icon: "🛣", label: "Road conditions" },
+          { icon: "📰", label: "Local news" },
+          { icon: "📡", label: "Nearby services" },
+        ].map(({ icon, label }) => (
+          <span
+            key={label}
+            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full"
+            style={{ background: "rgba(16,185,129,0.1)", color: "#6ee7b7", border: "1px solid rgba(16,185,129,0.2)" }}
+          >
+            {icon} {label}
+          </span>
+        ))}
       </div>
 
       {cached && (

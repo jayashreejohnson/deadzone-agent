@@ -80,9 +80,16 @@ export default function CountdownBanner({ zone, secondsUntil, packStatus }: Coun
                     : isWarning   ? "0 0 20px rgba(245,158,11,0.2)"
                     : "0 0 20px rgba(0,212,255,0.15)";
 
+  const PRE_ZONE_ACTIONS = [
+    { icon: "🎵", label: "Buffer audio" },
+    { icon: "💬", label: "Send a text" },
+    { icon: "🗺", label: "Save maps" },
+    { icon: "📸", label: "Screenshot nav" },
+  ];
+
   return (
     <div
-      className="flex items-center gap-4 px-4 py-3 rounded-xl w-full transition-all duration-500"
+      className="flex flex-col rounded-xl w-full transition-all duration-500 overflow-hidden"
       style={{
         background: "rgba(5,8,16,0.88)",
         backdropFilter: "blur(18px)",
@@ -90,75 +97,108 @@ export default function CountdownBanner({ zone, secondsUntil, packStatus }: Coun
         boxShadow: glowColor,
       }}
     >
-      {/* Signal bars */}
-      <div className="shrink-0">
-        <SignalBars secondsUntil={secondsUntil} />
-      </div>
-
-      {/* Zone info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-slate-100 font-semibold text-sm truncate">{zone.name}</span>
-          <SeverityChip severity={zone.severity} />
+      {/* ── Main row ── */}
+      <div className="flex items-center gap-4 px-4 py-3">
+        {/* Signal bars */}
+        <div className="shrink-0">
+          <SignalBars secondsUntil={secondsUntil} />
         </div>
-        <div className="text-[11px] text-slate-500 mt-0.5 tracking-wide">
-          {isOffline ? "you're in the dead zone" : `dead zone approaching`}
-          {zone.duration_minutes && !isOffline ? ` · ${zone.duration_minutes} min blackout` : ""}
+
+        {/* Zone info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-slate-100 font-semibold text-sm truncate">{zone.name}</span>
+            <SeverityChip severity={zone.severity} />
+          </div>
+          <div className="text-[11px] text-slate-500 mt-0.5 tracking-wide">
+            {isOffline ? "you're in the dead zone" : `dead zone approaching`}
+            {zone.duration_minutes && !isOffline ? ` · ${zone.duration_minutes} min blackout` : ""}
+          </div>
+        </div>
+
+        {/* Countdown or offline state */}
+        <div className="shrink-0 text-right">
+          {isOffline ? (
+            <div className="text-slate-400 text-sm font-medium tracking-wide">📵 offline</div>
+          ) : (
+            <div className="flex flex-col items-end gap-0.5">
+              <span
+                className="font-mono font-bold text-2xl tabular-nums leading-none"
+                style={{
+                  color: isCritical ? "#ef4444" : isWarning ? "#f59e0b" : "#00d4ff",
+                  animation: isCritical ? "countdownGlow 0.8s ease-in-out infinite" : "none",
+                  textShadow: isCritical
+                    ? "0 0 12px rgba(239,68,68,0.7)"
+                    : isWarning
+                    ? "0 0 10px rgba(245,158,11,0.5)"
+                    : "0 0 10px rgba(0,212,255,0.4)",
+                }}
+              >
+                {formatTime(secondsUntil)}
+              </span>
+              <span className="text-[10px] text-slate-500 tracking-widest uppercase">until loss</span>
+            </div>
+          )}
+        </div>
+
+        {/* Pack status pill */}
+        <div className="shrink-0">
+          {packStatus === "preparing" && (
+            <div className="flex items-center gap-1.5 text-xs"
+                 style={{ color: "#00d4ff" }}>
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-full border-2 animate-spin"
+                style={{ borderColor: "rgba(0,212,255,0.25)", borderTopColor: "#00d4ff" }}
+              />
+              <span className="hidden sm:inline tracking-wide">building pack</span>
+            </div>
+          )}
+          {packStatus === "ready" && (
+            <div className="flex items-center gap-1.5 text-xs font-medium"
+                 style={{ color: "#10b981" }}>
+              <span>✅</span>
+              <span className="hidden sm:inline tracking-wide">pack ready</span>
+            </div>
+          )}
+          {packStatus === "cached" && (
+            <div className="flex items-center gap-1.5 text-xs font-medium"
+                 style={{ color: "#8b5cf6" }}>
+              <span>💾</span>
+              <span className="hidden sm:inline tracking-wide">cached</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Countdown or offline state */}
-      <div className="shrink-0 text-right">
-        {isOffline ? (
-          <div className="text-slate-400 text-sm font-medium tracking-wide">📵 offline</div>
-        ) : (
-          <div className="flex flex-col items-end gap-0.5">
-            <span
-              className="font-mono font-bold text-2xl tabular-nums leading-none"
-              style={{
-                color: isCritical ? "#ef4444" : isWarning ? "#f59e0b" : "#00d4ff",
-                animation: isCritical ? "countdownGlow 0.8s ease-in-out infinite" : "none",
-                textShadow: isCritical
-                  ? "0 0 12px rgba(239,68,68,0.7)"
-                  : isWarning
-                  ? "0 0 10px rgba(245,158,11,0.5)"
-                  : "0 0 10px rgba(0,212,255,0.4)",
-              }}
-            >
-              {formatTime(secondsUntil)}
-            </span>
-            <span className="text-[10px] text-slate-500 tracking-widest uppercase">until loss</span>
+      {/* ── Pre-dead-zone action checklist ── */}
+      {!isOffline && secondsUntil > 5 && (
+        <div
+          className="flex items-center gap-3 px-4 py-2"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+        >
+          <span
+            className="text-[9px] uppercase tracking-[0.18em] shrink-0"
+            style={{ color: "#334155" }}
+          >
+            do now
+          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {PRE_ZONE_ACTIONS.map(({ icon, label }) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full"
+                style={{
+                  background:  "rgba(255,255,255,0.04)",
+                  color:       "#64748b",
+                  border:      "1px solid rgba(255,255,255,0.07)",
+                }}
+              >
+                {icon} {label}
+              </span>
+            ))}
           </div>
-        )}
-      </div>
-
-      {/* Pack status pill */}
-      <div className="shrink-0">
-        {packStatus === "preparing" && (
-          <div className="flex items-center gap-1.5 text-xs"
-               style={{ color: "#00d4ff" }}>
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-full border-2 animate-spin"
-              style={{ borderColor: "rgba(0,212,255,0.25)", borderTopColor: "#00d4ff" }}
-            />
-            <span className="hidden sm:inline tracking-wide">building pack</span>
-          </div>
-        )}
-        {packStatus === "ready" && (
-          <div className="flex items-center gap-1.5 text-xs font-medium"
-               style={{ color: "#10b981" }}>
-            <span>✅</span>
-            <span className="hidden sm:inline tracking-wide">pack ready</span>
-          </div>
-        )}
-        {packStatus === "cached" && (
-          <div className="flex items-center gap-1.5 text-xs font-medium"
-               style={{ color: "#8b5cf6" }}>
-            <span>💾</span>
-            <span className="hidden sm:inline tracking-wide">cached</span>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

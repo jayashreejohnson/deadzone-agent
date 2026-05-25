@@ -155,6 +155,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState<string | null>(null);
   const [detectedZones, setDetectedZones] = useState<DeadZone[]>([]);
+  const [expandedZoneId, setExpandedZoneId] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -495,30 +496,62 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
           </div>
 
           <div className="space-y-2">
-            {detectedZones.map((zone, idx) => (
-              <div
-                key={zone.id}
-                className="flex items-center gap-3 rounded-xl px-3.5 py-2.5"
-                style={{
-                  background:     "rgba(255,255,255,0.03)",
-                  border:         "1px solid rgba(255,255,255,0.07)",
-                  animationDelay: `${idx * 60}ms`,
-                }}
-              >
-                <span className="text-slate-500 text-xs font-mono w-4 shrink-0 text-center">
-                  {idx + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-slate-100 text-sm font-medium truncate">{cleanZoneName(zone.name)}</div>
-                  {zone.duration_minutes && (
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      {zone.duration_minutes} min blackout
+            {detectedZones.map((zone, idx) => {
+              const isExpanded = expandedZoneId === zone.id;
+              const severityTip =
+                zone.severity === "high"
+                  ? { icon: "⚠️", text: "Complete signal loss expected. Buffer audio, send pending texts, and save maps before entering." }
+                  : zone.severity === "low"
+                  ? { icon: "🟢", text: "Brief dip only. Cloud syncs may stall but calls usually hold." }
+                  : { icon: "🟡", text: "Intermittent signal likely. Finish any active uploads or calls before this zone." };
+
+              return (
+                <div key={zone.id} style={{ animationDelay: `${idx * 60}ms` }}>
+                  <button
+                    onClick={() => setExpandedZoneId(isExpanded ? null : zone.id)}
+                    className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 w-full text-left transition-all duration-200"
+                    style={{
+                      background: isExpanded ? "rgba(0,212,255,0.06)" : "rgba(255,255,255,0.03)",
+                      border:     isExpanded ? "1px solid rgba(0,212,255,0.18)" : "1px solid rgba(255,255,255,0.07)",
+                    }}
+                  >
+                    <span className="text-slate-500 text-xs font-mono w-4 shrink-0 text-center">
+                      {idx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-slate-100 text-sm font-medium truncate">{cleanZoneName(zone.name)}</div>
+                      {zone.duration_minutes && (
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {zone.duration_minutes} min blackout
+                        </div>
+                      )}
+                    </div>
+                    <SeverityChip severity={zone.severity} />
+                    <span
+                      className="text-[10px] ml-1 shrink-0 transition-transform duration-200"
+                      style={{ color: "#334155", transform: isExpanded ? "rotate(180deg)" : "none" }}
+                    >
+                      ▾
+                    </span>
+                  </button>
+
+                  {isExpanded && (
+                    <div
+                      className="mx-1 mb-1 px-3.5 py-2.5 rounded-b-xl text-[11px] leading-relaxed"
+                      style={{
+                        background: "rgba(0,212,255,0.04)",
+                        border:     "1px solid rgba(0,212,255,0.12)",
+                        borderTop:  "none",
+                        color:      "#94a3b8",
+                      }}
+                    >
+                      <span className="mr-1">{severityTip.icon}</span>
+                      {severityTip.text}
                     </div>
                   )}
                 </div>
-                <SeverityChip severity={zone.severity} />
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <button
