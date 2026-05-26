@@ -150,7 +150,7 @@ export default function CountdownBanner({ zone, secondsUntil, packStatus }: Coun
                 className="inline-block w-2.5 h-2.5 rounded-full border-2 animate-spin"
                 style={{ borderColor: "rgba(0,212,255,0.25)", borderTopColor: "#00d4ff" }}
               />
-              <span className="hidden sm:inline tracking-wide">building pack</span>
+              <span className="hidden sm:inline tracking-wide">saving for offline</span>
             </div>
           )}
           {packStatus === "ready" && (

@@ -9,28 +9,31 @@ type Line = { bullet: string; color: string; label: string; sub?: string; glow?:
 
 function classify(e: AgentEvent): Line | null {
   if (e.type === "status") {
-    return { bullet: "⚡", color: "#f59e0b", label: (e.msg as string) || "Weak connectivity predicted ahead", glow: "rgba(245,158,11,0.4)" };
+    return { bullet: "⚡", color: "#f59e0b", label: (e.msg as string) || "Dead zone ahead — preparing your pack", glow: "rgba(245,158,11,0.4)" };
   }
   if (e.type === "tool" && e.name === "nimble") {
+    // Per 30-agent feedback: rewrite as completed wins ("Got X") rather than
+    // in-progress system noise ("Scanning X..."). Reviewers said the log
+    // should read like a checklist, not a Datadog dashboard.
     const q = String(e.query ?? "").toLowerCase();
     if (q.includes("weather") || q.includes("forecast") || q.includes("elevation"))
-      return { bullet: "🌦", color: "#a78bfa", label: "Fetching weather forecast",         glow: "rgba(167,139,250,0.4)" };
+      return { bullet: "🌦", color: "#a78bfa", label: "Got the weather forecast",          glow: "rgba(167,139,250,0.4)" };
     if (q.includes("emergency") || q.includes("rescue") || q.includes("sheriff") || q.includes("sar"))
-      return { bullet: "🆘", color: "#ef4444", label: "Pulling emergency contacts",        glow: "rgba(239,68,68,0.35)" };
+      return { bullet: "🆘", color: "#ef4444", label: "Got emergency contacts",            glow: "rgba(239,68,68,0.35)" };
     if (q.includes("avalanche") || q.includes("rockslide") || q.includes("cdot") || q.includes("closure"))
-      return { bullet: "⛰", color: "#f59e0b", label: "Checking mountain road conditions", glow: "rgba(245,158,11,0.4)" };
+      return { bullet: "⛰", color: "#f59e0b", label: "Got mountain road conditions",       glow: "rgba(245,158,11,0.4)" };
     if (q.includes("transit") || q.includes("service alert") || q.includes("delay") || q.includes("subway") || q.includes("bart"))
-      return { bullet: "🚇", color: "#60a5fa", label: "Checking transit service alerts",   glow: "rgba(96,165,250,0.4)" };
+      return { bullet: "🚇", color: "#60a5fa", label: "Got the live transit alerts",       glow: "rgba(96,165,250,0.4)" };
     if (q.includes("road") || q.includes("traffic") || q.includes("highway"))
-      return { bullet: "🛣", color: "#60a5fa", label: "Checking road conditions",          glow: "rgba(96,165,250,0.4)" };
+      return { bullet: "🛣", color: "#60a5fa", label: "Got the road conditions",           glow: "rgba(96,165,250,0.4)" };
     if (q.includes("gas") || q.includes("fuel") || q.includes("last") || q.includes("station"))
-      return { bullet: "⛽", color: "#f59e0b", label: "Finding fuel & services ahead",     glow: "rgba(245,158,11,0.4)" };
+      return { bullet: "⛽", color: "#f59e0b", label: "Got fuel & services ahead",         glow: "rgba(245,158,11,0.4)" };
     if (q.includes("news"))
-      return { bullet: "📰", color: "#a78bfa", label: "Scanning local news",               glow: "rgba(167,139,250,0.4)" };
-    return   { bullet: "📍", color: "#a78bfa", label: "Finding nearby services",           glow: "rgba(167,139,250,0.4)" };
+      return { bullet: "📰", color: "#a78bfa", label: "Got the local news",                glow: "rgba(167,139,250,0.4)" };
+    return   { bullet: "📍", color: "#a78bfa", label: "Got nearby services",               glow: "rgba(167,139,250,0.4)" };
   }
   if (e.type === "tool" && e.name === "senso") {
-    return { bullet: "📦", color: "#10b981", label: "Assembling continuity pack", glow: "rgba(16,185,129,0.4)" };
+    return { bullet: "📦", color: "#10b981", label: "Saved your offline pack", glow: "rgba(16,185,129,0.4)" };
   }
   if (e.type === "payment") {
     return null; // internal cache settlement — not surfaced to users

@@ -10,7 +10,8 @@ import { AlertCard, PreparingCard, CachedFoundCard, ReadyCard } from "@/componen
 import TripPlanner from "@/components/TripPlanner";
 import CountdownBanner from "@/components/CountdownBanner";
 import OfflineOverlay from "@/components/OfflineOverlay";
-import MobileVisionWidget from "@/components/MobileVisionWidget";
+import SplitEntry, { hasDismissedEntry, markEntryDismissed } from "@/components/SplitEntry";
+import TopNavTabs from "@/components/TopNavTabs";
 import {
   ROUTE_ID, DEFAULT_ROUTE_POLYLINE,
   distanceKm, lerp, type LatLng, type DeadZone,
@@ -102,6 +103,13 @@ export default function Page() {
   const [isReplaying, setIsReplaying]     = useState(false);
   const [boundsVersion, setBoundsVersion] = useState(0);
   const [wsConnected, setWsConnected]     = useState(false);
+
+  // ── First-visit split-entry hero (Design B winner from 30-agent test) ──
+  // Default to false to avoid SSR mismatch; set true on mount if first visit.
+  const [showSplitEntry, setShowSplitEntry] = useState(false);
+  useEffect(() => {
+    if (!hasDismissedEntry()) setShowSplitEntry(true);
+  }, []);
 
   void initialTrip; // suppress unused warning
 
@@ -496,169 +504,99 @@ export default function Page() {
         />
       </div>
 
-      {/* ── Top bar: mobile-vision banner + navigation ────────── */}
-      <div
-        className="absolute top-0 left-0 right-0 z-[1100]"
-        style={{
-          background:    "rgba(5, 8, 16, 0.88)",
-          backdropFilter:"blur(18px)",
-          borderBottom:  "1px solid rgba(0, 212, 255, 0.12)",
-          boxShadow:     "0 1px 40px rgba(0,0,0,0.4)",
-        }}
-      >
-        {/* Banner row — promotes the mobile vision */}
-        <a
-          href="/mobile"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 px-4 py-1.5 text-[11px] font-medium group transition-all hover:bg-white/[0.02]"
-          style={{
-            background: "linear-gradient(90deg, rgba(0,212,255,0.10) 0%, rgba(139,92,246,0.10) 100%)",
-            borderBottom: "1px solid rgba(0,212,255,0.10)",
-            color: "#7dd3fc",
-            letterSpacing: "0.02em",
-          }}
-        >
-          <span>📱</span>
-          <span className="hidden sm:inline">This is the live demo. Explore the full mobile experience we&apos;re planning</span>
-          <span className="sm:hidden">See the mobile vision</span>
-          <span className="transition-transform group-hover:translate-x-1" style={{ color: "#a78bfa" }}>→</span>
-        </a>
-
-      {/* Nav row */}
-      <div className="px-4 py-2.5 flex items-center justify-between">
-        {/* Left — logo */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <span
-                className="inline-block w-2 h-2 rounded-full"
-                style={{ background: "#00d4ff", boxShadow: "0 0 8px #00d4ff" }}
-              />
-              <span
-                className="absolute inset-0 inline-block w-2 h-2 rounded-full animate-ping"
-                style={{ background: "#00d4ff", opacity: 0.4 }}
-              />
-            </div>
-            <span
-              className="font-bold text-sm tracking-tight"
-              style={{ color: "#e2e8f0", letterSpacing: "-0.01em" }}
-            >
-              DeadZone
-            </span>
-            <span
-              className="text-[10px] tracking-widest uppercase px-1.5 py-0.5 rounded"
-              style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.2)" }}
-            >
-              BETA
-            </span>
-          </div>
-          <span className="text-xs text-slate-600 hidden md:block tracking-wide">
-            live · always ready
-          </span>
-          {/* WS status dot */}
-          <span
-            className="hidden sm:flex items-center gap-1 text-[10px] font-medium tracking-wide"
-            style={{ color: wsConnected ? "#10b981" : "#94a3b8" }}
-          >
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full"
-              style={{
-                background: wsConnected ? "#10b981" : "#475569",
-                boxShadow: wsConnected ? "0 0 6px #10b981" : "none",
-              }}
-            />
-            {wsConnected ? "live" : "connecting"}
-          </span>
-        </div>
-
-        {/* Right — controls */}
-        <div className="flex items-center gap-1.5">
-          {/* User switcher */}
-          {(["user_a", "user_b"] as User[]).map((u) => (
-            <button
-              key={u}
-              onClick={() => setActiveUser(u)}
-              className="px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
-              style={
-                activeUser === u
-                  ? u === "user_a"
-                    ? { background: "rgba(0,212,255,0.15)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.3)" }
-                    : { background: "rgba(139,92,246,0.15)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.3)" }
-                  : { background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }
-              }
-            >
-              {u === "user_a" ? "Driver" : "Rider"}
-            </button>
-          ))}
-
-          {/* Trip controls */}
-          {planState === "tripping" && (
+      {/* ── Top navigation with peer tabs (demo / on your phone) ── */}
+      <div className="absolute top-0 left-0 right-0 z-[1100]">
+        <TopNavTabs
+          active="demo"
+          wsConnected={wsConnected}
+          rightSlot={
             <>
+              {/* User switcher */}
+              {(["user_a", "user_b"] as User[]).map((u) => (
+                <button
+                  key={u}
+                  onClick={() => setActiveUser(u)}
+                  className="px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
+                  style={
+                    activeUser === u
+                      ? u === "user_a"
+                        ? { background: "rgba(0,212,255,0.15)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.3)" }
+                        : { background: "rgba(139,92,246,0.15)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.3)" }
+                      : { background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }
+                  }
+                >
+                  {u === "user_a" ? "Driver" : "Rider"}
+                </button>
+              ))}
+
+              {/* Trip controls */}
+              {planState === "tripping" && (
+                <>
+                  <button
+                    onClick={() => startTrip(activeUser)}
+                    className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
+                    style={{ background: "rgba(0,212,255,0.12)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.25)" }}
+                  >
+                    ▶ restart
+                  </button>
+                  <button
+                    onClick={() => resetTrip(activeUser)}
+                    className="px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
+                    style={{ background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }}
+                  >
+                    reset
+                  </button>
+                </>
+              )}
+              {planState !== "tripping" && (
+                <button
+                  onClick={() => { setPlanState("idle"); setPlannedZones([]); setRoutePolyline([]); }}
+                  className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
+                  style={{ background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }}
+                >
+                  new trip
+                </button>
+              )}
+
+              {/* Replay button */}
+              {traceId && !isReplaying && (
+                <button
+                  onClick={handleReplay}
+                  className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200 flex items-center gap-1.5"
+                  style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
+                  title={`Replay trace ${traceId}`}
+                >
+                  <span>⏮</span>
+                  <span className="hidden lg:inline">Replay</span>
+                </button>
+              )}
+              {isReplaying && (
+                <div
+                  className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium flex items-center gap-1.5"
+                  style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
+                >
+                  <span className="animate-pulse">●</span>
+                  <span className="hidden lg:inline">Replaying</span>
+                </div>
+              )}
+
+              {/* Log toggle */}
               <button
-                onClick={() => startTrip(activeUser)}
-                className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
-                style={{ background: "rgba(0,212,255,0.12)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.25)" }}
+                onClick={() => setLogOpen((v) => !v)}
+                className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200 flex items-center gap-1.5"
+                style={
+                  logOpen
+                    ? { background: "rgba(0,212,255,0.12)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.25)" }
+                    : { background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }
+                }
               >
-                ▶ restart
-              </button>
-              <button
-                onClick={() => resetTrip(activeUser)}
-                className="px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
-                style={{ background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }}
-              >
-                reset
+                <span>⚡</span>
+                <span className="hidden lg:inline">Log</span>
+                <span>{logOpen ? "›" : "‹"}</span>
               </button>
             </>
-          )}
-          {planState !== "tripping" && (
-            <button
-              onClick={() => { setPlanState("idle"); setPlannedZones([]); setRoutePolyline([]); }}
-              className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200"
-              style={{ background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }}
-            >
-              new trip
-            </button>
-          )}
-
-          {/* Replay button */}
-          {traceId && !isReplaying && (
-            <button
-              onClick={handleReplay}
-              className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200 flex items-center gap-1.5"
-              style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
-              title={`Replay trace ${traceId}`}
-            >
-              <span>⏮</span>
-              <span className="hidden sm:inline">Replay</span>
-            </button>
-          )}
-          {isReplaying && (
-            <div
-              className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium flex items-center gap-1.5"
-              style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
-            >
-              <span className="animate-pulse">●</span>
-              <span className="hidden sm:inline">Replaying</span>
-            </div>
-          )}
-
-          {/* Log toggle */}
-          <button
-            onClick={() => setLogOpen((v) => !v)}
-            className="ml-1.5 px-2.5 py-1 text-xs rounded-lg font-medium transition-all duration-200 flex items-center gap-1.5"
-            style={
-              logOpen
-                ? { background: "rgba(0,212,255,0.12)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.25)" }
-                : { background: "rgba(255,255,255,0.05)", color: "#64748b", border: "1px solid rgba(255,255,255,0.07)" }
-            }
-          >
-            <span>⚡</span>
-            <span className="hidden sm:inline">Log</span>
-            <span>{logOpen ? "›" : "‹"}</span>
-          </button>
-        </div>
-      </div>
+          }
+        />
       </div>
 
       {/* ── Trip planner — single stable instance, repositions modal→card ── */}
@@ -697,7 +635,7 @@ export default function Page() {
         <div
           className="absolute left-4 z-[1200] transition-all duration-300"
           style={{
-            top:   "6.5rem",
+            top:   "4.5rem",
             right: logOpen ? `${LOG_W + 16}px` : "1rem",
           }}
         >
@@ -714,7 +652,7 @@ export default function Page() {
         <div
           className="absolute z-[1200] flex justify-center transition-all duration-300"
           style={{
-            top:   showCountdown ? "10rem" : "7rem",
+            top:   showCountdown ? "8rem" : "5rem",
             left:  "1rem",
             right: logOpen ? `${LOG_W + 16}px` : "1rem",
           }}
@@ -745,7 +683,7 @@ export default function Page() {
       )}
 
       {/* ── Toasts ────────────────────────────────────────────── */}
-      <div className="absolute z-[1300] flex flex-col gap-2" style={{ top: "6rem", right: logOpen ? `${LOG_W + 12}px` : "1rem" }}>
+      <div className="absolute z-[1300] flex flex-col gap-2" style={{ top: "4rem", right: logOpen ? `${LOG_W + 12}px` : "1rem" }}>
         {toasts.map((t) => (
           <Toast
             key={t.id}
@@ -766,7 +704,7 @@ export default function Page() {
       <div
         className="absolute bottom-11 right-0 z-[1050] flex flex-col"
         style={{
-          top:       "5rem",
+          top:       "3rem",
           width:     `${LOG_W}px`,
           background:"rgba(5, 8, 16, 0.94)",
           backdropFilter: "blur(18px)",
@@ -788,8 +726,17 @@ export default function Page() {
         <Dashboard />
       </div>
 
-      {/* ── Floating mobile vision preview (visible above planner backdrop) ── */}
-      <MobileVisionWidget />
+      {/* ── First-visit split entry hero (winning design from 30-agent test) ── */}
+      {showSplitEntry && (
+        <SplitEntry
+          onTryDemo={() => { markEntryDismissed(); setShowSplitEntry(false); }}
+          onExploreMobile={() => {
+            markEntryDismissed();
+            setShowSplitEntry(false);
+            window.location.href = "/mobile";
+          }}
+        />
+      )}
 
       {/* ── Offline simulation overlay ────────────────────────── */}
       {showOfflineOverlay && offlineZone && (

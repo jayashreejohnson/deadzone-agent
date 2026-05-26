@@ -327,6 +327,29 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
                 </button>
               ))}
             </div>
+            {/* Cross-mode hint — makes the other mode discoverable */}
+            {mode === "driving" && (
+              <button
+                onClick={() => switchMode("transit")}
+                className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium transition-colors duration-150 hover:opacity-90"
+                style={{ color: "#a78bfa" }}
+              >
+                <span>🚇</span>
+                <span>Or pick a subway / BART line ({TRANSIT_ROUTES.length})</span>
+                <span>→</span>
+              </button>
+            )}
+            {mode === "transit" && (
+              <button
+                onClick={() => switchMode("driving")}
+                className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium transition-colors duration-150 hover:opacity-90"
+                style={{ color: "#7dd3fc" }}
+              >
+                <span>🚗</span>
+                <span>Or pick a driving route ({DRIVING_ROUTES.length})</span>
+                <span>→</span>
+              </button>
+            )}
           </div>
         )}
 

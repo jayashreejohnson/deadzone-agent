@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import TopNavTabs from "@/components/TopNavTabs";
+import WaitlistForm from "@/components/WaitlistForm";
 
 /* ── Fade-in ─────────────────────────────────────────────── */
 function useFadeIn(threshold = 0.12) {
@@ -593,33 +595,29 @@ export default function MobilePage() {
         color: "#e2e8f0",
       }}
     >
-      {/* Nav — sticky inside the snap container */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4"
-        style={{ height: NAV_H, borderBottom: "1px solid rgba(0,212,255,.06)", background: "rgba(5,8,16,.94)", backdropFilter: "blur(18px)" }}>
-        <Link href="/" className="flex items-center gap-2 text-sm" style={{ color: "#475569" }}>
-          <span>←</span><span>Back to app</span>
-        </Link>
-        <span className="text-sm font-semibold tracking-tight" style={{ color: "#00d4ff" }}>DeadZone</span>
-        <div style={{ width: 88 }} />
-      </nav>
+      {/* Nav — sticky inside the snap container, shared with the demo page */}
+      <div className="sticky top-0 z-50" style={{ minHeight: NAV_H }}>
+        <TopNavTabs active="mobile" />
+      </div>
 
       {/* Hero */}
       <section id="hero" className="flex flex-col" style={{ height: PANEL_H, scrollSnapAlign: "start" }}>
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center max-w-3xl mx-auto w-full">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-10 text-xs font-medium"
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-8 text-xs font-medium"
             style={{ background: "rgba(167,139,250,.07)", border: "1px solid rgba(167,139,250,.18)", color: "#a78bfa" }}>
             <span>📱</span><span>Coming to iOS and Android</span>
           </div>
-          <h1 className="text-5xl sm:text-6xl font-bold mb-8 leading-tight" style={{ letterSpacing: "-0.03em" }}>
+          <h1 className="text-5xl sm:text-6xl font-bold mb-6 leading-tight" style={{ letterSpacing: "-0.03em" }}>
             Six features.
             <br />
             <span style={{ color: "#00d4ff" }}>Zero signal required.</span>
           </h1>
-          <p className="text-xl mx-auto" style={{ color: "#475569", lineHeight: 1.8, maxWidth: 500 }}>
+          <p className="text-xl mx-auto mb-8" style={{ color: "#475569", lineHeight: 1.8, maxWidth: 500 }}>
             Whether you drive through tunnels or ride the subway,
             DeadZone quietly prepares everything you need
             before your signal drops — so you never have to.
           </p>
+          <WaitlistForm />
         </div>
         {/* Mobile → first phone panel; desktop → first feature section */}
         <div className="lg:hidden"><ScrollArrow targetId="m-01-phone" /></div>
@@ -700,18 +698,21 @@ export default function MobilePage() {
       {/* Footer */}
       <footer
         id="section-footer"
-        className="border-t flex flex-col items-center justify-center text-center"
+        className="border-t flex flex-col items-center justify-center text-center px-6"
         style={{ height: PANEL_H, scrollSnapAlign: "start", borderColor: "rgba(255,255,255,.04)" }}
       >
         <div className="text-5xl mb-6 opacity-20">📡</div>
         <h2 className="text-2xl font-bold mb-3" style={{ letterSpacing: "-0.02em" }}>DeadZone</h2>
-        <p className="mb-2" style={{ color: "#334155", fontSize: 14 }}>The web demo is live. The app is coming.</p>
+        <p className="mb-6" style={{ color: "#334155", fontSize: 14 }}>The web demo is live. The app is coming.</p>
+
+        <WaitlistForm variant="footer" />
+
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold mb-10 transition-all duration-200"
-          style={{ background: "rgba(0,212,255,.1)", color: "#00d4ff", border: "1px solid rgba(0,212,255,.2)" }}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium mt-8 mb-10 transition-all duration-200"
+          style={{ background: "rgba(0,212,255,.06)", color: "#7dd3fc", border: "1px solid rgba(0,212,255,.15)" }}
         >
-          Try the live demo →
+          ← Try the live demo
         </Link>
         <p style={{ color: "#1e293b", fontSize: 11 }}>Built at Agentic Engineering Hack · Datadog NYC 2026</p>
       </footer>
