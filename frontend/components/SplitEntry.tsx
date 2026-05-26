@@ -124,25 +124,27 @@ function PreviewContent() {
 }
 
 function PhoneFrame({ children }: { children: React.ReactNode }) {
+  // Sized down from 200x380 so the right column fits without scrolling
+  // on common laptop viewports (1366x768 and up).
   return (
-    <div className="relative" style={{ width: 200, height: 380 }}>
+    <div className="relative shrink-0" style={{ width: 168, height: 320 }}>
       <div
         className="absolute inset-0 overflow-hidden"
         style={{
-          borderRadius: 32,
+          borderRadius: 28,
           background: "#0c0c18",
           border: "3px solid #252535",
           boxShadow: "inset 0 0 0 1px #2a2a3c, 0 24px 60px -16px rgba(0,0,0,0.8)",
         }}
       >
         <div className="absolute z-20"
-          style={{ top: 8, left: "50%", transform: "translateX(-50%)",
-                   width: 58, height: 16, background: "#000", borderRadius: 10 }} />
-        <div className="absolute inset-0 overflow-hidden" style={{ paddingTop: 28 }}>
+          style={{ top: 7, left: "50%", transform: "translateX(-50%)",
+                   width: 50, height: 14, background: "#000", borderRadius: 9 }} />
+        <div className="absolute inset-0 overflow-hidden" style={{ paddingTop: 24 }}>
           {children}
         </div>
         <div className="absolute inset-0 pointer-events-none"
-          style={{ borderRadius: 32,
+          style={{ borderRadius: 28,
                    background: "linear-gradient(135deg, rgba(255,255,255,.06) 0%, transparent 52%)" }} />
       </div>
     </div>
@@ -205,12 +207,13 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
         {/* LEFT — Try it now */}
         <button
           onClick={onTryDemo}
-          className="flex-1 flex flex-col items-center justify-center px-8 py-10 group relative overflow-hidden transition-all duration-300"
+          className="flex-1 flex flex-col items-center justify-center px-8 py-8 group relative overflow-y-auto transition-all duration-300"
           style={{
             background: "linear-gradient(135deg, rgba(0,212,255,0.04) 0%, rgba(5,8,16,0) 100%)",
             borderRight: "1px solid rgba(0,212,255,0.08)",
             borderBottom: "1px solid rgba(0,212,255,0.08)",
             cursor: "pointer",
+            minHeight: 0,
           }}
         >
           {/* Ambient map preview */}
@@ -229,17 +232,17 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
           </div>
 
           <div className="relative z-10 max-w-md text-center">
-            <div className="inline-block mb-5 px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest uppercase"
+            <div className="inline-block mb-3 px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest uppercase"
               style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.25)" }}>
               Live · running now
             </div>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 leading-tight" style={{ color: "#e2e8f0", letterSpacing: "-0.02em" }}>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight" style={{ color: "#e2e8f0", letterSpacing: "-0.02em" }}>
               See the agent build your offline pack
             </h2>
-            <p className="text-base mb-8 leading-relaxed" style={{ color: "#64748b" }}>
+            <p className="text-sm sm:text-base mb-6 leading-relaxed" style={{ color: "#64748b" }}>
               Pick a route. Watch DeadZone detect where you&apos;ll lose signal and quietly gather what you&apos;ll need before you go dark.
             </p>
-            <div className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200 group-hover:translate-y-[-2px]"
+            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200 group-hover:translate-y-[-2px]"
               style={{
                 background: "linear-gradient(135deg, #0891b2 0%, #00d4ff 100%)",
                 color: "#050810",
@@ -255,29 +258,30 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
         {/* RIGHT — Coming to your phone */}
         <button
           onClick={onExploreMobile}
-          className="flex-1 flex flex-col items-center justify-center px-8 py-10 group relative overflow-hidden transition-all duration-300"
+          className="flex-1 flex flex-col items-center justify-center px-8 py-6 group relative overflow-y-auto transition-all duration-300"
           style={{
             background: "linear-gradient(135deg, rgba(139,92,246,0.04) 0%, rgba(5,8,16,0) 100%)",
             cursor: "pointer",
+            minHeight: 0,
           }}
         >
           <div className="relative z-10 max-w-md flex flex-col items-center text-center">
-            <div className="inline-block mb-5 px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest uppercase"
+            <div className="inline-block mb-3 px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest uppercase"
               style={{ background: "rgba(167,139,250,0.1)", color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.25)" }}>
               Coming soon · join the list
             </div>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 leading-tight" style={{ color: "#e2e8f0", letterSpacing: "-0.02em" }}>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight" style={{ color: "#e2e8f0", letterSpacing: "-0.02em" }}>
               Coming to your phone
             </h2>
-            <p className="text-base mb-6 leading-relaxed" style={{ color: "#64748b" }}>
-              The full DeadZone app. Auto-detection, alerts before you go dark, contacts notified, content pre-fetched. See what we&apos;re building.
+            <p className="text-sm sm:text-base mb-5 leading-relaxed" style={{ color: "#64748b" }}>
+              The full DeadZone app. Auto-detection, alerts before you go dark, contacts notified, content pre-fetched.
             </p>
 
             {/* Phone preview */}
-            <div className="mb-6"
+            <div className="mb-3"
               style={{
                 padding: 3,
-                borderRadius: 35,
+                borderRadius: 31,
                 background: "linear-gradient(135deg, rgba(0,212,255,0.18) 0%, rgba(167,139,250,0.22) 100%)",
                 boxShadow: "0 0 40px -12px rgba(167,139,250,0.4)",
               }}
@@ -295,11 +299,11 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
               </PhoneFrame>
             </div>
 
-            <div className="text-[11px] font-medium mb-5 tracking-wide" style={{ color: "#7dd3fc" }}>
+            <div className="text-[11px] font-medium mb-4 tracking-wide" style={{ color: "#7dd3fc" }}>
               {current.label}
             </div>
 
-            <div className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200 group-hover:translate-y-[-2px]"
+            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200 group-hover:translate-y-[-2px]"
               style={{
                 background: "linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)",
                 color: "#fff",

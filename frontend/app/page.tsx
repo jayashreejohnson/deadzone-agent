@@ -10,7 +10,7 @@ import { AlertCard, PreparingCard, CachedFoundCard, ReadyCard } from "@/componen
 import TripPlanner from "@/components/TripPlanner";
 import CountdownBanner from "@/components/CountdownBanner";
 import OfflineOverlay from "@/components/OfflineOverlay";
-import SplitEntry, { hasDismissedEntry, markEntryDismissed } from "@/components/SplitEntry";
+import SplitEntry from "@/components/SplitEntry";
 import TopNavTabs from "@/components/TopNavTabs";
 import {
   ROUTE_ID, DEFAULT_ROUTE_POLYLINE,
@@ -104,12 +104,10 @@ export default function Page() {
   const [boundsVersion, setBoundsVersion] = useState(0);
   const [wsConnected, setWsConnected]     = useState(false);
 
-  // ── First-visit split-entry hero (Design B winner from 30-agent test) ──
-  // Default to false to avoid SSR mismatch; set true on mount if first visit.
-  const [showSplitEntry, setShowSplitEntry] = useState(false);
-  useEffect(() => {
-    if (!hasDismissedEntry()) setShowSplitEntry(true);
-  }, []);
+  // ── Split-entry hero (Design B winner from 30-agent test) ──
+  // Shows on every URL visit — no memory. User dismisses by clicking either
+  // CTA, which sets it to false for the current page-view only. Reload = split.
+  const [showSplitEntry, setShowSplitEntry] = useState(true);
 
   void initialTrip; // suppress unused warning
 
@@ -726,15 +724,11 @@ export default function Page() {
         <Dashboard />
       </div>
 
-      {/* ── First-visit split entry hero (winning design from 30-agent test) ── */}
+      {/* ── Split-entry hero — shows on every visit (no memory) ── */}
       {showSplitEntry && (
         <SplitEntry
-          onTryDemo={() => { markEntryDismissed(); setShowSplitEntry(false); }}
-          onExploreMobile={() => {
-            markEntryDismissed();
-            setShowSplitEntry(false);
-            window.location.href = "/mobile";
-          }}
+          onTryDemo={() => setShowSplitEntry(false)}
+          onExploreMobile={() => { window.location.href = "/mobile"; }}
         />
       )}
 
