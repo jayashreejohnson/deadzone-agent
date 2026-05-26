@@ -274,7 +274,7 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
               Coming to your phone
             </h2>
             <p className="text-sm sm:text-base mb-5 leading-relaxed" style={{ color: "#64748b" }}>
-              The full DeadZone app. Auto-detection, alerts before you go dark, contacts notified, content pre-fetched.
+              Preview the mobile app we&apos;re designing — auto-detection, alerts before you go dark, contacts notified, content pre-fetched.
             </p>
 
             {/* Phone preview */}
