@@ -268,13 +268,13 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
           <div className="relative z-10 max-w-md flex flex-col items-center text-center">
             <div className="inline-block mb-3 px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest uppercase"
               style={{ background: "rgba(167,139,250,0.1)", color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.25)" }}>
-              Coming soon · preview the features
+              Concept · mockups only
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight" style={{ color: "#e2e8f0", letterSpacing: "-0.02em" }}>
-              Coming to your phone
+              If DeadZone went mobile
             </h2>
             <p className="text-sm sm:text-base mb-5 leading-relaxed" style={{ color: "#64748b" }}>
-              Preview the mobile app we&apos;re designing — auto-detection, alerts before you go dark, contacts notified, content pre-fetched.
+              Mockups of how this could work on mobile — auto-detection, alerts before you go dark, contacts notified, content pre-fetched.
             </p>
 
             {/* Phone preview */}
