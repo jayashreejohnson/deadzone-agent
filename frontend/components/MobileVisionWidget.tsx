@@ -164,11 +164,15 @@ function MiniPhone({ children }: { children: React.ReactNode }) {
 
 // ── Main widget ──────────────────────────────────────────────
 
+const FULL_CYCLE_MS = SCREENS.length * CYCLE_MS; // 15s — show every screen once
+
 export default function MobileVisionWidget() {
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
 
+  // Honor prefers-reduced-motion
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReducedMotion(mq.matches);
@@ -177,8 +181,9 @@ export default function MobileVisionWidget() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // Cycle through screens with crossfade
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || collapsed) return;
     const interval = setInterval(() => {
       setVisible(false);
       setTimeout(() => {
@@ -187,78 +192,144 @@ export default function MobileVisionWidget() {
       }, FADE_MS);
     }, CYCLE_MS);
     return () => clearInterval(interval);
-  }, [reducedMotion]);
+  }, [reducedMotion, collapsed]);
 
+  // Auto-collapse after one full cycle so the widget gets out of the way
+  // once visitors have seen all three previews.
+  useEffect(() => {
+    if (collapsed) return;
+    const t = setTimeout(() => setCollapsed(true), FULL_CYCLE_MS);
+    return () => clearTimeout(t);
+  }, [collapsed]);
+
+  // ── Collapsed pill ──
+  if (collapsed) {
+    return (
+      <a
+        href="/mobile"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="View the full mobile vision for DeadZone — opens in new tab"
+        className="hidden sm:flex absolute items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium group transition-all duration-300 hover:-translate-y-0.5"
+        style={{
+          bottom: "5.5rem",
+          left:   "1rem",
+          zIndex: 1600,
+          background: "linear-gradient(90deg, rgba(0,212,255,0.10) 0%, rgba(139,92,246,0.10) 100%)",
+          border:     "1px solid rgba(167,139,250,0.28)",
+          color:      "#c4b5fd",
+          backdropFilter: "blur(14px)",
+          boxShadow: "0 6px 18px -8px rgba(0,0,0,0.6), 0 0 20px -8px rgba(167,139,250,0.25)",
+        }}
+      >
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#a78bfa",
+                       boxShadow: "0 0 8px #a78bfa", display: "inline-block" }} />
+        <span>📱</span>
+        <span>Mobile vision</span>
+        <span className="transition-transform duration-300 group-hover:translate-x-0.5"
+              style={{ color: "#7dd3fc" }}>→</span>
+      </a>
+    );
+  }
+
+  // ── Expanded widget ──
   const current = SCREENS[idx];
 
   return (
-    <a
-      href="/mobile"
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="View the full mobile vision for DeadZone — opens in new tab"
-      className="hidden sm:flex absolute flex-col items-center gap-1.5 group transition-all duration-300 hover:-translate-y-1"
+    <div
+      className="hidden sm:flex absolute flex-col items-center gap-1.5"
       style={{
         bottom: "5.5rem",
         left:   "1rem",
         zIndex: 1600,
       }}
     >
-      {/* Tiny banner above the phone — sets context */}
-      <div
-        className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[8px] font-medium tracking-[0.18em] uppercase"
+      {/* Dismiss × button — sibling so clicking it doesn't trigger navigation */}
+      <button
+        type="button"
+        onClick={() => setCollapsed(true)}
+        aria-label="Hide mobile preview"
+        className="absolute z-10 flex items-center justify-center transition-all duration-200 hover:scale-110"
         style={{
-          background: "rgba(167,139,250,0.1)",
-          color:      "#c4b5fd",
-          border:     "1px solid rgba(167,139,250,0.25)",
-          letterSpacing: "0.2em",
-        }}
-      >
-        <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#a78bfa",
-                       boxShadow: "0 0 6px #a78bfa", display: "inline-block" }} />
-        Coming to mobile
-      </div>
-
-      {/* Phone with pulsing border */}
-      <div
-        className={reducedMotion ? "relative" : "relative mvw-glow-animated"}
-        style={{
-          padding: 2,
-          borderRadius: 24,
-          background: "linear-gradient(135deg, rgba(0,212,255,0.18) 0%, rgba(167,139,250,0.18) 100%)",
-          boxShadow:  "0 0 28px -8px rgba(0,212,255,0.35), 0 16px 40px -12px rgba(0,0,0,0.7)",
-          animation:  reducedMotion ? "none" : "mvw-glow 4s ease-in-out infinite",
-        }}
-      >
-        <MiniPhone>
-          <div
-            style={{
-              opacity:    visible ? 1 : 0,
-              transition: `opacity ${FADE_MS}ms ease-in-out`,
-              height:     "100%",
-            }}
-          >
-            {current.node}
-          </div>
-        </MiniPhone>
-      </div>
-
-      {/* Caption */}
-      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-300"
-        style={{
-          background: "rgba(5,8,16,0.85)",
-          backdropFilter: "blur(12px)",
-          border: "1px solid rgba(0,212,255,0.1)",
+          top: 4,
+          right: -8,
+          width: 20,
+          height: 20,
+          borderRadius: "50%",
+          background: "rgba(5,8,16,0.95)",
+          border: "1px solid rgba(255,255,255,0.15)",
           color: "#94a3b8",
-          minWidth: 130,
-          justifyContent: "center",
+          fontSize: 11,
+          lineHeight: 1,
+          cursor: "pointer",
+          backdropFilter: "blur(8px)",
         }}
       >
-        <span style={{ color: "#7dd3fc" }}>{current.label}</span>
-        <span className="transition-transform duration-300 group-hover:translate-x-0.5"
-              style={{ color: "#a78bfa" }}>→</span>
-      </div>
+        ✕
+      </button>
 
-    </a>
+      <a
+        href="/mobile"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="View the full mobile vision for DeadZone — opens in new tab"
+        className="flex flex-col items-center gap-1.5 group transition-all duration-300 hover:-translate-y-1"
+      >
+        {/* Tiny banner above the phone — sets context */}
+        <div
+          className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[8px] font-medium uppercase"
+          style={{
+            background: "rgba(167,139,250,0.1)",
+            color:      "#c4b5fd",
+            border:     "1px solid rgba(167,139,250,0.25)",
+            letterSpacing: "0.2em",
+          }}
+        >
+          <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#a78bfa",
+                         boxShadow: "0 0 6px #a78bfa", display: "inline-block" }} />
+          Coming to mobile
+        </div>
+
+        {/* Phone with pulsing border */}
+        <div
+          className={reducedMotion ? "relative" : "relative mvw-glow-animated"}
+          style={{
+            padding: 2,
+            borderRadius: 24,
+            background: "linear-gradient(135deg, rgba(0,212,255,0.18) 0%, rgba(167,139,250,0.18) 100%)",
+            boxShadow:  "0 0 28px -8px rgba(0,212,255,0.35), 0 16px 40px -12px rgba(0,0,0,0.7)",
+            animation:  reducedMotion ? "none" : "mvw-glow 4s ease-in-out infinite",
+          }}
+        >
+          <MiniPhone>
+            <div
+              style={{
+                opacity:    visible ? 1 : 0,
+                transition: `opacity ${FADE_MS}ms ease-in-out`,
+                height:     "100%",
+              }}
+            >
+              {current.node}
+            </div>
+          </MiniPhone>
+        </div>
+
+        {/* Caption */}
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-300"
+          style={{
+            background: "rgba(5,8,16,0.85)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(0,212,255,0.1)",
+            color: "#94a3b8",
+            minWidth: 130,
+            justifyContent: "center",
+          }}
+        >
+          <span style={{ color: "#7dd3fc" }}>{current.label}</span>
+          <span className="transition-transform duration-300 group-hover:translate-x-0.5"
+                style={{ color: "#a78bfa" }}>→</span>
+        </div>
+      </a>
+    </div>
   );
 }
