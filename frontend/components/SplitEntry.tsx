@@ -268,7 +268,7 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
           <div className="relative z-10 max-w-md flex flex-col items-center text-center">
             <div className="inline-block mb-3 px-3 py-1 rounded-full text-[10px] font-semibold tracking-widest uppercase"
               style={{ background: "rgba(167,139,250,0.1)", color: "#c4b5fd", border: "1px solid rgba(167,139,250,0.25)" }}>
-              Coming soon · join the list
+              Coming soon · preview the features
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight" style={{ color: "#e2e8f0", letterSpacing: "-0.02em" }}>
               Coming to your phone

@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import TopNavTabs from "@/components/TopNavTabs";
-import WaitlistForm from "@/components/WaitlistForm";
 
 /* ── Fade-in ─────────────────────────────────────────────── */
 function useFadeIn(threshold = 0.12) {
@@ -607,17 +606,16 @@ export default function MobilePage() {
             style={{ background: "rgba(167,139,250,.07)", border: "1px solid rgba(167,139,250,.18)", color: "#a78bfa" }}>
             <span>📱</span><span>Coming to iOS and Android</span>
           </div>
-          <h1 className="text-5xl sm:text-6xl font-bold mb-6 leading-tight" style={{ letterSpacing: "-0.03em" }}>
+          <h1 className="text-5xl sm:text-6xl font-bold mb-8 leading-tight" style={{ letterSpacing: "-0.03em" }}>
             Six features.
             <br />
             <span style={{ color: "#00d4ff" }}>Zero signal required.</span>
           </h1>
-          <p className="text-xl mx-auto mb-8" style={{ color: "#475569", lineHeight: 1.8, maxWidth: 500 }}>
+          <p className="text-xl mx-auto" style={{ color: "#475569", lineHeight: 1.8, maxWidth: 500 }}>
             Whether you drive through tunnels or ride the subway,
             DeadZone quietly prepares everything you need
             before your signal drops — so you never have to.
           </p>
-          <WaitlistForm />
         </div>
         {/* Mobile → first phone panel; desktop → first feature section */}
         <div className="lg:hidden"><ScrollArrow targetId="m-01-phone" /></div>
@@ -698,21 +696,18 @@ export default function MobilePage() {
       {/* Footer */}
       <footer
         id="section-footer"
-        className="border-t flex flex-col items-center justify-center text-center px-6"
+        className="border-t flex flex-col items-center justify-center text-center"
         style={{ height: PANEL_H, scrollSnapAlign: "start", borderColor: "rgba(255,255,255,.04)" }}
       >
         <div className="text-5xl mb-6 opacity-20">📡</div>
         <h2 className="text-2xl font-bold mb-3" style={{ letterSpacing: "-0.02em" }}>DeadZone</h2>
-        <p className="mb-6" style={{ color: "#334155", fontSize: 14 }}>The web demo is live. The app is coming.</p>
-
-        <WaitlistForm variant="footer" />
-
+        <p className="mb-2" style={{ color: "#334155", fontSize: 14 }}>The web demo is live. The app is coming.</p>
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium mt-8 mb-10 transition-all duration-200"
-          style={{ background: "rgba(0,212,255,.06)", color: "#7dd3fc", border: "1px solid rgba(0,212,255,.15)" }}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold mb-10 transition-all duration-200"
+          style={{ background: "rgba(0,212,255,.1)", color: "#00d4ff", border: "1px solid rgba(0,212,255,.2)" }}
         >
-          ← Try the live demo
+          Try the live demo →
         </Link>
         <p style={{ color: "#1e293b", fontSize: 11 }}>Built at Agentic Engineering Hack · Datadog NYC 2026</p>
       </footer>
