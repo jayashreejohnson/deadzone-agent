@@ -560,6 +560,7 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
         resp = await client.chat.completions.create(
             model=_MODEL, messages=messages, tools=TOOLS,
             tool_choice="auto", parallel_tool_calls=True, temperature=0,
+            max_tokens=2048,  # cap so low-credit OpenRouter accounts don't reject (default 8192 fails)
         )
         msg = resp.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))

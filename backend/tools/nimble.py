@@ -157,6 +157,7 @@ async def _llm_stub(query: str) -> dict:
                 {"role": "user",   "content": _LLM_PROMPT.format(query=query)},
             ],
             temperature=0.3,
+            max_tokens=1024,
         )
         raw = resp.choices[0].message.content or ""
         raw = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()

@@ -211,6 +211,7 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
                 {"role": "user",   "content": prompt},
             ],
             temperature=0.2,
+            max_tokens=1024,  # JSON response is tiny; default 8192 fails on low-credit OpenRouter accounts
         )
     except Exception as e:
         print(f"[agent1] LLM API call failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
