@@ -49,7 +49,13 @@ function classify(e: AgentEvent): Line | null {
     return { bullet: "🎯", color, label: `Pack quality score: ${score}/100`, sub: `${cov} · ${sla} · ${e.build_ms}ms build`, glow: `${color}60` };
   }
   if (e.type === "log") {
-    return { bullet: e.level === "warn" ? "⚠" : "·", color: e.level === "warn" ? "#fbbf24" : "#475569", label: (e.msg as string) || "" };
+    const msg = String(e.msg || "");
+    // Hide internal LLM provider fallback warnings — they're operational noise
+    // (OpenRouter→Groq→scripted), not user-relevant signal.
+    if (e.level === "warn" && /LLM|fallback|scripted flow|orchestrator failed|Rate limit|Insufficient credits|402|429/i.test(msg)) {
+      return null;
+    }
+    return { bullet: e.level === "warn" ? "⚠" : "·", color: e.level === "warn" ? "#fbbf24" : "#475569", label: msg };
   }
   // Silent event types (shown in waterfall only)
   if (e.type === "tool_start" || e.type === "tool_end" || e.type === "trace_started") return null;
