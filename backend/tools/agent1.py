@@ -477,7 +477,24 @@ async def predict(route: str, departure_time: str) -> dict:
             pass
         return transit
 
-    # 2. CoverageMap real signal data — only if both keys present
+    # 2. Curated driving routes — use verified hardcoded zones FIRST. These coords
+    # are hand-picked and more accurate than LLM predictions; using them here also
+    # saves LLM tokens for unknown routes (critical during LinkedIn-launch traffic
+    # spikes when token budgets are tight). LLM remains primary for unknown routes.
+    driving = _driving_hardcoded(route, departure_time)
+    if driving is not None:
+        try:
+            LLMObs.annotate(
+                input_data=payload,
+                output_data={"dead_zones_count": _count_zones(driving)},
+                metadata={"backend": "driving_hardcoded"},
+                tags={"tool": "agent1_predict"},
+            )
+        except Exception:
+            pass
+        return driving
+
+    # 3. CoverageMap real signal data — only if both keys present
     if _COVERAGEMAP_KEY and _GOOGLE_MAPS_KEY:
         try:
             data = await _coveragemap_predict(route, departure_time)
@@ -498,7 +515,8 @@ async def predict(route: str, departure_time: str) -> dict:
         except Exception as e:
             print(f"[agent1] CoverageMap failed ({type(e).__name__}: {e}); trying LLM", flush=True)
 
-    # 3. LLM — the actual agentic prediction. PRIMARY for non-transit driving routes.
+    # 4. LLM — the agentic prediction for UNKNOWN routes only (known routes use
+    # driving_hardcoded above for accuracy + token economy).
     try:
         data = await _llm_predict(route, departure_time)
         try:
@@ -513,21 +531,6 @@ async def predict(route: str, departure_time: str) -> dict:
         return data
     except Exception as e:
         print(f"[agent1] LLM prediction failed ({type(e).__name__}: {e}); using safety-net fallback", flush=True)
-
-    # 4. Curated driving routes: verified zones for the 6 routes in the trip planner.
-    # Only fires if both CoverageMap and LLM failed — keeps the demo working.
-    driving = _driving_hardcoded(route, departure_time)
-    if driving is not None:
-        try:
-            LLMObs.annotate(
-                input_data=payload,
-                output_data={"dead_zones_count": _count_zones(driving)},
-                metadata={"backend": "driving_hardcoded_fallback"},
-                tags={"tool": "agent1_predict"},
-            )
-        except Exception:
-            pass
-        return driving
 
     # 5. Generic last-resort fallback for unknown routes when everything else fails
     return _hardcoded_fallback(route, departure_time)
