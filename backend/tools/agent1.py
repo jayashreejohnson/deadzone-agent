@@ -1,19 +1,23 @@
 """Agent 1 — dead zone prediction for any driving route.
 
-Prediction priority:
-  1. CoverageMap API + Google Maps Directions  — real signal strength data
-  2. LLM fallback (OpenRouter/Gemini)          — geographic knowledge
-  3. Hardcoded stub                             — last resort only
+Prediction priority (agentic-first):
+  1. LLM (OpenRouter → Groq)                   — primary agentic prediction
+  2. CoverageMap API + Google Maps Directions  — real signal strength data
+  3. Transit / driving hardcoded zones          — fail-safe for known routes
+  4. Generic hardcoded stub                     — last resort
 
-CoverageMap queries T-Mobile signal strength at evenly-spaced waypoints
-along the actual road route. Points below -105 dBm are flagged as dead zones
-and clustered into segments.
+Circuit breaker: once the LLM provider chain fails, a process-level breaker
+trips for `_LLM_CIRCUIT_COOLDOWN` seconds. While the breaker is open, calls
+skip the LLM and fall straight through to CoverageMap → hardcoded, so we
+don't pay a timeout/429 on every subsequent request during a provider outage.
+The breaker auto-resets after the cooldown and the LLM is retried.
 """
 from __future__ import annotations
 import os
 import re
 import json
 import math
+import time
 import httpx
 from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import tool
@@ -30,6 +34,30 @@ _COVERAGEMAP_URL   = "https://enterprise.coveragemap.com/api/v1/signal-strength/
 _GMAPS_URL         = "https://maps.googleapis.com/maps/api/directions/json"
 _DEAD_ZONE_DBM     = -95    # below this = weak/dead signal (poor call/data quality)
 _CLUSTER_GAP_KM    = 8.0    # points further apart than this start a new cluster
+
+# ── LLM circuit breaker ───────────────────────────────────────────
+# Trips when the LLM provider chain fails (timeouts, 402, 429, 5xx).
+# While open, predict() skips the LLM entirely and goes to CoverageMap +
+# hardcoded fallbacks — saves 30s+ of timeout per request during an outage.
+_LLM_CIRCUIT_OPEN_UNTIL: float = 0.0
+_LLM_CIRCUIT_COOLDOWN  : float = float(os.getenv("LLM_CIRCUIT_COOLDOWN_SEC", "300"))  # 5 min default
+
+
+def _llm_circuit_open() -> bool:
+    return time.time() < _LLM_CIRCUIT_OPEN_UNTIL
+
+
+def _trip_llm_circuit(reason: str) -> None:
+    global _LLM_CIRCUIT_OPEN_UNTIL
+    _LLM_CIRCUIT_OPEN_UNTIL = time.time() + _LLM_CIRCUIT_COOLDOWN
+    print(f"[agent1] LLM circuit OPEN for {int(_LLM_CIRCUIT_COOLDOWN)}s ({reason})", flush=True)
+
+
+def _reset_llm_circuit() -> None:
+    global _LLM_CIRCUIT_OPEN_UNTIL
+    if _LLM_CIRCUIT_OPEN_UNTIL > 0:
+        print("[agent1] LLM circuit CLOSED (provider recovered)", flush=True)
+    _LLM_CIRCUIT_OPEN_UNTIL = 0.0
 
 
 # ── Real data: CoverageMap + Google Maps ──────────────────────────
@@ -234,6 +262,7 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
     if _OPENROUTER_KEY:
         try:
             data = await _call_llm("OpenRouter", "https://openrouter.ai/api/v1", _OPENROUTER_KEY, _OPENROUTER_MODEL, route, departure_time)
+            _reset_llm_circuit()
             return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_openrouter"}
         except Exception as e:
             print(f"[agent1] OpenRouter failed for '{route}': {type(e).__name__}: {e!s}; trying Groq", flush=True)
@@ -243,11 +272,15 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
     if _GROQ_KEY:
         try:
             data = await _call_llm("Groq", "https://api.groq.com/openai/v1", _GROQ_KEY, _GROQ_MODEL, route, departure_time)
+            _reset_llm_circuit()
             return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_groq"}
         except Exception as e:
             print(f"[agent1] Groq failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
             last_error = e
 
+    # Both providers failed — trip the breaker so subsequent calls skip the LLM
+    # until the cooldown expires.
+    _trip_llm_circuit(f"{type(last_error).__name__ if last_error else 'unknown'}")
     raise last_error or RuntimeError("All LLM providers failed")
 
 
@@ -460,41 +493,36 @@ def _hardcoded_fallback(route: str, departure_time: str) -> dict:
 
 @tool(name="agent1_predict")
 async def predict(route: str, departure_time: str) -> dict:
-    """Predict dead zones. Transit hardcoded → CoverageMap (real) → LLM (fallback) → hardcoded."""
+    """Predict dead zones. LLM (primary) → CoverageMap → hardcoded fail-safes.
+
+    Circuit breaker: if the LLM chain has failed recently, skip it entirely
+    until the cooldown expires (avoids paying 30s timeout per request during
+    a provider outage). Hardcoded zones are ONLY used as fail-safes.
+    """
     payload = {"route": route, "departure_time": departure_time}
 
-    # 1. Transit lines: always use verified geographic data — LLM gets tunnel locations wrong.
-    transit = _transit_hardcoded(route, departure_time)
-    if transit is not None:
+    # 1. LLM — the primary agentic prediction. Skipped only if the breaker is
+    # currently open from a recent failure.
+    if not _llm_circuit_open():
         try:
-            LLMObs.annotate(
-                input_data=payload,
-                output_data={"dead_zones_count": _count_zones(transit)},
-                metadata={"backend": "transit_hardcoded"},
-                tags={"tool": "agent1_predict"},
-            )
-        except Exception:
-            pass
-        return transit
+            data = await _llm_predict(route, departure_time)
+            try:
+                LLMObs.annotate(
+                    input_data=payload,
+                    output_data={"dead_zones_count": _count_zones(data)},
+                    metadata={"backend": "llm_predict"},
+                    tags={"tool": "agent1_predict"},
+                )
+            except Exception:
+                pass
+            return data
+        except Exception as e:
+            print(f"[agent1] LLM prediction failed ({type(e).__name__}: {e}); falling through to CoverageMap/hardcoded", flush=True)
+    else:
+        remaining = int(_LLM_CIRCUIT_OPEN_UNTIL - time.time())
+        print(f"[agent1] LLM circuit open ({remaining}s left); skipping LLM for '{route}'", flush=True)
 
-    # 2. Curated driving routes — use verified hardcoded zones FIRST. These coords
-    # are hand-picked and more accurate than LLM predictions; using them here also
-    # saves LLM tokens for unknown routes (critical during LinkedIn-launch traffic
-    # spikes when token budgets are tight). LLM remains primary for unknown routes.
-    driving = _driving_hardcoded(route, departure_time)
-    if driving is not None:
-        try:
-            LLMObs.annotate(
-                input_data=payload,
-                output_data={"dead_zones_count": _count_zones(driving)},
-                metadata={"backend": "driving_hardcoded"},
-                tags={"tool": "agent1_predict"},
-            )
-        except Exception:
-            pass
-        return driving
-
-    # 3. CoverageMap real signal data — only if both keys present
+    # 2. CoverageMap real signal data — only if both keys present
     if _COVERAGEMAP_KEY and _GOOGLE_MAPS_KEY:
         try:
             data = await _coveragemap_predict(route, departure_time)
@@ -511,26 +539,37 @@ async def predict(route: str, departure_time: str) -> dict:
                 except Exception:
                     pass
                 return data
-            print(f"[agent1] CoverageMap found 0 zones for '{route}'; trying LLM", flush=True)
+            print(f"[agent1] CoverageMap found 0 zones for '{route}'; trying hardcoded fail-safe", flush=True)
         except Exception as e:
-            print(f"[agent1] CoverageMap failed ({type(e).__name__}: {e}); trying LLM", flush=True)
+            print(f"[agent1] CoverageMap failed ({type(e).__name__}: {e}); trying hardcoded fail-safe", flush=True)
 
-    # 4. LLM — the agentic prediction for UNKNOWN routes only (known routes use
-    # driving_hardcoded above for accuracy + token economy).
-    try:
-        data = await _llm_predict(route, departure_time)
+    # 3. Transit hardcoded fail-safe — known transit lines (tunnels)
+    transit = _transit_hardcoded(route, departure_time)
+    if transit is not None:
         try:
             LLMObs.annotate(
                 input_data=payload,
-                output_data={"dead_zones_count": _count_zones(data)},
-                metadata={"backend": "llm_predict"},
+                output_data={"dead_zones_count": _count_zones(transit)},
+                metadata={"backend": "transit_hardcoded"},
                 tags={"tool": "agent1_predict"},
             )
         except Exception:
             pass
-        return data
-    except Exception as e:
-        print(f"[agent1] LLM prediction failed ({type(e).__name__}: {e}); using safety-net fallback", flush=True)
+        return transit
+
+    # 4. Driving hardcoded fail-safe — curated routes in the trip planner
+    driving = _driving_hardcoded(route, departure_time)
+    if driving is not None:
+        try:
+            LLMObs.annotate(
+                input_data=payload,
+                output_data={"dead_zones_count": _count_zones(driving)},
+                metadata={"backend": "driving_hardcoded"},
+                tags={"tool": "agent1_predict"},
+            )
+        except Exception:
+            pass
+        return driving
 
     # 5. Generic last-resort fallback for unknown routes when everything else fails
     return _hardcoded_fallback(route, departure_time)
