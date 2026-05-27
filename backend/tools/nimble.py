@@ -13,9 +13,22 @@ from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import tool
 
 NIMBLE_URL = "https://api.webit.live/api/v1/realtime/serp"
-_API_KEY       = os.getenv("NIMBLE_API_KEY",    "").strip()
+_API_KEY        = os.getenv("NIMBLE_API_KEY",    "").strip()
 _OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
-_MODEL         = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001")
+_OPENROUTER_MODEL = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001").strip()
+_GROQ_KEY       = os.getenv("GROQ_API_KEY", "").strip()
+_GROQ_MODEL     = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+
+# Pick provider — Groq primary, OpenRouter fallback.
+if _GROQ_KEY:
+    _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL = "groq", _GROQ_KEY, "https://api.groq.com/openai/v1", _GROQ_MODEL
+elif _OPENROUTER_KEY:
+    _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL = "openrouter", _OPENROUTER_KEY, "https://openrouter.ai/api/v1", _OPENROUTER_MODEL
+else:
+    _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL = "", "", "", ""
+
+# Back-compat
+_MODEL = _LLM_MODEL
 
 _URL_CHECK_TIMEOUT = 3.0   # seconds per URL reachability check
 
@@ -145,11 +158,11 @@ Rules:
 
 async def _llm_stub(query: str) -> dict:
     """Generate route-specific search results via LLM when Nimble is unavailable."""
-    if not _OPENROUTER_KEY:
+    if not _LLM_KEY:
         return _generic_stub(query)
     try:
         from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1")
+        client = AsyncOpenAI(api_key=_LLM_KEY, base_url=_LLM_BASE_URL)
         resp = await client.chat.completions.create(
             model=_MODEL,
             messages=[

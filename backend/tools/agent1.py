@@ -20,6 +20,9 @@ from ddtrace.llmobs.decorators import tool
 
 _AGENT1_URL        = os.getenv("AGENT1_URL",         "").strip().rstrip("/")
 _OPENROUTER_KEY    = os.getenv("OPENROUTER_API_KEY",  "").strip()
+_OPENROUTER_MODEL  = os.getenv("OPENAI_MODEL",        "google/gemini-2.0-flash-001").strip()
+_GROQ_KEY          = os.getenv("GROQ_API_KEY",        "").strip()
+_GROQ_MODEL        = os.getenv("GROQ_MODEL",          "llama-3.3-70b-versatile").strip()
 _COVERAGEMAP_KEY   = os.getenv("COVERAGEMAP_API_KEY", "").strip()
 _GOOGLE_MAPS_KEY   = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
 
@@ -190,56 +193,62 @@ def _extract_json(raw: str) -> dict:
     raise ValueError(f"No JSON object found in LLM output. First 300 chars: {cleaned[:300]!r}")
 
 
-async def _llm_predict(route: str, departure_time: str) -> dict:
-    if not _OPENROUTER_KEY:
-        print(f"[agent1] LLM skipped: OPENROUTER_API_KEY not set", flush=True)
-        return _hardcoded_fallback(route, departure_time)
-
+async def _call_llm(provider: str, base_url: str, api_key: str, model: str, route: str, departure_time: str) -> dict:
+    """Single attempt against one provider. Raises on any failure."""
     from openai import AsyncOpenAI
-    client = AsyncOpenAI(
-        api_key=_OPENROUTER_KEY,
-        base_url="https://openrouter.ai/api/v1",
-        timeout=30.0,
-    )
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=30.0)
     prompt = _LLM_PROMPT.format(route=route, departure_time=departure_time)
-    model = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001")
 
-    try:
-        resp = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": _LLM_SYSTEM},
-                {"role": "user",   "content": prompt},
-            ],
-            temperature=0.2,
-            max_tokens=1024,  # JSON response is tiny; default 8192 fails on low-credit OpenRouter accounts
-        )
-    except Exception as e:
-        print(f"[agent1] LLM API call failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
-        raise
-
+    resp = await client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": _LLM_SYSTEM},
+            {"role": "user",   "content": prompt},
+        ],
+        temperature=0.2,
+        max_tokens=1024,
+    )
     raw = resp.choices[0].message.content or ""
     if not raw:
-        print(f"[agent1] LLM returned empty content for '{route}' (model={model})", flush=True)
-        raise ValueError("Empty LLM response")
+        raise ValueError(f"{provider} returned empty content")
 
-    try:
-        data = _extract_json(raw)
-    except Exception as e:
-        print(f"[agent1] LLM JSON parse failed for '{route}': {e!s}", flush=True)
-        raise
-
-    # Validate the shape we promised the caller
+    data = _extract_json(raw)
     if "dead_zones" not in data:
-        print(f"[agent1] LLM response missing 'dead_zones' key. Keys: {list(data.keys())}", flush=True)
-        raise ValueError(f"Missing dead_zones key (got: {list(data.keys())})")
-    if not isinstance(data["dead_zones"], list):
-        raise ValueError(f"dead_zones is {type(data['dead_zones']).__name__}, not list")
-    if not data["dead_zones"]:
-        raise ValueError("LLM returned empty dead_zones list")
+        raise ValueError(f"{provider} response missing 'dead_zones' key (keys: {list(data.keys())})")
+    if not isinstance(data["dead_zones"], list) or not data["dead_zones"]:
+        raise ValueError(f"{provider} returned empty/invalid dead_zones list")
 
-    print(f"[agent1] LLM success: {len(data['dead_zones'])} zone(s) for '{route}' via {model}", flush=True)
-    return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict"}
+    print(f"[agent1] {provider} success: {len(data['dead_zones'])} zone(s) for '{route}' via {model}", flush=True)
+    return data
+
+
+async def _llm_predict(route: str, departure_time: str) -> dict:
+    """Try Groq (fast + free), fall back to OpenRouter. Raise if both fail."""
+    if not _GROQ_KEY and not _OPENROUTER_KEY:
+        print(f"[agent1] LLM skipped: neither GROQ_API_KEY nor OPENROUTER_API_KEY set", flush=True)
+        return _hardcoded_fallback(route, departure_time)
+
+    last_error: Exception | None = None
+
+    # 1. Groq (primary — free tier, fast LPU inference)
+    if _GROQ_KEY:
+        try:
+            data = await _call_llm("Groq", "https://api.groq.com/openai/v1", _GROQ_KEY, _GROQ_MODEL, route, departure_time)
+            return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_groq"}
+        except Exception as e:
+            print(f"[agent1] Groq failed for '{route}': {type(e).__name__}: {e!s}; trying OpenRouter", flush=True)
+            last_error = e
+
+    # 2. OpenRouter (fallback)
+    if _OPENROUTER_KEY:
+        try:
+            data = await _call_llm("OpenRouter", "https://openrouter.ai/api/v1", _OPENROUTER_KEY, _OPENROUTER_MODEL, route, departure_time)
+            return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_openrouter"}
+        except Exception as e:
+            print(f"[agent1] OpenRouter failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
+            last_error = e
+
+    raise last_error or RuntimeError("All LLM providers failed")
 
 
 # ── Transit dead zone database ────────────────────────────────────

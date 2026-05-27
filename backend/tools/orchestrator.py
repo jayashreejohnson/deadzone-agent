@@ -22,8 +22,33 @@ from tools.agent1 import is_transit_route
 from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import workflow, agent
 
-_OPENAI_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
-_MODEL = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001")
+_OPENROUTER_KEY   = os.getenv("OPENROUTER_API_KEY", "").strip()
+_OPENROUTER_MODEL = os.getenv("OPENAI_MODEL",       "google/gemini-2.0-flash-001").strip()
+_GROQ_KEY         = os.getenv("GROQ_API_KEY",       "").strip()
+_GROQ_MODEL       = os.getenv("GROQ_MODEL",         "llama-3.3-70b-versatile").strip()
+
+# Pick the active provider — Groq primary, OpenRouter fallback.
+# Set _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL at import time so the
+# rest of this module can stay simple.
+if _GROQ_KEY:
+    _LLM_PROVIDER = "groq"
+    _LLM_KEY      = _GROQ_KEY
+    _LLM_BASE_URL = "https://api.groq.com/openai/v1"
+    _LLM_MODEL    = _GROQ_MODEL
+elif _OPENROUTER_KEY:
+    _LLM_PROVIDER = "openrouter"
+    _LLM_KEY      = _OPENROUTER_KEY
+    _LLM_BASE_URL = "https://openrouter.ai/api/v1"
+    _LLM_MODEL    = _OPENROUTER_MODEL
+else:
+    _LLM_PROVIDER = ""
+    _LLM_KEY      = ""
+    _LLM_BASE_URL = ""
+    _LLM_MODEL    = ""
+
+# Back-compat for the gating check below.
+_OPENAI_KEY = _LLM_KEY
+_MODEL      = _LLM_MODEL
 
 PRICE_USD = 0.02
 
@@ -540,7 +565,8 @@ Be fast. Issue parallel tool calls whenever possible. Do not invent data — use
 @agent(name="pack_builder")
 async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
     from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=_OPENAI_KEY, base_url="https://openrouter.ai/api/v1")
+    client = AsyncOpenAI(api_key=_LLM_KEY, base_url=_LLM_BASE_URL)
+    print(f"[orchestrator] Using {_LLM_PROVIDER} ({_LLM_MODEL}) for pack-building agent", flush=True)
     try:
         LLMObs.annotate(
             input_data=signal,

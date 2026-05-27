@@ -38,10 +38,13 @@ def _check_env() -> None:
     missing_critical = []
     missing_optional = []
 
-    if not os.getenv("OPENROUTER_API_KEY", "").strip():
+    if not os.getenv("GROQ_API_KEY", "").strip() and not os.getenv("OPENROUTER_API_KEY", "").strip():
         missing_critical.append(
-            "OPENROUTER_API_KEY — LLM orchestrator will fall back to scripted mode"
+            "GROQ_API_KEY or OPENROUTER_API_KEY — LLM orchestrator will fall back to scripted mode"
         )
+    else:
+        which = "Groq" if os.getenv("GROQ_API_KEY", "").strip() else "OpenRouter"
+        print(f"[startup] LLM provider: {which}")
     if not os.getenv("AGENT1_URL", "").strip():
         missing_optional.append(
             "AGENT1_URL — dead-zone predictions will use the built-in stub (default: localhost:8001)"
