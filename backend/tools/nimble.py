@@ -19,11 +19,11 @@ _OPENROUTER_MODEL = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001").str
 _GROQ_KEY       = os.getenv("GROQ_API_KEY", "").strip()
 _GROQ_MODEL     = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
 
-# Pick provider — Groq primary, OpenRouter fallback.
-if _GROQ_KEY:
-    _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL = "groq", _GROQ_KEY, "https://api.groq.com/openai/v1", _GROQ_MODEL
-elif _OPENROUTER_KEY:
+# Pick provider — OpenRouter primary, Groq fallback.
+if _OPENROUTER_KEY:
     _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL = "openrouter", _OPENROUTER_KEY, "https://openrouter.ai/api/v1", _OPENROUTER_MODEL
+elif _GROQ_KEY:
+    _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL = "groq", _GROQ_KEY, "https://api.groq.com/openai/v1", _GROQ_MODEL
 else:
     _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL = "", "", "", ""
 

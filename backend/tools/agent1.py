@@ -223,29 +223,29 @@ async def _call_llm(provider: str, base_url: str, api_key: str, model: str, rout
 
 
 async def _llm_predict(route: str, departure_time: str) -> dict:
-    """Try Groq (fast + free), fall back to OpenRouter. Raise if both fail."""
-    if not _GROQ_KEY and not _OPENROUTER_KEY:
-        print(f"[agent1] LLM skipped: neither GROQ_API_KEY nor OPENROUTER_API_KEY set", flush=True)
+    """Try OpenRouter (primary), fall back to Groq. Raise if both fail."""
+    if not _OPENROUTER_KEY and not _GROQ_KEY:
+        print(f"[agent1] LLM skipped: neither OPENROUTER_API_KEY nor GROQ_API_KEY set", flush=True)
         return _hardcoded_fallback(route, departure_time)
 
     last_error: Exception | None = None
 
-    # 1. Groq (primary — free tier, fast LPU inference)
-    if _GROQ_KEY:
-        try:
-            data = await _call_llm("Groq", "https://api.groq.com/openai/v1", _GROQ_KEY, _GROQ_MODEL, route, departure_time)
-            return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_groq"}
-        except Exception as e:
-            print(f"[agent1] Groq failed for '{route}': {type(e).__name__}: {e!s}; trying OpenRouter", flush=True)
-            last_error = e
-
-    # 2. OpenRouter (fallback)
+    # 1. OpenRouter (primary)
     if _OPENROUTER_KEY:
         try:
             data = await _call_llm("OpenRouter", "https://openrouter.ai/api/v1", _OPENROUTER_KEY, _OPENROUTER_MODEL, route, departure_time)
             return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_openrouter"}
         except Exception as e:
-            print(f"[agent1] OpenRouter failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
+            print(f"[agent1] OpenRouter failed for '{route}': {type(e).__name__}: {e!s}; trying Groq", flush=True)
+            last_error = e
+
+    # 2. Groq (fallback — free tier, fast LPU inference)
+    if _GROQ_KEY:
+        try:
+            data = await _call_llm("Groq", "https://api.groq.com/openai/v1", _GROQ_KEY, _GROQ_MODEL, route, departure_time)
+            return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_groq"}
+        except Exception as e:
+            print(f"[agent1] Groq failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
             last_error = e
 
     raise last_error or RuntimeError("All LLM providers failed")
