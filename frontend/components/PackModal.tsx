@@ -11,12 +11,12 @@ export default function PackModal({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-6"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6"
       style={{ background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-4xl h-[88vh] rounded-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-4xl h-[92vh] sm:h-[88vh] rounded-2xl flex flex-col overflow-hidden"
         style={{
           background: "#050810",
           border: "1px solid rgba(0,212,255,0.18)",

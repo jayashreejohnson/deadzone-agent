@@ -24,15 +24,19 @@ export function AlertCard({
           <p className="text-xs text-slate-500 mt-0.5">Signal drops soon — we&apos;re preparing your pack</p>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      {/* Stat tiles — single column under ~360px so labels/values don't get
+          truncated; 3-up on anything wider. */}
+      <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-2 sm:gap-3 mb-5">
         <StatTile label="Location"       value={deadzoneName} color="#f59e0b" />
         <StatTile label="Est. blackout"  value={`${mins}m ${secs.toString().padStart(2, "0")}s`} color="#f59e0b" />
         <StatTile label="Confidence"     value={`${confidence}%`} color="#10b981" />
       </div>
-      <div className="flex gap-2">
+      {/* Buttons — full-width primary on mobile, inline row from sm: up.
+          Prevents the Prepare Pack CTA from being clipped on phones. */}
+      <div className="flex flex-col sm:flex-row gap-2">
         <button
           onClick={onPrepare}
-          className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200"
+          className="w-full sm:flex-1 px-4 py-3 sm:py-2.5 rounded-xl font-semibold text-sm tracking-wide transition-all duration-200"
           style={{
             background: "linear-gradient(135deg, #d97706 0%, #f59e0b 100%)",
             color:      "#050810",
@@ -41,20 +45,22 @@ export function AlertCard({
         >
           Prepare Pack
         </button>
-        <button
-          onClick={onSwitch}
-          className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
-          style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8", border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          Reroute
-        </button>
-        <button
-          onClick={onStay}
-          className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
-          style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8", border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          Stay
-        </button>
+        <div className="flex gap-2 sm:contents">
+          <button
+            onClick={onSwitch}
+            className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+            style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8", border: "1px solid rgba(255,255,255,0.08)" }}
+          >
+            Reroute
+          </button>
+          <button
+            onClick={onStay}
+            className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+            style={{ background: "rgba(255,255,255,0.05)", color: "#94a3b8", border: "1px solid rgba(255,255,255,0.08)" }}
+          >
+            Stay
+          </button>
+        </div>
       </div>
     </Shell>
   );

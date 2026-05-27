@@ -75,7 +75,25 @@ export default function Page() {
   const [showOfflineOverlay, setShowOfflineOverlay] = useState(false);
 
   // UI panels
+  // Detect small viewports so we can collapse the log drawer and give the
+  // overlay cards (Prepare Pack / Open Continuity Pack) the full width on
+  // phones — otherwise the 300px log column eats the buttons.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
+
   const [logOpen, setLogOpen] = useState(true);
+  // Auto-collapse the log drawer when we detect a mobile viewport so the
+  // overlay cards aren't squeezed off-screen on first render.
+  useEffect(() => {
+    if (isMobile) setLogOpen(false);
+  }, [isMobile]);
 
   const initialTrip = useCallback(
     (): TripState => ({
@@ -684,7 +702,7 @@ export default function Page() {
           className="absolute left-4 z-[1200] transition-all duration-300"
           style={{
             top:   "4.5rem",
-            right: logOpen ? `${LOG_W + 16}px` : "1rem",
+            right: isMobile ? "1rem" : (logOpen ? `${LOG_W + 16}px` : "1rem"),
           }}
         >
           <CountdownBanner
@@ -702,7 +720,7 @@ export default function Page() {
           style={{
             top:   showCountdown ? "8rem" : "5rem",
             left:  "1rem",
-            right: logOpen ? `${LOG_W + 16}px` : "1rem",
+            right: isMobile ? "1rem" : (logOpen ? `${LOG_W + 16}px` : "1rem"),
           }}
         >
           <div style={{ width: "100%", maxWidth: "520px" }}>
@@ -731,7 +749,7 @@ export default function Page() {
       )}
 
       {/* ── Toasts ────────────────────────────────────────────── */}
-      <div className="absolute z-[1300] flex flex-col gap-2" style={{ top: "4rem", right: logOpen ? `${LOG_W + 12}px` : "1rem" }}>
+      <div className="absolute z-[1300] flex flex-col gap-2" style={{ top: "4rem", right: isMobile ? "1rem" : (logOpen ? `${LOG_W + 12}px` : "1rem") }}>
         {toasts.map((t) => (
           <Toast
             key={t.id}
