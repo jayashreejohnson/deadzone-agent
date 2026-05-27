@@ -156,23 +156,46 @@ Rules:
 """
 
 
+async def _call_llm_with_fallback(query: str):
+    """Try OpenRouter, then Groq. Returns (raw_content, provider_name) or raises."""
+    from openai import AsyncOpenAI
+    messages = [
+        {"role": "system", "content": _LLM_SYSTEM},
+        {"role": "user",   "content": _LLM_PROMPT.format(query=query)},
+    ]
+    last_error: Exception | None = None
+
+    if _OPENROUTER_KEY:
+        try:
+            c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=30.0)
+            r = await c.chat.completions.create(
+                model=_OPENROUTER_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
+            )
+            return (r.choices[0].message.content or ""), "openrouter"
+        except Exception as e:
+            print(f"[nimble] OpenRouter stub failed: {type(e).__name__}: {str(e)[:160]}; trying Groq", flush=True)
+            last_error = e
+
+    if _GROQ_KEY:
+        try:
+            c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=30.0)
+            r = await c.chat.completions.create(
+                model=_GROQ_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
+            )
+            return (r.choices[0].message.content or ""), "groq"
+        except Exception as e:
+            print(f"[nimble] Groq stub failed: {type(e).__name__}: {str(e)[:160]}", flush=True)
+            last_error = e
+
+    raise last_error or RuntimeError("No LLM providers configured")
+
+
 async def _llm_stub(query: str) -> dict:
     """Generate route-specific search results via LLM when Nimble is unavailable."""
-    if not _LLM_KEY:
+    if not _OPENROUTER_KEY and not _GROQ_KEY:
         return _generic_stub(query)
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=_LLM_KEY, base_url=_LLM_BASE_URL)
-        resp = await client.chat.completions.create(
-            model=_MODEL,
-            messages=[
-                {"role": "system", "content": _LLM_SYSTEM},
-                {"role": "user",   "content": _LLM_PROMPT.format(query=query)},
-            ],
-            temperature=0.3,
-            max_tokens=1024,
-        )
-        raw = resp.choices[0].message.content or ""
+        raw, _provider = await _call_llm_with_fallback(query)
         raw = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()
         data = json.loads(raw)
         return {

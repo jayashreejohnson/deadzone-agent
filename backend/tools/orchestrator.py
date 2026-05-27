@@ -562,11 +562,44 @@ Never finish without calling deliver_pack. This is not optional.
 Be fast. Issue parallel tool calls whenever possible. Do not invent data — use the tools."""
 
 
+async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None = None):
+    """Try OpenRouter, then Groq. Each request is independent — if OpenRouter
+    fails on iteration 3 of the tool loop, iteration 4 can still come back to
+    it (rate-limit case). Tool-calling state is just messages, so providers
+    are interchangeable."""
+    from openai import AsyncOpenAI
+    last_error: Exception | None = None
+
+    if _OPENROUTER_KEY:
+        try:
+            c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=30.0)
+            kwargs: dict = {"model": _OPENROUTER_MODEL, "messages": messages,
+                            "temperature": 0, "max_tokens": 2048}
+            if tools:
+                kwargs.update({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": True})
+            return await c.chat.completions.create(**kwargs), "openrouter"
+        except Exception as e:
+            print(f"[orchestrator] OpenRouter call failed: {type(e).__name__}: {str(e)[:160]}; trying Groq", flush=True)
+            last_error = e
+
+    if _GROQ_KEY:
+        try:
+            c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=30.0)
+            kwargs = {"model": _GROQ_MODEL, "messages": messages,
+                      "temperature": 0, "max_tokens": 2048}
+            if tools:
+                kwargs.update({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": True})
+            return await c.chat.completions.create(**kwargs), "groq"
+        except Exception as e:
+            print(f"[orchestrator] Groq call failed: {type(e).__name__}: {str(e)[:160]}", flush=True)
+            last_error = e
+
+    raise last_error or RuntimeError("No LLM providers configured")
+
+
 @agent(name="pack_builder")
 async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
-    from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=_LLM_KEY, base_url=_LLM_BASE_URL)
-    print(f"[orchestrator] Using {_LLM_PROVIDER} ({_LLM_MODEL}) for pack-building agent", flush=True)
+    print(f"[orchestrator] LLM primary={_LLM_PROVIDER} ({_LLM_MODEL}), Groq fallback={'ready' if _GROQ_KEY else 'not configured'}", flush=True)
     try:
         LLMObs.annotate(
             input_data=signal,
@@ -583,11 +616,7 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
     ]
 
     for _ in range(8):
-        resp = await client.chat.completions.create(
-            model=_MODEL, messages=messages, tools=TOOLS,
-            tool_choice="auto", parallel_tool_calls=True, temperature=0,
-            max_tokens=2048,  # cap so low-credit OpenRouter accounts don't reject (default 8192 fails)
-        )
+        resp, _provider = await _call_llm_with_fallback(messages, tools=TOOLS)
         msg = resp.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))
 
