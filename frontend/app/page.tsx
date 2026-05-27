@@ -125,7 +125,7 @@ export default function Page() {
       if (zone) {
         // Eagerly fire /signal even if the dot hasn't physically reached the
         // zone radius yet — the countdown is the demo's source of truth, not
-        // the polyline geometry. Backend cache makes repeat fires idempotent.
+        // the polyline geometry.
         const alreadyTriggered = trips.user_a.triggered.has(zone.id);
         if (!alreadyTriggered) {
           setOverlay({ kind: "preparing" });
@@ -145,6 +145,18 @@ export default function Page() {
               route:            routeName,
             }),
           }).catch(() => {});
+          // CRITICAL: mark this zone as triggered immediately so the animation
+          // loop's handleZoneEnter does NOT re-fire when the dot physically
+          // enters the zone radius later. Without this, handleZoneEnter resets
+          // overlay from "ready" → "alert" → "preparing" and the user can
+          // never open the pack for the first zone.
+          setTrips((prev) => {
+            const t = prev.user_a;
+            if (t.triggered.has(zone.id)) return prev;
+            const triggered = new Set(t.triggered);
+            triggered.add(zone.id);
+            return { ...prev, user_a: { ...t, triggered } };
+          });
         }
         setOfflineZone(zone);
         // Cap the offline simulation at 10 seconds. The pack usually arrives
