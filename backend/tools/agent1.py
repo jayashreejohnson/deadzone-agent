@@ -139,7 +139,8 @@ async def _coveragemap_predict(route: str, departure_time: str) -> dict:
 
 _LLM_SYSTEM = (
     "You are a cellular network coverage expert with deep knowledge of real-world "
-    "geography. Your job is to predict where drivers will lose signal on a given route."
+    "geography. Your job is to predict where drivers will lose signal on a given route. "
+    "Respond in English only. All location descriptions must use English landmark names."
 )
 
 _LLM_PROMPT = """Predict cellular dead zones for this driving route:
@@ -530,6 +531,15 @@ def _count_zones(resp: dict) -> int:
         return 0
 
 
+def _sanitize_desc(s: str | None, fallback: str) -> str:
+    """Strip non-ASCII chars from LLM-generated descriptions (occasional Cyrillic / CJK leakage)."""
+    if not s:
+        return fallback
+    cleaned = re.sub(r"[^\x00-\x7F]+", "", s)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,-/")
+    return cleaned if cleaned else fallback
+
+
 def normalize_zones(resp: dict) -> list[dict]:
     """Flatten the response into a list of {id, lat, lng, description, ...} dicts."""
     out: list[dict] = []
@@ -539,11 +549,12 @@ def normalize_zones(resp: dict) -> list[dict]:
         return out
     for i, z in enumerate(zones):
         loc = z.get("location", {})
+        desc = _sanitize_desc(loc.get("description"), f"Zone {i + 1}")
         out.append({
-            "id":               f"dz_{i:02d}_{(loc.get('description') or '').lower().replace(' ', '_')[:24]}",
+            "id":               f"dz_{i:02d}_{desc.lower().replace(' ', '_')[:24]}",
             "lat":              loc.get("lat"),
             "lng":              loc.get("lon"),
-            "description":      loc.get("description", f"Zone {i}"),
+            "description":      desc,
             "start_time":       z.get("start_time"),
             "duration_minutes": z.get("duration_minutes"),
             "severity":         z.get("severity"),
