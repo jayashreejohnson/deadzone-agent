@@ -174,20 +174,69 @@ Guidelines:
 """
 
 
+def _extract_json(raw: str) -> dict:
+    """Pull a JSON object out of an LLM response that may have fences/prose around it."""
+    cleaned = re.sub(r"```(?:json)?\s*", "", raw)
+    cleaned = re.sub(r"\s*```", "", cleaned).strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+    # Fallback: find the outermost {...} and try to parse that
+    match = re.search(r"\{[\s\S]*\}", cleaned)
+    if match:
+        return json.loads(match.group(0))
+    raise ValueError(f"No JSON object found in LLM output. First 300 chars: {cleaned[:300]!r}")
+
+
 async def _llm_predict(route: str, departure_time: str) -> dict:
     if not _OPENROUTER_KEY:
+        print(f"[agent1] LLM skipped: OPENROUTER_API_KEY not set", flush=True)
         return _hardcoded_fallback(route, departure_time)
+
     from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1")
-    prompt = _LLM_PROMPT.format(route=route, departure_time=departure_time)
-    resp = await client.chat.completions.create(
-        model="google/gemini-2.0-flash-001",
-        messages=[{"role": "system", "content": _LLM_SYSTEM}, {"role": "user", "content": prompt}],
-        temperature=0.2,
+    client = AsyncOpenAI(
+        api_key=_OPENROUTER_KEY,
+        base_url="https://openrouter.ai/api/v1",
+        timeout=30.0,
     )
+    prompt = _LLM_PROMPT.format(route=route, departure_time=departure_time)
+    model = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001")
+
+    try:
+        resp = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": _LLM_SYSTEM},
+                {"role": "user",   "content": prompt},
+            ],
+            temperature=0.2,
+        )
+    except Exception as e:
+        print(f"[agent1] LLM API call failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
+        raise
+
     raw = resp.choices[0].message.content or ""
-    raw = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()
-    data = json.loads(raw)
+    if not raw:
+        print(f"[agent1] LLM returned empty content for '{route}' (model={model})", flush=True)
+        raise ValueError("Empty LLM response")
+
+    try:
+        data = _extract_json(raw)
+    except Exception as e:
+        print(f"[agent1] LLM JSON parse failed for '{route}': {e!s}", flush=True)
+        raise
+
+    # Validate the shape we promised the caller
+    if "dead_zones" not in data:
+        print(f"[agent1] LLM response missing 'dead_zones' key. Keys: {list(data.keys())}", flush=True)
+        raise ValueError(f"Missing dead_zones key (got: {list(data.keys())})")
+    if not isinstance(data["dead_zones"], list):
+        raise ValueError(f"dead_zones is {type(data['dead_zones']).__name__}, not list")
+    if not data["dead_zones"]:
+        raise ValueError("LLM returned empty dead_zones list")
+
+    print(f"[agent1] LLM success: {len(data['dead_zones'])} zone(s) for '{route}' via {model}", flush=True)
     return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict"}
 
 
@@ -403,7 +452,7 @@ async def predict(route: str, departure_time: str) -> dict:
     """Predict dead zones. Transit hardcoded → CoverageMap (real) → LLM (fallback) → hardcoded."""
     payload = {"route": route, "departure_time": departure_time}
 
-    # 0a. Transit lines: always use verified geographic data — LLM gets tunnel locations wrong.
+    # 1. Transit lines: always use verified geographic data — LLM gets tunnel locations wrong.
     transit = _transit_hardcoded(route, departure_time)
     if transit is not None:
         try:
@@ -417,27 +466,12 @@ async def predict(route: str, departure_time: str) -> dict:
             pass
         return transit
 
-    # 0b. Curated driving routes: verified zones for the six routes in the trip
-    # planner. Deterministic and always available regardless of external API state.
-    driving = _driving_hardcoded(route, departure_time)
-    if driving is not None:
-        try:
-            LLMObs.annotate(
-                input_data=payload,
-                output_data={"dead_zones_count": _count_zones(driving)},
-                metadata={"backend": "driving_hardcoded"},
-                tags={"tool": "agent1_predict"},
-            )
-        except Exception:
-            pass
-        return driving
-
-    # 1. Real signal data via CoverageMap + Google Maps
+    # 2. CoverageMap real signal data — only if both keys present
     if _COVERAGEMAP_KEY and _GOOGLE_MAPS_KEY:
         try:
             data = await _coveragemap_predict(route, departure_time)
             zone_count = _count_zones(data)
-            print(f"[agent1] CoverageMap: {zone_count} dead zone(s) for '{route}'")
+            print(f"[agent1] CoverageMap: {zone_count} dead zone(s) for '{route}'", flush=True)
             if zone_count > 0:
                 try:
                     LLMObs.annotate(
@@ -449,16 +483,13 @@ async def predict(route: str, departure_time: str) -> dict:
                 except Exception:
                     pass
                 return data
-            # CoverageMap found no weak signal points — route has good coverage.
-            # Fall through to LLM which can predict tunnels / terrain gaps.
-            print(f"[agent1] CoverageMap found 0 zones for '{route}'; supplementing with LLM")
+            print(f"[agent1] CoverageMap found 0 zones for '{route}'; trying LLM", flush=True)
         except Exception as e:
-            print(f"[agent1] CoverageMap failed ({e}); falling back to LLM")
+            print(f"[agent1] CoverageMap failed ({type(e).__name__}: {e}); trying LLM", flush=True)
 
-    # 2. LLM geographic knowledge fallback
+    # 3. LLM — the actual agentic prediction. PRIMARY for non-transit driving routes.
     try:
         data = await _llm_predict(route, departure_time)
-        print(f"[agent1] LLM: {_count_zones(data)} dead zone(s) for '{route}'")
         try:
             LLMObs.annotate(
                 input_data=payload,
@@ -470,8 +501,25 @@ async def predict(route: str, departure_time: str) -> dict:
             pass
         return data
     except Exception as e:
-        print(f"[agent1] LLM prediction failed ({e}); using hardcoded fallback")
-        return _hardcoded_fallback(route, departure_time)
+        print(f"[agent1] LLM prediction failed ({type(e).__name__}: {e}); using safety-net fallback", flush=True)
+
+    # 4. Curated driving routes: verified zones for the 6 routes in the trip planner.
+    # Only fires if both CoverageMap and LLM failed — keeps the demo working.
+    driving = _driving_hardcoded(route, departure_time)
+    if driving is not None:
+        try:
+            LLMObs.annotate(
+                input_data=payload,
+                output_data={"dead_zones_count": _count_zones(driving)},
+                metadata={"backend": "driving_hardcoded_fallback"},
+                tags={"tool": "agent1_predict"},
+            )
+        except Exception:
+            pass
+        return driving
+
+    # 5. Generic last-resort fallback for unknown routes when everything else fails
+    return _hardcoded_fallback(route, departure_time)
 
 
 def _count_zones(resp: dict) -> int:
