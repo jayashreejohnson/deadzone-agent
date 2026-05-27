@@ -132,6 +132,48 @@ async def root():
     return {"service": "deadzone-agent", "ok": True}
 
 
+@app.get("/llm-check")
+async def llm_check():
+    """Diagnostic: ping each configured LLM provider from Railway and report status."""
+    from openai import AsyncOpenAI
+
+    async def _ping(name: str, key: str, base_url: str, model: str) -> dict:
+        if not key:
+            return {"ok": False, "configured": False, "error": f"{name.upper()}_API_KEY not set"}
+        try:
+            client = AsyncOpenAI(api_key=key, base_url=base_url, timeout=15.0)
+            r = await client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": "Say 'ok' and nothing else."}],
+                max_tokens=10,
+                temperature=0,
+            )
+            return {
+                "ok": True,
+                "configured": True,
+                "model": model,
+                "response": (r.choices[0].message.content or "")[:50],
+            }
+        except Exception as e:
+            return {
+                "ok": False,
+                "configured": True,
+                "model": model,
+                "error": f"{type(e).__name__}: {str(e)[:200]}",
+            }
+
+    openrouter_key   = os.getenv("OPENROUTER_API_KEY", "").strip()
+    openrouter_model = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001").strip()
+    groq_key         = os.getenv("GROQ_API_KEY", "").strip()
+    groq_model       = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+
+    return {
+        "primary":    "openrouter" if openrouter_key else ("groq" if groq_key else "none"),
+        "openrouter": await _ping("openrouter", openrouter_key, "https://openrouter.ai/api/v1", openrouter_model),
+        "groq":       await _ping("groq",       groq_key,       "https://api.groq.com/openai/v1", groq_model),
+    }
+
+
 @app.post("/signal")
 async def signal(s: Signal):
     """Frontend tells us a user is heading into a dead zone. Orchestrator runs in background."""
