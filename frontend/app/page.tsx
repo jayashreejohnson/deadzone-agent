@@ -123,9 +123,34 @@ export default function Page() {
     if (countdownSeconds <= 0) {
       const zone = nextZone || plannedZones[0];
       if (zone) {
+        // Eagerly fire /signal even if the dot hasn't physically reached the
+        // zone radius yet — the countdown is the demo's source of truth, not
+        // the polyline geometry. Backend cache makes repeat fires idempotent.
+        const alreadyTriggered = trips.user_a.triggered.has(zone.id);
+        if (!alreadyTriggered) {
+          setOverlay({ kind: "preparing" });
+          setZonePackStatus((prev) => ({ ...prev, [zone.id]: "preparing" }));
+          fetch(`${API}/signal`, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({
+              user_id: "user_a",
+              lat: zone.lat, lng: zone.lng,
+              eta_seconds:      (zone.duration_minutes || 4) * 60,
+              route_id:         routeId,
+              deadzone_id:      zone.id,
+              duration_minutes: zone.duration_minutes || 4,
+              severity:         zone.severity || "medium",
+              zone_description: zone.name,
+              route:            routeName,
+            }),
+          }).catch(() => {});
+        }
         setOfflineZone(zone);
-        const simDuration = Math.round((zone.duration_minutes || 4) * 60 * 0.3);
-        setOfflineSimDuration(Math.max(simDuration, 5));
+        // Cap the offline simulation at 10 seconds. The pack usually arrives
+        // in 3-8s; this overlay is purely demo theatre and dismisses early
+        // when the pack actually arrives (see effect below).
+        setOfflineSimDuration(10);
         setShowOfflineOverlay(true);
         setOfflineActive(true);
       }
@@ -133,7 +158,20 @@ export default function Page() {
     }
     const id = setTimeout(() => setCountdownSeconds((s) => (s !== null ? s - 1 : null)), 1000);
     return () => clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planState, countdownSeconds, nextZone, plannedZones]);
+
+  // ── Pack-arrives-during-offline: dismiss the overlay immediately ──────
+  // If pack_ready comes in while the NO SIGNAL overlay is up, end the sim
+  // right away so the user sees the ReadyCard without waiting out the timer.
+  useEffect(() => {
+    if (overlay.kind === "ready" && showOfflineOverlay) {
+      setShowOfflineOverlay(false);
+      setOfflineActive(false);
+      setOfflineZone(null);
+      pushToast({ id: _toastSeq++, variant: "synced" });
+    }
+  }, [overlay.kind, showOfflineOverlay]);
 
   // ── WebSocket ─────────────────────────────────────────────────
   useEffect(() => {
