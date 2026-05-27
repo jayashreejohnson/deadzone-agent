@@ -207,7 +207,7 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
         {/* LEFT — Try it now */}
         <button
           onClick={onTryDemo}
-          className="flex-1 flex flex-col items-center justify-center px-8 py-8 group relative overflow-y-auto transition-all duration-300"
+          className="flex-1 flex flex-col items-center justify-center px-6 sm:px-8 py-6 sm:py-8 group relative overflow-y-auto transition-all duration-300"
           style={{
             background: "linear-gradient(135deg, rgba(0,212,255,0.04) 0%, rgba(5,8,16,0) 100%)",
             borderRight: "1px solid rgba(0,212,255,0.08)",
@@ -258,7 +258,7 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
         {/* RIGHT — Coming to your phone */}
         <button
           onClick={onExploreMobile}
-          className="flex-1 flex flex-col items-center justify-center px-8 py-6 group relative overflow-y-auto transition-all duration-300"
+          className="flex-1 flex flex-col items-center justify-center px-6 sm:px-8 py-6 group relative overflow-y-auto transition-all duration-300"
           style={{
             background: "linear-gradient(135deg, rgba(139,92,246,0.04) 0%, rgba(5,8,16,0) 100%)",
             cursor: "pointer",
@@ -277,8 +277,8 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
               Mockups of how this could work on mobile — auto-detection, alerts before you go dark, contacts notified, content pre-fetched.
             </p>
 
-            {/* Phone preview */}
-            <div className="mb-3"
+            {/* Phone preview — hidden on small viewports (too tall for stacked mobile layout). */}
+            <div className="hidden sm:block mb-3"
               style={{
                 padding: 3,
                 borderRadius: 31,
@@ -299,7 +299,7 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
               </PhoneFrame>
             </div>
 
-            <div className="text-[11px] font-medium mb-4 tracking-wide" style={{ color: "#7dd3fc" }}>
+            <div className="hidden sm:block text-[11px] font-medium mb-4 tracking-wide" style={{ color: "#7dd3fc" }}>
               {current.label}
             </div>
 
