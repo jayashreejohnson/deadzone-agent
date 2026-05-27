@@ -17,7 +17,7 @@ import uuid
 from typing import Any
 
 from bus import emit
-from tools import nimble, senso, payments, clickhouse_db as db
+from tools import nimble, senso, payments, clickhouse_db as db, llm_circuit
 from tools.agent1 import is_transit_route
 from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import workflow, agent
@@ -476,11 +476,16 @@ async def run(signal: dict) -> None:
     except Exception:
         pass
 
-    if _OPENAI_KEY:
+    # Agentic-first: try the LLM unless the shared circuit breaker is open
+    # (i.e. a recent call from anywhere in the stack already proved both
+    # providers are down). Once open, skip straight to the scripted path so
+    # we don't burn 30s+ on a guaranteed timeout.
+    if _OPENAI_KEY and not llm_circuit.is_open():
         try:
             await _run_with_llm(signal, ctx)
             return
         except Exception as e:
+            llm_circuit.trip(f"orchestrator:{type(e).__name__}")
             warn_ev = {
                 "type": "log", "level": "warn",
                 "msg":  f"LLM orchestrator failed ({e!s}); falling back to scripted flow",
@@ -488,6 +493,14 @@ async def run(signal: dict) -> None:
             }
             await emit(warn_ev)
             db.append_trace_event(ctx.trace_id, warn_ev)
+    elif _OPENAI_KEY and llm_circuit.is_open():
+        skip_ev = {
+            "type": "log", "level": "warn",
+            "msg":  f"LLM circuit open ({llm_circuit.seconds_remaining()}s left); using scripted flow",
+            "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
+        }
+        await emit(skip_ev)
+        db.append_trace_event(ctx.trace_id, skip_ev)
     await _run_scripted(signal, ctx)
 
 
@@ -577,7 +590,9 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
                             "temperature": 0, "max_tokens": 2048}
             if tools:
                 kwargs.update({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": True})
-            return await c.chat.completions.create(**kwargs), "openrouter"
+            resp = await c.chat.completions.create(**kwargs)
+            llm_circuit.reset()
+            return resp, "openrouter"
         except Exception as e:
             print(f"[orchestrator] OpenRouter call failed: {type(e).__name__}: {str(e)[:160]}; trying Groq", flush=True)
             last_error = e
@@ -589,11 +604,15 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
                       "temperature": 0, "max_tokens": 2048}
             if tools:
                 kwargs.update({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": True})
-            return await c.chat.completions.create(**kwargs), "groq"
+            resp = await c.chat.completions.create(**kwargs)
+            llm_circuit.reset()
+            return resp, "groq"
         except Exception as e:
             print(f"[orchestrator] Groq call failed: {type(e).__name__}: {str(e)[:160]}", flush=True)
             last_error = e
 
+    # Both providers failed for this call — trip the shared breaker.
+    llm_circuit.trip(f"orchestrator:{type(last_error).__name__ if last_error else 'no_providers'}")
     raise last_error or RuntimeError("No LLM providers configured")
 
 

@@ -11,6 +11,7 @@ import httpx
 from bus import emit
 from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import tool
+from tools import llm_circuit
 
 NIMBLE_URL = "https://api.webit.live/api/v1/realtime/serp"
 _API_KEY        = os.getenv("NIMBLE_API_KEY",    "").strip()
@@ -171,6 +172,7 @@ async def _call_llm_with_fallback(query: str):
             r = await c.chat.completions.create(
                 model=_OPENROUTER_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
             )
+            llm_circuit.reset()
             return (r.choices[0].message.content or ""), "openrouter"
         except Exception as e:
             print(f"[nimble] OpenRouter stub failed: {type(e).__name__}: {str(e)[:160]}; trying Groq", flush=True)
@@ -182,17 +184,27 @@ async def _call_llm_with_fallback(query: str):
             r = await c.chat.completions.create(
                 model=_GROQ_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
             )
+            llm_circuit.reset()
             return (r.choices[0].message.content or ""), "groq"
         except Exception as e:
             print(f"[nimble] Groq stub failed: {type(e).__name__}: {str(e)[:160]}", flush=True)
             last_error = e
 
+    # Both providers failed — trip the shared breaker.
+    llm_circuit.trip(f"nimble:{type(last_error).__name__ if last_error else 'no_providers'}")
     raise last_error or RuntimeError("No LLM providers configured")
 
 
 async def _llm_stub(query: str) -> dict:
-    """Generate route-specific search results via LLM when Nimble is unavailable."""
+    """Generate route-specific search results via LLM when Nimble is unavailable.
+
+    Short-circuits to the generic stub if the shared LLM breaker is open —
+    no point hitting providers we already know are down.
+    """
     if not _OPENROUTER_KEY and not _GROQ_KEY:
+        return _generic_stub(query)
+    if llm_circuit.is_open():
+        print(f"[nimble] LLM circuit open ({llm_circuit.seconds_remaining()}s left); using generic stub", flush=True)
         return _generic_stub(query)
     try:
         raw, _provider = await _call_llm_with_fallback(query)

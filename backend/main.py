@@ -167,25 +167,21 @@ async def llm_check():
     groq_key         = os.getenv("GROQ_API_KEY", "").strip()
     groq_model       = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
 
-    from .tools import agent1
+    from .tools import llm_circuit
     return {
         "primary":    "openrouter" if openrouter_key else ("groq" if groq_key else "none"),
         "openrouter": await _ping("openrouter", openrouter_key, "https://openrouter.ai/api/v1", openrouter_model),
         "groq":       await _ping("groq",       groq_key,       "https://api.groq.com/openai/v1", groq_model),
-        "circuit":    {
-            "open": agent1._llm_circuit_open(),
-            "seconds_remaining": max(0, int(agent1._LLM_CIRCUIT_OPEN_UNTIL - __import__("time").time())),
-            "cooldown_seconds": int(agent1._LLM_CIRCUIT_COOLDOWN),
-        },
+        "circuit":    llm_circuit.status(),
     }
 
 
 @app.post("/llm-circuit/reset")
 async def llm_circuit_reset():
-    """Manually close the LLM circuit breaker (e.g. after refilling Groq tokens)."""
-    from .tools import agent1
-    agent1._reset_llm_circuit()
-    return {"ok": True, "circuit_open": agent1._llm_circuit_open()}
+    """Manually close the shared LLM circuit breaker (e.g. after refilling Groq tokens)."""
+    from .tools import llm_circuit
+    llm_circuit.reset()
+    return {"ok": True, "circuit": llm_circuit.status()}
 
 
 @app.post("/signal")

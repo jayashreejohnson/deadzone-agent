@@ -21,6 +21,7 @@ import time
 import httpx
 from ddtrace.llmobs import LLMObs
 from ddtrace.llmobs.decorators import tool
+from tools import llm_circuit
 
 _AGENT1_URL        = os.getenv("AGENT1_URL",         "").strip().rstrip("/")
 _OPENROUTER_KEY    = os.getenv("OPENROUTER_API_KEY",  "").strip()
@@ -35,29 +36,8 @@ _GMAPS_URL         = "https://maps.googleapis.com/maps/api/directions/json"
 _DEAD_ZONE_DBM     = -95    # below this = weak/dead signal (poor call/data quality)
 _CLUSTER_GAP_KM    = 8.0    # points further apart than this start a new cluster
 
-# ── LLM circuit breaker ───────────────────────────────────────────
-# Trips when the LLM provider chain fails (timeouts, 402, 429, 5xx).
-# While open, predict() skips the LLM entirely and goes to CoverageMap +
-# hardcoded fallbacks — saves 30s+ of timeout per request during an outage.
-_LLM_CIRCUIT_OPEN_UNTIL: float = 0.0
-_LLM_CIRCUIT_COOLDOWN  : float = float(os.getenv("LLM_CIRCUIT_COOLDOWN_SEC", "300"))  # 5 min default
-
-
-def _llm_circuit_open() -> bool:
-    return time.time() < _LLM_CIRCUIT_OPEN_UNTIL
-
-
-def _trip_llm_circuit(reason: str) -> None:
-    global _LLM_CIRCUIT_OPEN_UNTIL
-    _LLM_CIRCUIT_OPEN_UNTIL = time.time() + _LLM_CIRCUIT_COOLDOWN
-    print(f"[agent1] LLM circuit OPEN for {int(_LLM_CIRCUIT_COOLDOWN)}s ({reason})", flush=True)
-
-
-def _reset_llm_circuit() -> None:
-    global _LLM_CIRCUIT_OPEN_UNTIL
-    if _LLM_CIRCUIT_OPEN_UNTIL > 0:
-        print("[agent1] LLM circuit CLOSED (provider recovered)", flush=True)
-    _LLM_CIRCUIT_OPEN_UNTIL = 0.0
+# LLM circuit breaker lives in tools.llm_circuit and is shared with
+# orchestrator and nimble. One failure trips it for everyone.
 
 
 # ── Real data: CoverageMap + Google Maps ──────────────────────────
@@ -262,7 +242,7 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
     if _OPENROUTER_KEY:
         try:
             data = await _call_llm("OpenRouter", "https://openrouter.ai/api/v1", _OPENROUTER_KEY, _OPENROUTER_MODEL, route, departure_time)
-            _reset_llm_circuit()
+            llm_circuit.reset()
             return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_openrouter"}
         except Exception as e:
             print(f"[agent1] OpenRouter failed for '{route}': {type(e).__name__}: {e!s}; trying Groq", flush=True)
@@ -272,15 +252,15 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
     if _GROQ_KEY:
         try:
             data = await _call_llm("Groq", "https://api.groq.com/openai/v1", _GROQ_KEY, _GROQ_MODEL, route, departure_time)
-            _reset_llm_circuit()
+            llm_circuit.reset()
             return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_groq"}
         except Exception as e:
             print(f"[agent1] Groq failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
             last_error = e
 
-    # Both providers failed — trip the breaker so subsequent calls skip the LLM
-    # until the cooldown expires.
-    _trip_llm_circuit(f"{type(last_error).__name__ if last_error else 'unknown'}")
+    # Both providers failed — trip the shared breaker so orchestrator and
+    # nimble also skip the LLM until the cooldown expires.
+    llm_circuit.trip(f"agent1:{type(last_error).__name__ if last_error else 'unknown'}")
     raise last_error or RuntimeError("All LLM providers failed")
 
 
@@ -501,9 +481,9 @@ async def predict(route: str, departure_time: str) -> dict:
     """
     payload = {"route": route, "departure_time": departure_time}
 
-    # 1. LLM — the primary agentic prediction. Skipped only if the breaker is
-    # currently open from a recent failure.
-    if not _llm_circuit_open():
+    # 1. LLM — the primary agentic prediction. Skipped only if the shared
+    # breaker is currently open from a recent failure anywhere in the stack.
+    if not llm_circuit.is_open():
         try:
             data = await _llm_predict(route, departure_time)
             try:
@@ -519,8 +499,7 @@ async def predict(route: str, departure_time: str) -> dict:
         except Exception as e:
             print(f"[agent1] LLM prediction failed ({type(e).__name__}: {e}); falling through to CoverageMap/hardcoded", flush=True)
     else:
-        remaining = int(_LLM_CIRCUIT_OPEN_UNTIL - time.time())
-        print(f"[agent1] LLM circuit open ({remaining}s left); skipping LLM for '{route}'", flush=True)
+        print(f"[agent1] LLM circuit open ({llm_circuit.seconds_remaining()}s left); skipping LLM for '{route}'", flush=True)
 
     # 2. CoverageMap real signal data — only if both keys present
     if _COVERAGEMAP_KEY and _GOOGLE_MAPS_KEY:
