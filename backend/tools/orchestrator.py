@@ -487,16 +487,20 @@ async def run(signal: dict) -> None:
     except Exception:
         pass
 
-    # Agentic-first: try the LLM unless the shared circuit breaker is open
-    # (i.e. a recent call from anywhere in the stack already proved both
-    # providers are down). Once open, skip straight to the scripted path so
-    # we don't burn 30s+ on a guaranteed timeout.
+    # Agentic-first: try the LLM unless EVERY provider's per-provider
+    # breaker is open (i.e. there's literally no provider with a chance of
+    # responding). _call_llm_with_fallback does per-provider skipping
+    # inside the chain, so we only short-circuit here when the whole
+    # fleet is down.
     if _OPENAI_KEY and not llm_circuit.is_open():
         try:
             await _run_with_llm(signal, ctx)
             return
         except Exception as e:
-            llm_circuit.trip(f"orchestrator:{type(e).__name__}")
+            # Per-provider tripping already happened inside
+            # _call_llm_with_fallback. No extra global trip needed here —
+            # that would have been over-aggressive (one failure from a
+            # single provider tripping the whole stack).
             warn_ev = {
                 "type": "log", "level": "warn",
                 "msg":  f"LLM orchestrator failed ({e!s}); falling back to scripted flow",
@@ -507,7 +511,7 @@ async def run(signal: dict) -> None:
     elif _OPENAI_KEY and llm_circuit.is_open():
         skip_ev = {
             "type": "log", "level": "warn",
-            "msg":  f"LLM circuit open ({llm_circuit.seconds_remaining()}s left); using scripted flow",
+            "msg":  "All LLM providers' breakers open; using scripted flow",
             "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
         }
         await emit(skip_ev)
@@ -594,7 +598,7 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
     from openai import AsyncOpenAI
     last_error: Exception | None = None
 
-    if _OPENROUTER_KEY:
+    if _OPENROUTER_KEY and not llm_circuit.is_open("openrouter"):
         try:
             c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=_LLM_TIMEOUT_SEC)
             kwargs: dict = {"model": _OPENROUTER_MODEL, "messages": messages,
@@ -602,13 +606,16 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
             if tools:
                 kwargs.update({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": True})
             resp = await c.chat.completions.create(**kwargs)
-            llm_circuit.reset()
+            llm_circuit.reset("openrouter")
             return resp, "openrouter"
         except Exception as e:
             print(f"[orchestrator] OpenRouter call failed: {type(e).__name__}: {str(e)[:160]}; trying Groq", flush=True)
+            llm_circuit.classify_and_trip("openrouter", e)
             last_error = e
+    elif _OPENROUTER_KEY:
+        print(f"[orchestrator] OpenRouter circuit open ({llm_circuit.seconds_remaining('openrouter')}s); skipping", flush=True)
 
-    if _GROQ_KEY:
+    if _GROQ_KEY and not llm_circuit.is_open("groq"):
         try:
             c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC)
             kwargs = {"model": _GROQ_MODEL, "messages": messages,
@@ -616,13 +623,16 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
             if tools:
                 kwargs.update({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": True})
             resp = await c.chat.completions.create(**kwargs)
-            llm_circuit.reset()
+            llm_circuit.reset("groq")
             return resp, "groq"
         except Exception as e:
             print(f"[orchestrator] Groq call failed: {type(e).__name__}: {str(e)[:160]}; trying Cerebras", flush=True)
+            llm_circuit.classify_and_trip("groq", e)
             last_error = e
+    elif _GROQ_KEY:
+        print(f"[orchestrator] Groq circuit open ({llm_circuit.seconds_remaining('groq')}s); skipping", flush=True)
 
-    if _CEREBRAS_KEY:
+    if _CEREBRAS_KEY and not llm_circuit.is_open("cerebras"):
         try:
             c = AsyncOpenAI(api_key=_CEREBRAS_KEY, base_url="https://api.cerebras.ai/v1", timeout=_LLM_TIMEOUT_SEC)
             kwargs = {"model": _CEREBRAS_MODEL, "messages": messages,
@@ -632,15 +642,16 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
                 # Omit the parallel flag to maximize compatibility.
                 kwargs.update({"tools": tools, "tool_choice": "auto"})
             resp = await c.chat.completions.create(**kwargs)
-            llm_circuit.reset()
+            llm_circuit.reset("cerebras")
             return resp, "cerebras"
         except Exception as e:
             print(f"[orchestrator] Cerebras call failed: {type(e).__name__}: {str(e)[:160]}", flush=True)
+            llm_circuit.classify_and_trip("cerebras", e)
             last_error = e
+    elif _CEREBRAS_KEY:
+        print(f"[orchestrator] Cerebras circuit open ({llm_circuit.seconds_remaining('cerebras')}s); skipping", flush=True)
 
-    # All providers failed for this call — trip the shared breaker.
-    llm_circuit.trip(f"orchestrator:{type(last_error).__name__ if last_error else 'no_providers'}")
-    raise last_error or RuntimeError("No LLM providers configured")
+    raise last_error or RuntimeError("All LLM providers unavailable (all breakers open)")
 
 
 @agent(name="pack_builder")

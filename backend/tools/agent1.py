@@ -244,40 +244,47 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
 
     last_error: Exception | None = None
 
-    # 1. OpenRouter (primary)
-    if _OPENROUTER_KEY:
+    # 1. OpenRouter (primary) — skipped if its per-provider breaker is open
+    if _OPENROUTER_KEY and not llm_circuit.is_open("openrouter"):
         try:
             data = await _call_llm("OpenRouter", "https://openrouter.ai/api/v1", _OPENROUTER_KEY, _OPENROUTER_MODEL, route, departure_time)
-            llm_circuit.reset()
+            llm_circuit.reset("openrouter")
             return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_openrouter"}
         except Exception as e:
             print(f"[agent1] OpenRouter failed for '{route}': {type(e).__name__}: {e!s}; trying Groq", flush=True)
+            llm_circuit.classify_and_trip("openrouter", e)
             last_error = e
+    elif _OPENROUTER_KEY:
+        print(f"[agent1] OpenRouter circuit open ({llm_circuit.seconds_remaining('openrouter')}s); skipping", flush=True)
 
     # 2. Groq (fallback — free tier, fast LPU inference)
-    if _GROQ_KEY:
+    if _GROQ_KEY and not llm_circuit.is_open("groq"):
         try:
             data = await _call_llm("Groq", "https://api.groq.com/openai/v1", _GROQ_KEY, _GROQ_MODEL, route, departure_time)
-            llm_circuit.reset()
+            llm_circuit.reset("groq")
             return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_groq"}
         except Exception as e:
             print(f"[agent1] Groq failed for '{route}': {type(e).__name__}: {e!s}; trying Cerebras", flush=True)
+            llm_circuit.classify_and_trip("groq", e)
             last_error = e
+    elif _GROQ_KEY:
+        print(f"[agent1] Groq circuit open ({llm_circuit.seconds_remaining('groq')}s); skipping", flush=True)
 
     # 3. Cerebras (final fallback — generous free tier, instant signup)
-    if _CEREBRAS_KEY:
+    if _CEREBRAS_KEY and not llm_circuit.is_open("cerebras"):
         try:
             data = await _call_llm("Cerebras", "https://api.cerebras.ai/v1", _CEREBRAS_KEY, _CEREBRAS_MODEL, route, departure_time)
-            llm_circuit.reset()
+            llm_circuit.reset("cerebras")
             return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_cerebras"}
         except Exception as e:
             print(f"[agent1] Cerebras failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
+            llm_circuit.classify_and_trip("cerebras", e)
             last_error = e
+    elif _CEREBRAS_KEY:
+        print(f"[agent1] Cerebras circuit open ({llm_circuit.seconds_remaining('cerebras')}s); skipping", flush=True)
 
-    # All providers failed — trip the shared breaker so orchestrator and
-    # nimble also skip the LLM until the cooldown expires.
-    llm_circuit.trip(f"agent1:{type(last_error).__name__ if last_error else 'unknown'}")
-    raise last_error or RuntimeError("All LLM providers failed")
+    # All available providers either failed this call or are circuit-open.
+    raise last_error or RuntimeError("All LLM providers unavailable (all breakers open)")
 
 
 # ── Transit dead zone database ────────────────────────────────────
@@ -497,8 +504,9 @@ async def predict(route: str, departure_time: str) -> dict:
     """
     payload = {"route": route, "departure_time": departure_time}
 
-    # 1. LLM — the primary agentic prediction. Skipped only if the shared
-    # breaker is currently open from a recent failure anywhere in the stack.
+    # 1. LLM — the primary agentic prediction. Skipped only if EVERY
+    # provider's breaker is open (i.e. no provider has any chance of
+    # responding). Per-provider skipping happens inside _llm_predict.
     if not llm_circuit.is_open():
         try:
             data = await _llm_predict(route, departure_time)
@@ -515,7 +523,7 @@ async def predict(route: str, departure_time: str) -> dict:
         except Exception as e:
             print(f"[agent1] LLM prediction failed ({type(e).__name__}: {e}); falling through to CoverageMap/hardcoded", flush=True)
     else:
-        print(f"[agent1] LLM circuit open ({llm_circuit.seconds_remaining()}s left); skipping LLM for '{route}'", flush=True)
+        print(f"[agent1] All LLM provider breakers open; skipping LLM for '{route}'", flush=True)
 
     # 2. CoverageMap real signal data — only if both keys present
     if _COVERAGEMAP_KEY and _GOOGLE_MAPS_KEY:

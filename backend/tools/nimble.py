@@ -173,45 +173,52 @@ async def _call_llm_with_fallback(query: str):
     ]
     last_error: Exception | None = None
 
-    if _OPENROUTER_KEY:
+    if _OPENROUTER_KEY and not llm_circuit.is_open("openrouter"):
         try:
             c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=_LLM_TIMEOUT_SEC)
             r = await c.chat.completions.create(
                 model=_OPENROUTER_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
             )
-            llm_circuit.reset()
+            llm_circuit.reset("openrouter")
             return (r.choices[0].message.content or ""), "openrouter"
         except Exception as e:
             print(f"[nimble] OpenRouter stub failed: {type(e).__name__}: {str(e)[:160]}; trying Groq", flush=True)
+            llm_circuit.classify_and_trip("openrouter", e)
             last_error = e
+    elif _OPENROUTER_KEY:
+        print(f"[nimble] OpenRouter circuit open ({llm_circuit.seconds_remaining('openrouter')}s); skipping", flush=True)
 
-    if _GROQ_KEY:
+    if _GROQ_KEY and not llm_circuit.is_open("groq"):
         try:
             c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC)
             r = await c.chat.completions.create(
                 model=_GROQ_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
             )
-            llm_circuit.reset()
+            llm_circuit.reset("groq")
             return (r.choices[0].message.content or ""), "groq"
         except Exception as e:
             print(f"[nimble] Groq stub failed: {type(e).__name__}: {str(e)[:160]}; trying Cerebras", flush=True)
+            llm_circuit.classify_and_trip("groq", e)
             last_error = e
+    elif _GROQ_KEY:
+        print(f"[nimble] Groq circuit open ({llm_circuit.seconds_remaining('groq')}s); skipping", flush=True)
 
-    if _CEREBRAS_KEY:
+    if _CEREBRAS_KEY and not llm_circuit.is_open("cerebras"):
         try:
             c = AsyncOpenAI(api_key=_CEREBRAS_KEY, base_url="https://api.cerebras.ai/v1", timeout=_LLM_TIMEOUT_SEC)
             r = await c.chat.completions.create(
                 model=_CEREBRAS_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
             )
-            llm_circuit.reset()
+            llm_circuit.reset("cerebras")
             return (r.choices[0].message.content or ""), "cerebras"
         except Exception as e:
             print(f"[nimble] Cerebras stub failed: {type(e).__name__}: {str(e)[:160]}", flush=True)
+            llm_circuit.classify_and_trip("cerebras", e)
             last_error = e
+    elif _CEREBRAS_KEY:
+        print(f"[nimble] Cerebras circuit open ({llm_circuit.seconds_remaining('cerebras')}s); skipping", flush=True)
 
-    # All providers failed — trip the shared breaker.
-    llm_circuit.trip(f"nimble:{type(last_error).__name__ if last_error else 'no_providers'}")
-    raise last_error or RuntimeError("No LLM providers configured")
+    raise last_error or RuntimeError("All LLM providers unavailable (all breakers open)")
 
 
 async def _llm_stub(query: str) -> dict:
@@ -223,7 +230,9 @@ async def _llm_stub(query: str) -> dict:
     if not _OPENROUTER_KEY and not _GROQ_KEY and not _CEREBRAS_KEY:
         return _generic_stub(query)
     if llm_circuit.is_open():
-        print(f"[nimble] LLM circuit open ({llm_circuit.seconds_remaining()}s left); using generic stub", flush=True)
+        # Every configured provider has its breaker open — go straight to
+        # the generic stub instead of cycling through dead providers.
+        print(f"[nimble] All LLM provider breakers open; using generic stub", flush=True)
         return _generic_stub(query)
     try:
         raw, _provider = await _call_llm_with_fallback(query)
