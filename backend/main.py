@@ -169,7 +169,7 @@ async def llm_check():
     cerebras_key     = os.getenv("CEREBRAS_API_KEY", "").strip()
     cerebras_model   = os.getenv("CEREBRAS_MODEL", "llama-3.3-70b").strip()
 
-    from .tools import llm_circuit
+    from tools import llm_circuit
     return {
         "primary":    "openrouter" if openrouter_key else ("groq" if groq_key else ("cerebras" if cerebras_key else "none")),
         "openrouter": await _ping("openrouter", openrouter_key,  "https://openrouter.ai/api/v1", openrouter_model),
@@ -182,7 +182,7 @@ async def llm_check():
 @app.post("/llm-circuit/reset")
 async def llm_circuit_reset():
     """Manually close the shared LLM circuit breaker (e.g. after refilling Groq tokens)."""
-    from .tools import llm_circuit
+    from tools import llm_circuit
     llm_circuit.reset()
     return {"ok": True, "circuit": llm_circuit.status()}
 
