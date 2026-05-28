@@ -179,6 +179,39 @@ async def llm_check():
     }
 
 
+@app.get("/llm-models")
+async def llm_models():
+    """List the actual models each configured provider exposes for our key.
+
+    Useful when a 404 ('model_not_found') suggests we're guessing wrong IDs.
+    Queries each provider's OpenAI-compatible /v1/models endpoint.
+    """
+    import httpx
+    providers = [
+        ("openrouter", os.getenv("OPENROUTER_API_KEY", "").strip(), "https://openrouter.ai/api/v1"),
+        ("groq",       os.getenv("GROQ_API_KEY", "").strip(),       "https://api.groq.com/openai/v1"),
+        ("cerebras",   os.getenv("CEREBRAS_API_KEY", "").strip(),   "https://api.cerebras.ai/v1"),
+    ]
+    out: dict = {}
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for name, key, base in providers:
+            if not key:
+                out[name] = {"configured": False}
+                continue
+            try:
+                r = await client.get(f"{base}/models", headers={"Authorization": f"Bearer {key}"})
+                if r.status_code != 200:
+                    out[name] = {"configured": True, "error": f"HTTP {r.status_code}: {r.text[:160]}"}
+                    continue
+                data = r.json()
+                # OpenAI-style: {"data": [{"id": "..."}, ...]}
+                ids = [m.get("id") for m in (data.get("data") or []) if isinstance(m, dict)]
+                out[name] = {"configured": True, "models": ids[:40]}
+            except Exception as e:
+                out[name] = {"configured": True, "error": f"{type(e).__name__}: {str(e)[:160]}"}
+    return out
+
+
 @app.post("/llm-circuit/reset")
 async def llm_circuit_reset():
     """Manually close the shared LLM circuit breaker (e.g. after refilling Groq tokens)."""
