@@ -28,8 +28,14 @@ _OPENROUTER_KEY    = os.getenv("OPENROUTER_API_KEY",  "").strip()
 _OPENROUTER_MODEL  = os.getenv("OPENAI_MODEL",        "google/gemini-2.0-flash-001").strip()
 _GROQ_KEY          = os.getenv("GROQ_API_KEY",        "").strip()
 _GROQ_MODEL        = os.getenv("GROQ_MODEL",          "llama-3.3-70b-versatile").strip()
+_CEREBRAS_KEY      = os.getenv("CEREBRAS_API_KEY",    "").strip()
+_CEREBRAS_MODEL    = os.getenv("CEREBRAS_MODEL",      "llama-3.3-70b").strip()
 _COVERAGEMAP_KEY   = os.getenv("COVERAGEMAP_API_KEY", "").strip()
 _GOOGLE_MAPS_KEY   = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
+
+# Per-provider HTTP timeout. Short on purpose so a dead provider doesn't
+# hold up the next provider in the chain.
+_LLM_TIMEOUT_SEC   = float(os.getenv("LLM_TIMEOUT_SEC", "8"))
 
 _COVERAGEMAP_URL   = "https://enterprise.coveragemap.com/api/v1/signal-strength/lookup"
 _GMAPS_URL         = "https://maps.googleapis.com/maps/api/directions/json"
@@ -204,7 +210,7 @@ def _extract_json(raw: str) -> dict:
 async def _call_llm(provider: str, base_url: str, api_key: str, model: str, route: str, departure_time: str) -> dict:
     """Single attempt against one provider. Raises on any failure."""
     from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=30.0)
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=_LLM_TIMEOUT_SEC)
     prompt = _LLM_PROMPT.format(route=route, departure_time=departure_time)
 
     resp = await client.chat.completions.create(
@@ -231,9 +237,9 @@ async def _call_llm(provider: str, base_url: str, api_key: str, model: str, rout
 
 
 async def _llm_predict(route: str, departure_time: str) -> dict:
-    """Try OpenRouter (primary), fall back to Groq. Raise if both fail."""
-    if not _OPENROUTER_KEY and not _GROQ_KEY:
-        print(f"[agent1] LLM skipped: neither OPENROUTER_API_KEY nor GROQ_API_KEY set", flush=True)
+    """Try OpenRouter → Groq → Cerebras in order. Raise if all fail."""
+    if not _OPENROUTER_KEY and not _GROQ_KEY and not _CEREBRAS_KEY:
+        print(f"[agent1] LLM skipped: no provider keys set", flush=True)
         return _hardcoded_fallback(route, departure_time)
 
     last_error: Exception | None = None
@@ -255,10 +261,20 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
             llm_circuit.reset()
             return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_groq"}
         except Exception as e:
-            print(f"[agent1] Groq failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
+            print(f"[agent1] Groq failed for '{route}': {type(e).__name__}: {e!s}; trying Cerebras", flush=True)
             last_error = e
 
-    # Both providers failed — trip the shared breaker so orchestrator and
+    # 3. Cerebras (final fallback — generous free tier, instant signup)
+    if _CEREBRAS_KEY:
+        try:
+            data = await _call_llm("Cerebras", "https://api.cerebras.ai/v1", _CEREBRAS_KEY, _CEREBRAS_MODEL, route, departure_time)
+            llm_circuit.reset()
+            return {"route": route, "departure_time": departure_time, "dead_zones": data, "_source": "llm_predict_cerebras"}
+        except Exception as e:
+            print(f"[agent1] Cerebras failed for '{route}': {type(e).__name__}: {e!s}", flush=True)
+            last_error = e
+
+    # All providers failed — trip the shared breaker so orchestrator and
     # nimble also skip the LLM until the cooldown expires.
     llm_circuit.trip(f"agent1:{type(last_error).__name__ if last_error else 'unknown'}")
     raise last_error or RuntimeError("All LLM providers failed")

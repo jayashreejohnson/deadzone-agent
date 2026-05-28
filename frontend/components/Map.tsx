@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { memo, useEffect, useMemo } from "react";
 import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import { MAP_CENTER, MAP_ZOOM, type LatLng, type DeadZone } from "@/lib/route";
 
@@ -46,40 +46,32 @@ function severityLabel(severity?: string): string {
   return "";
 }
 
-export default function Map({ dots, activeUser, deadZones, routePolyline, nextZone, boundsVersion }: MapProps) {
-  // Use exactly what's passed in — never fall back to the default Manhattan/Newark data
-  // so the map is clean before a route is scanned.
-  const zones = deadZones ?? [];
-  const route = routePolyline ?? [];
-  const polylinePos: [number, number][] = route.map((p) => [p.lat, p.lng]);
-
+/**
+ * Static map layers — route polyline + dead-zone circles.
+ *
+ * Pulled into its own memoized component so the animation loop (which
+ * updates user position ~3x/sec) does NOT re-create these Leaflet layers
+ * every tick. Layer churn on the polyline + circles was what caused the
+ * map to flash whenever the dot moved.
+ *
+ * Re-renders only when zones, route, or the highlighted "next" zone id
+ * change — none of which happen during the per-tick animation.
+ */
+const StaticLayers = memo(function StaticLayers({
+  zones, polylinePos, nextZoneId,
+}: {
+  zones: DeadZone[];
+  polylinePos: [number, number][];
+  nextZoneId: string | undefined;
+}) {
   return (
-    <MapContainer
-      center={MAP_CENTER}
-      zoom={MAP_ZOOM}
-      style={{ height: "100%", width: "100%" }}
-      scrollWheelZoom={true}
-    >
-      {/* CartoDB Dark Matter — free, no API key, cinematic dark aesthetic */}
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        subdomains="abcd"
-        maxZoom={19}
-      />
-
-      {/* Auto-pan to route bounds when a new plan comes in */}
-      <MapAutoBounds zones={zones} route={route} boundsVersion={boundsVersion} />
-
-      {/* Route polyline — electric cyan */}
+    <>
       <Polyline
         positions={polylinePos}
         pathOptions={{ color: "#00d4ff", weight: 3, opacity: 0.85, dashArray: "8 6" }}
       />
-
-      {/* Dead zones */}
       {zones.map((dz) => {
-        const isNext = nextZone?.id === dz.id;
+        const isNext = nextZoneId === dz.id;
         const color =
           isNext
             ? "#ef4444"
@@ -90,7 +82,6 @@ export default function Map({ dots, activeUser, deadZones, routePolyline, nextZo
             : "#f59e0b";
         const fillOpacity = isNext ? 0.28 : 0.14;
         const weight      = isNext ? 2 : 1.5;
-
         return (
           <Circle
             key={dz.id}
@@ -121,8 +112,56 @@ export default function Map({ dots, activeUser, deadZones, routePolyline, nextZo
           </Circle>
         );
       })}
+    </>
+  );
+});
 
-      {/* User position dots */}
+export default function Map({ dots, activeUser, deadZones, routePolyline, nextZone, boundsVersion }: MapProps) {
+  // Use exactly what's passed in — never fall back to the default Manhattan/Newark data
+  // so the map is clean before a route is scanned.
+  const zones = deadZones ?? [];
+  const route = routePolyline ?? [];
+
+  // Stable references — without these the memoized StaticLayers would
+  // re-render every animation tick because the array identities change.
+  const polylinePos: [number, number][] = useMemo(
+    () => route.map((p) => [p.lat, p.lng]),
+    // Hash on coordinate values, not array identity, so animation-loop
+    // re-renders of `routePolyline` with the same values are a no-op.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [route.length, route[0]?.lat, route[0]?.lng, route[route.length - 1]?.lat, route[route.length - 1]?.lng],
+  );
+  const stableZones = useMemo(
+    () => zones,
+    // Re-memo when the zone set actually changes (new plan), not on every
+    // parent render with a fresh-but-equivalent array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [zones.length, zones.map((z) => z.id).join(",")],
+  );
+
+  return (
+    <MapContainer
+      center={MAP_CENTER}
+      zoom={MAP_ZOOM}
+      style={{ height: "100%", width: "100%" }}
+      scrollWheelZoom={true}
+    >
+      {/* CartoDB Dark Matter — free, no API key, cinematic dark aesthetic */}
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        subdomains="abcd"
+        maxZoom={19}
+      />
+
+      {/* Auto-pan to route bounds when a new plan comes in */}
+      <MapAutoBounds zones={stableZones} route={route} boundsVersion={boundsVersion} />
+
+      {/* Static layers: route + zones. Memoized so animation ticks don't
+          re-create the Leaflet polyline/circle layers (was causing flash). */}
+      <StaticLayers zones={stableZones} polylinePos={polylinePos} nextZoneId={nextZone?.id} />
+
+      {/* User position dots — these intentionally update with every tick */}
       {dots.map(
         (d) =>
           d.pos && (

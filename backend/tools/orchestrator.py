@@ -26,8 +26,14 @@ _OPENROUTER_KEY   = os.getenv("OPENROUTER_API_KEY", "").strip()
 _OPENROUTER_MODEL = os.getenv("OPENAI_MODEL",       "google/gemini-2.0-flash-001").strip()
 _GROQ_KEY         = os.getenv("GROQ_API_KEY",       "").strip()
 _GROQ_MODEL       = os.getenv("GROQ_MODEL",         "llama-3.3-70b-versatile").strip()
+_CEREBRAS_KEY     = os.getenv("CEREBRAS_API_KEY",   "").strip()
+_CEREBRAS_MODEL   = os.getenv("CEREBRAS_MODEL",     "llama-3.3-70b").strip()
 
-# Pick the active provider — OpenRouter primary, Groq fallback.
+# Short per-request timeout so a dead provider doesn't burn 30s before
+# we try the next one in the chain.
+_LLM_TIMEOUT_SEC  = float(os.getenv("LLM_TIMEOUT_SEC", "8"))
+
+# Pick the active provider — OpenRouter primary, Groq fallback, Cerebras final.
 # Set _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL at import time so the
 # rest of this module can stay simple.
 if _OPENROUTER_KEY:
@@ -40,6 +46,11 @@ elif _GROQ_KEY:
     _LLM_KEY      = _GROQ_KEY
     _LLM_BASE_URL = "https://api.groq.com/openai/v1"
     _LLM_MODEL    = _GROQ_MODEL
+elif _CEREBRAS_KEY:
+    _LLM_PROVIDER = "cerebras"
+    _LLM_KEY      = _CEREBRAS_KEY
+    _LLM_BASE_URL = "https://api.cerebras.ai/v1"
+    _LLM_MODEL    = _CEREBRAS_MODEL
 else:
     _LLM_PROVIDER = ""
     _LLM_KEY      = ""
@@ -585,7 +596,7 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
 
     if _OPENROUTER_KEY:
         try:
-            c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=30.0)
+            c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=_LLM_TIMEOUT_SEC)
             kwargs: dict = {"model": _OPENROUTER_MODEL, "messages": messages,
                             "temperature": 0, "max_tokens": 2048}
             if tools:
@@ -599,7 +610,7 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
 
     if _GROQ_KEY:
         try:
-            c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=30.0)
+            c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC)
             kwargs = {"model": _GROQ_MODEL, "messages": messages,
                       "temperature": 0, "max_tokens": 2048}
             if tools:
@@ -608,10 +619,26 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
             llm_circuit.reset()
             return resp, "groq"
         except Exception as e:
-            print(f"[orchestrator] Groq call failed: {type(e).__name__}: {str(e)[:160]}", flush=True)
+            print(f"[orchestrator] Groq call failed: {type(e).__name__}: {str(e)[:160]}; trying Cerebras", flush=True)
             last_error = e
 
-    # Both providers failed for this call — trip the shared breaker.
+    if _CEREBRAS_KEY:
+        try:
+            c = AsyncOpenAI(api_key=_CEREBRAS_KEY, base_url="https://api.cerebras.ai/v1", timeout=_LLM_TIMEOUT_SEC)
+            kwargs = {"model": _CEREBRAS_MODEL, "messages": messages,
+                      "temperature": 0, "max_tokens": 2048}
+            if tools:
+                # Cerebras supports OpenAI-style tools, but not parallel_tool_calls on all models.
+                # Omit the parallel flag to maximize compatibility.
+                kwargs.update({"tools": tools, "tool_choice": "auto"})
+            resp = await c.chat.completions.create(**kwargs)
+            llm_circuit.reset()
+            return resp, "cerebras"
+        except Exception as e:
+            print(f"[orchestrator] Cerebras call failed: {type(e).__name__}: {str(e)[:160]}", flush=True)
+            last_error = e
+
+    # All providers failed for this call — trip the shared breaker.
     llm_circuit.trip(f"orchestrator:{type(last_error).__name__ if last_error else 'no_providers'}")
     raise last_error or RuntimeError("No LLM providers configured")
 

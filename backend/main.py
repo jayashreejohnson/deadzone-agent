@@ -166,12 +166,15 @@ async def llm_check():
     openrouter_model = os.getenv("OPENAI_MODEL", "google/gemini-2.0-flash-001").strip()
     groq_key         = os.getenv("GROQ_API_KEY", "").strip()
     groq_model       = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+    cerebras_key     = os.getenv("CEREBRAS_API_KEY", "").strip()
+    cerebras_model   = os.getenv("CEREBRAS_MODEL", "llama-3.3-70b").strip()
 
     from .tools import llm_circuit
     return {
-        "primary":    "openrouter" if openrouter_key else ("groq" if groq_key else "none"),
-        "openrouter": await _ping("openrouter", openrouter_key, "https://openrouter.ai/api/v1", openrouter_model),
-        "groq":       await _ping("groq",       groq_key,       "https://api.groq.com/openai/v1", groq_model),
+        "primary":    "openrouter" if openrouter_key else ("groq" if groq_key else ("cerebras" if cerebras_key else "none")),
+        "openrouter": await _ping("openrouter", openrouter_key,  "https://openrouter.ai/api/v1", openrouter_model),
+        "groq":       await _ping("groq",       groq_key,        "https://api.groq.com/openai/v1", groq_model),
+        "cerebras":   await _ping("cerebras",   cerebras_key,    "https://api.cerebras.ai/v1",  cerebras_model),
         "circuit":    llm_circuit.status(),
     }
 

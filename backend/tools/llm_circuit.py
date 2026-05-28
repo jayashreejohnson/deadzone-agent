@@ -38,7 +38,7 @@ import time
 # Module-level state. Process-local — Railway runs a single worker so this is
 # fine for the demo. For multi-worker deploys, swap for Redis-backed state.
 _open_until: float = 0.0
-_cooldown  : float = float(os.getenv("LLM_CIRCUIT_COOLDOWN_SEC", "300"))  # 5 min default
+_cooldown  : float = float(os.getenv("LLM_CIRCUIT_COOLDOWN_SEC", "60"))  # 60s default — short blast radius, retry quickly
 _last_reason: str = ""
 _trip_count : int = 0
 
