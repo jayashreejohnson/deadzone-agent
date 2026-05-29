@@ -287,7 +287,27 @@ async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
         return result
 
     if name == "senso_publish":
-        url = await senso.publish(args["title"], args["route_id"], args["sections"])
+        # Defensive coercion: free-tier LLMs sometimes pass strings or
+        # malformed entries inside `sections`. Senso's HTML renderer expects
+        # a list of dicts with heading/summary/sources keys — coerce here so
+        # the LLM doesn't have to waste another round-trip recovering.
+        title    = args.get("title") or f"Offline pack: {ctx.signal.get('zone_description', 'route')}"
+        route_id = args.get("route_id") or ctx.signal.get("route_id", "")
+        raw_secs = args.get("sections") or []
+        if not isinstance(raw_secs, list):
+            raw_secs = [raw_secs]
+        clean_secs: list[dict] = []
+        for s in raw_secs:
+            if isinstance(s, dict):
+                clean_secs.append({
+                    "heading": str(s.get("heading") or s.get("title") or "Section"),
+                    "summary": str(s.get("summary") or s.get("content") or s.get("text") or ""),
+                    "sources": s.get("sources") if isinstance(s.get("sources"), list) else [],
+                })
+            elif isinstance(s, str):
+                # LLM passed a bare string — wrap it as a single section.
+                clean_secs.append({"heading": "Notes", "summary": s, "sources": []})
+        url = await senso.publish(title, route_id, clean_secs)
         ctx.pack_url = url
         return {"url": url}
 
@@ -553,90 +573,71 @@ async def run(signal: dict) -> None:
 
 # ---------- LLM-driven path ----------
 
-SYSTEM_PROMPT = """You are an offline-pack-building agent. A user is approaching a connectivity dead zone and needs an offline content pack delivered BEFORE they lose signal — time matters.
+SYSTEM_PROMPT = """You build offline content packs for drivers about to lose cell signal. Speed matters — the user has minutes. Be terse, no commentary between tool calls.
 
-The signal dict you receive includes:
-- duration_minutes: how long the dead zone lasts (drives content depth)
-- severity: "high" | "medium" | "low"
-- zone_description: human-readable name of the zone (e.g. "Lincoln Tunnel Mid")
-- route: the full route name (e.g. "Manhattan to Newark")
-- lat / lng: coordinates of the dead zone
+INPUTS: signal contains route, zone_description, duration_minutes, severity, lat, lng, user_id, route_id, deadzone_id.
 
-ROUTE TYPE DETECTION — look at the route string and classify it:
-- TRANSIT route: contains "train", "subway", "BART", "metro", "transit", "tube", "L train", "E train"
-- MOUNTAIN route: contains "Million Dollar Highway", "Vail", "US-550", "PCH", "Big Sur", "mountain", "pass"
-- LONG RURAL route: contains "US-50", "Nevada", "loneliest road", duration_minutes >= 15
-- URBAN TUNNEL route: "Lincoln Tunnel", "Newark", "Manhattan", "tunnel", subway lines
-- DEFAULT: standard highway driving route
+THE ONE RULE: every run MUST end with a `deliver_pack` call. No deliver_pack = the user gets nothing. There is no other way to mark success.
 
-Workflow (follow exactly):
+ROUTE TYPE (one of):
+- transit: contains train / subway / BART / metro / tube
+- mountain: contains pass / Vail / Big Sur / Million Dollar / PCH / US-550
+- rural: contains US-50 / Nevada / "loneliest" / duration_minutes >= 15
+- tunnel: contains tunnel / Lincoln / Holland / Midtown
+- default: anything else
 
-1. Call `clickhouse_find_recent_pack` first with the route_id and deadzone_id from the signal.
+STEP 1. In ONE parallel batch, call `clickhouse_find_recent_pack` AND the appropriate nimble_searches. Don't wait for the cache result before kicking off searches — if it hits, you'll ignore the searches.
 
-2A. IF a pack is found (cache hit):
-    - Call `payments_pay` from the user's agent to the cached pack's owner_user_id (use "agent_<last_letter_of_user_id>" naming — e.g. user_a → agent_a, user_b → agent_b). Amount: 0.02 USD. Memo: "buy cached pack".
-    - Call `clickhouse_log_event` with action="bought", the found pack_id, build_ms=0.
-    - Call `deliver_pack` with the cached URL, cached=true, the pack_id.
-    - Reply with one short sentence and stop.
+Nimble query templates (pick 2-4 by route type; use shorter queries for shorter zones):
+  transit:  road="{zone} {route} service alerts delays", news="commuter news {zone}", poi="nearby exits {zone}", weather="weather {zone}"
+  mountain: weather="mountain weather {zone} {route} forecast", road="road conditions closures {zone} {route}", poi="emergency contacts sheriff {zone}", news="local mountain news {zone}"
+  rural:    weather="weather next 4h {zone}", road="road conditions gas stations {zone}", poi="last gas station {zone} services", news="local news {zone}"
+  tunnel:   road="traffic {zone} {route}", news="local news {zone}", weather="weather {route}", poi="rest stops {zone}"
+Counts: duration >= 5 → all 4 topics. duration 2-4 → weather+road+news. duration < 2 → road+news.
 
-2B. IF no pack is found (cache miss), choose queries based on ROUTE TYPE and duration_minutes:
+STEP 2. After searches return:
+  • Cache HIT: call payments_pay (from=agent_<last char of user_id>, to=agent_<last char of cached.owner_user_id>, amount_usd=0.02, memo="buy cached pack") AND clickhouse_log_event (action="bought", pack_id=cached.pack_id, build_ms=0) AND deliver_pack (url=cached.url, cached=true, pack_id=cached.pack_id) — all 3 IN PARALLEL. STOP.
+  • Cache MISS: call senso_publish.
 
-    TRANSIT ROUTE — run nimble_search calls for transit-specific content:
-        * topic="road",    query: "{zone_description} {route} transit service alerts delays today"
-        * topic="news",    query: "commuter news updates {zone_description} {route}"
-        * topic="weather", query: "weather forecast {zone_description}" (if duration >= 5)
-        * topic="poi",     query: "nearby services exits {zone_description}" (if duration >= 5)
+STEP 3 (miss path). senso_publish args MUST be EXACTLY this shape:
+  title: string, e.g. "Offline pack: <zone_description>"
+  route_id: string, taken from signal.route_id
+  sections: ARRAY OF OBJECTS. Each object: {"heading": "<string>", "summary": "<2-3 sentences>", "sources": [{"url": "...", "title": "...", "snippet": "..."}, ...]}
+  NEVER pass markdown or strings inside sections. Always objects.
 
-    MOUNTAIN ROUTE — safety is critical, always 4 searches:
-        * topic="weather", query: "high elevation mountain weather {zone_description} {route} forecast alerts"
-        * topic="road",    query: "road conditions closures rockslide avalanche {zone_description} {route}"
-        * topic="poi",     query: "emergency contacts search rescue services {zone_description} county sheriff"
-        * topic="news",    query: "local mountain news road conditions {zone_description} {route}"
+STEP 4. After senso_publish, call clickhouse_save_pack with the published url, owner_user_id=signal.user_id, and source_count=<total source count across sections>.
 
-    LONG RURAL ROUTE (duration >= 15 min) — scale content for extended blackout:
-        * topic="weather", query: "weather forecast next 4 hours {zone_description} {route}"
-        * topic="road",    query: "road conditions gas stations services {zone_description} {route}"
-        * topic="poi",     query: "last gas station before {zone_description} {route} emergency services"
-        * topic="news",    query: "local news {zone_description} {route}"
+STEP 5 (FINAL, MANDATORY). Call deliver_pack with url=<published url>, cached=false, pack_id=<pack_id from save_pack>. Then stop, reply with one short sentence.
 
-    URBAN TUNNEL / DEFAULT — standard 4-topic search for long, 3 for medium, 2 for short:
-        LONG (duration_minutes >= 5):
-            * topic="weather", query: "weather {zone_description} {route}"
-            * topic="road",    query: "road conditions traffic {zone_description} {route}"
-            * topic="news",    query: "local news {zone_description} {route}"
-            * topic="poi",     query: "nearby services rest stops {zone_description} {route}"
-        MEDIUM (2–4 min): weather + road + news
-        SHORT (< 2 min): road + news
-
-    After all search calls return:
-    - Call `senso_publish` with descriptive title and sections.
-    - Call `clickhouse_save_pack` with the returned URL, owner_user_id from the signal, source_count = total sources.
-    - Call `clickhouse_log_event` with action="built", pack_id = EXACT pack_id from clickhouse_save_pack.
-    - Call `deliver_pack` with the new URL, cached=false, exact pack_id.
-    - Reply with one short sentence and stop.
-
-CRITICAL RULE: You MUST always call `deliver_pack` as the FINAL tool call in every run.
-deliver_pack is MANDATORY — without it the user's device will not receive the pack.
-Never finish without calling deliver_pack. This is not optional.
-
-Be fast. Issue parallel tool calls whenever possible. Do not invent data — use the tools."""
+Parallel calls are cheap. Sequential calls cost a full round-trip — minimize them. Never narrate; the tools speak for you."""
 
 
-async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None = None):
-    """Try OpenRouter, then Groq. Each request is independent — if OpenRouter
-    fails on iteration 3 of the tool loop, iteration 4 can still come back to
-    it (rate-limit case). Tool-calling state is just messages, so providers
-    are interchangeable."""
+async def _call_llm_with_fallback(
+    messages: list[dict],
+    tools: list[dict] | None = None,
+    tool_choice: object = "auto",
+):
+    """Try OpenRouter, then Groq, then Cerebras. tool_choice can be 'auto',
+    'required', or a specific {type:function, function:{name:...}} dict to
+    force a single tool — used to guarantee deliver_pack on the final hop."""
     from openai import AsyncOpenAI
     last_error: Exception | None = None
+
+    def _tool_kwargs(provider: str) -> dict:
+        if not tools:
+            return {}
+        kw: dict = {"tools": tools, "tool_choice": tool_choice}
+        # parallel_tool_calls is helpful on OpenRouter (Gemini, etc.) and
+        # Groq's Llama; some Cerebras models don't accept it, so omit there.
+        if provider != "cerebras":
+            kw["parallel_tool_calls"] = True
+        return kw
 
     if _OPENROUTER_KEY and not llm_circuit.is_open("openrouter"):
         try:
             c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=_LLM_TIMEOUT_SEC)
-            kwargs: dict = {"model": _OPENROUTER_MODEL, "messages": messages,
-                            "temperature": 0, "max_tokens": 2048}
-            if tools:
-                kwargs.update({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": True})
+            kwargs = {"model": _OPENROUTER_MODEL, "messages": messages,
+                      "temperature": 0, "max_tokens": 2048, **_tool_kwargs("openrouter")}
             resp = await c.chat.completions.create(**kwargs)
             llm_circuit.reset("openrouter")
             return resp, "openrouter"
@@ -651,9 +652,7 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
         try:
             c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC)
             kwargs = {"model": _GROQ_MODEL, "messages": messages,
-                      "temperature": 0, "max_tokens": 2048}
-            if tools:
-                kwargs.update({"tools": tools, "tool_choice": "auto", "parallel_tool_calls": True})
+                      "temperature": 0, "max_tokens": 2048, **_tool_kwargs("groq")}
             resp = await c.chat.completions.create(**kwargs)
             llm_circuit.reset("groq")
             return resp, "groq"
@@ -668,11 +667,7 @@ async def _call_llm_with_fallback(messages: list[dict], tools: list[dict] | None
         try:
             c = AsyncOpenAI(api_key=_CEREBRAS_KEY, base_url="https://api.cerebras.ai/v1", timeout=_LLM_TIMEOUT_SEC)
             kwargs = {"model": _CEREBRAS_MODEL, "messages": messages,
-                      "temperature": 0, "max_tokens": 2048}
-            if tools:
-                # Cerebras supports OpenAI-style tools, but not parallel_tool_calls on all models.
-                # Omit the parallel flag to maximize compatibility.
-                kwargs.update({"tools": tools, "tool_choice": "auto"})
+                      "temperature": 0, "max_tokens": 2048, **_tool_kwargs("cerebras")}
             resp = await c.chat.completions.create(**kwargs)
             llm_circuit.reset("cerebras")
             return resp, "cerebras"
@@ -704,8 +699,25 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
             f"Signal received:\n{json.dumps(signal, indent=2)}\n\nExecute the workflow now."},
     ]
 
-    for _ in range(8):
-        resp, _provider = await _call_llm_with_fallback(messages, tools=TOOLS)
+    # Max 5 iterations is enough for the prescribed flow (cache + searches
+    # in parallel → publish → save → deliver). 8 was generous for
+    # exploration; we want tighter bounds so the loop can't drag.
+    for _iter in range(5):
+        # Once the pack URL exists (senso_publish succeeded) AND the
+        # pack_id has been minted (clickhouse_save_pack succeeded), the
+        # ONLY thing left is deliver_pack. Force the LLM to call it by
+        # restricting tool_choice — no more chances to forget.
+        force_deliver = bool(ctx.pack_url) and bool(ctx.pack_id) and not ctx.delivered
+        if force_deliver:
+            call_tools  = [t for t in TOOLS if t["function"]["name"] == "deliver_pack"]
+            tool_choice = {"type": "function", "function": {"name": "deliver_pack"}}
+        else:
+            call_tools  = TOOLS
+            tool_choice = "auto"
+
+        resp, _provider = await _call_llm_with_fallback(
+            messages, tools=call_tools, tool_choice=tool_choice,
+        )
         msg = resp.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))
 
@@ -748,7 +760,9 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
             db.append_trace_event(ctx.trace_id, final_ev)
             break
 
-    # Safety net: if the LLM never called deliver_pack, do it now
+    # Safety net: if the LLM never called deliver_pack despite the
+    # tool_choice forcing, do it now. Should be unreachable in practice
+    # but keeps the user from ever seeing a missing pack.
     if not ctx.delivered and ctx.pack_url:
         warn_ev = {
             "type": "log", "level": "warn",
