@@ -629,15 +629,27 @@ _ZONE_ALIASES: dict[str, str] = {
 
 
 def _resolve_zone(q: str) -> str | None:
-    """Find a known zone key for this query — checks direct keys first,
-    then aliases (route names, alternate landmarks)."""
+    """Find a known zone key for this query.
+
+    Prefers the LONGEST/most-specific match so "Manhattan to Newark"
+    resolves to "lincoln tunnel" (via the alias) rather than to "newark"
+    just because "newark" is a substring of the route name. The road
+    section was already getting the right hit because the LLM included
+    "Lincoln Tunnel" in road queries; this fixes the weather/poi/news
+    sections that don't.
+    """
+    candidates: list[tuple[int, str]] = []
     for zone_key in _ZONE_SOURCES:
         if zone_key in q:
-            return zone_key
+            candidates.append((len(zone_key), zone_key))
     for alias, canonical in _ZONE_ALIASES.items():
         if alias in q and canonical in _ZONE_SOURCES:
-            return canonical
-    return None
+            candidates.append((len(alias), canonical))
+    if not candidates:
+        return None
+    # Longest match wins.
+    candidates.sort(reverse=True)
+    return candidates[0][1]
 
 
 def _generic_stub(query: str) -> dict:
