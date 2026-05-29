@@ -21,17 +21,17 @@ export function AlertCard({
         </div>
         <div>
           <h3 className="text-base font-semibold text-slate-100">Dead zone ahead</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Signal drops soon — we&apos;re preparing your pack</p>
+          <p className="text-xs text-slate-500 mt-0.5">Signal drops soon, we&apos;re preparing your pack</p>
         </div>
       </div>
-      {/* Stat tiles — single column under ~360px so labels/values don't get
+      {/* Stat tiles, single column under ~360px so labels/values don't get
           truncated; 3-up on anything wider. */}
       <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-2 sm:gap-3 mb-5">
         <StatTile label="Location"       value={deadzoneName} color="#f59e0b" />
         <StatTile label="Est. blackout"  value={`${mins}m ${secs.toString().padStart(2, "0")}s`} color="#f59e0b" />
         <StatTile label="Confidence"     value={`${confidence}%`} color="#10b981" />
       </div>
-      {/* Buttons — full-width primary on mobile, inline row from sm: up.
+      {/* Buttons, full-width primary on mobile, inline row from sm: up.
           Prevents the Prepare Pack CTA from being clipped on phones. */}
       <div className="flex flex-col sm:flex-row gap-2">
         <button
@@ -100,7 +100,7 @@ export function CachedFoundCard() {
         </div>
         <div>
           <h3 className="text-base font-semibold text-slate-100">Saved pack found</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Reusing a recent pack for this route — instant delivery</p>
+          <p className="text-xs text-slate-500 mt-0.5">Reusing a recent pack for this route, instant delivery</p>
         </div>
       </div>
     </Shell>
@@ -124,7 +124,7 @@ export function ReadyCard({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-base font-semibold text-slate-100">Offline continuity ready</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Downloaded and ready — no signal needed</p>
+          <p className="text-xs text-slate-500 mt-0.5">Downloaded and ready, no signal needed</p>
         </div>
         {evalScore !== undefined && scoreColor && (
           <div
@@ -170,7 +170,7 @@ export function ReadyCard({
           }}
         >
           <span>⚡</span>
-          Served from network cache — instant delivery
+          Served from network cache, instant delivery
         </div>
       )}
 

@@ -9,7 +9,7 @@ function renderLine(e: AgentEvent): { color: string; text: string } {
       return { color: "text-orange-300", text: `⚠️  ${e.msg as string}` };
     case "tool":
       if (e.name === "nimble") return { color: "text-sky-300", text: `🔎 nimble.search("${e.query as string}")` };
-      if (e.name === "senso") return { color: "text-violet-300", text: `📤 senso.publish — ${e.msg as string}` };
+      if (e.name === "senso") return { color: "text-violet-300", text: `📤 senso.publish, ${e.msg as string}` };
       return { color: "text-slate-300", text: `🛠  ${e.name as string}` };
     case "payment":
       return {
@@ -19,7 +19,7 @@ function renderLine(e: AgentEvent): { color: string; text: string } {
     case "pack_ready":
       return {
         color: "text-emerald-400 font-semibold",
-        text: e.cached ? `✅ pack delivered (CACHED) — ${e.url as string}` : `✅ pack delivered — ${e.url as string}`,
+        text: e.cached ? `✅ pack delivered (CACHED), ${e.url as string}` : `✅ pack delivered, ${e.url as string}`,
       };
     case "log":
       return { color: e.level === "warn" ? "text-yellow-300" : "text-slate-400", text: `· ${e.msg as string}` };

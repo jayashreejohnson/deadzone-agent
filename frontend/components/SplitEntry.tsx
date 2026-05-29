@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 
 /**
  * First-visit split-screen hero. Equal-weighted left/right halves:
- *   Left  — "Try it now" (the live demo)
- *   Right — "Coming to your phone" (the mobile vision)
+ *   Left , "Try it now" (the live demo)
+ *   Right, "Coming to your phone" (the mobile vision)
  *
  * Dismisses on either CTA click; localStorage flag prevents re-showing.
  * Returning visitors see the demo directly with persistent top nav tabs.
@@ -204,7 +204,7 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
       {/* Split content */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0">
 
-        {/* LEFT — Try it now */}
+        {/* LEFT, Try it now */}
         <button
           onClick={onTryDemo}
           className="flex-1 flex flex-col items-center justify-center px-6 sm:px-8 py-6 sm:py-8 group relative overflow-y-auto transition-all duration-300"
@@ -255,7 +255,7 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
           </div>
         </button>
 
-        {/* RIGHT — Coming to your phone */}
+        {/* RIGHT, Coming to your phone */}
         <button
           onClick={onExploreMobile}
           className="flex-1 flex flex-col items-center justify-center px-6 sm:px-8 py-6 group relative overflow-y-auto transition-all duration-300"
@@ -274,10 +274,10 @@ export default function SplitEntry({ onTryDemo, onExploreMobile }: Props) {
               If DeadZone went mobile
             </h2>
             <p className="text-sm sm:text-base mb-5 leading-relaxed" style={{ color: "#64748b" }}>
-              Mockups of how this could work on mobile — auto-detection, alerts before you go dark, contacts notified, content pre-fetched.
+              Mockups of how this could work on mobile, auto-detection, alerts before you go dark, contacts notified, content pre-fetched.
             </p>
 
-            {/* Phone preview — hidden on small viewports (too tall for stacked mobile layout). */}
+            {/* Phone preview, hidden on small viewports (too tall for stacked mobile layout). */}
             <div className="hidden sm:block mb-3"
               style={{
                 padding: 3,

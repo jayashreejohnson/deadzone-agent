@@ -1,10 +1,10 @@
-"""Agent 1 — dead zone prediction for any driving route.
+"""Agent 1, dead zone prediction for any driving route.
 
 Prediction priority (agentic-first):
-  1. LLM (OpenRouter → Groq)                   — primary agentic prediction
-  2. CoverageMap API + Google Maps Directions  — real signal strength data
-  3. Transit / driving hardcoded zones          — fail-safe for known routes
-  4. Generic hardcoded stub                     — last resort
+  1. LLM (OpenRouter → Groq)                  , primary agentic prediction
+  2. CoverageMap API + Google Maps Directions , real signal strength data
+  3. Transit / driving hardcoded zones         , fail-safe for known routes
+  4. Generic hardcoded stub                    , last resort
 
 Circuit breaker: once the LLM provider chain fails, a process-level breaker
 trips for `_LLM_CIRCUIT_COOLDOWN` seconds. While the breaker is open, calls
@@ -60,7 +60,7 @@ async def _get_waypoints(origin: str, destination: str, num_points: int = 30) ->
         data = resp.json()
 
     if data.get("status") != "OK":
-        raise ValueError(f"Google Maps error: {data.get('status')} — {data.get('error_message', '')}")
+        raise ValueError(f"Google Maps error: {data.get('status')}, {data.get('error_message', '')}")
 
     encoded = data["routes"][0]["overview_polyline"]["points"]
     coords  = poly_lib.decode(encoded)
@@ -135,7 +135,7 @@ async def _coveragemap_predict(route: str, departure_time: str) -> dict:
     # Parse "Origin to Destination"
     parts = re.split(r"\s+to\s+", route, maxsplit=1, flags=re.IGNORECASE)
     if len(parts) != 2:
-        raise ValueError(f"Cannot parse route '{route}' — expected 'Origin to Destination'")
+        raise ValueError(f"Cannot parse route '{route}', expected 'Origin to Destination'")
     origin, destination = parts[0].strip(), parts[1].strip()
 
     waypoints  = await _get_waypoints(origin, destination, num_points=30)
@@ -165,7 +165,7 @@ _LLM_PROMPT = """Predict cellular dead zones for this driving route:
 Route: {route}
 Departure: {departure_time}
 
-Return ONLY valid JSON — no markdown fences, no explanation, no prose. Use this exact schema:
+Return ONLY valid JSON, no markdown fences, no explanation, no prose. Use this exact schema:
 {{
   "dead_zones": [
     {{
@@ -182,7 +182,7 @@ Return ONLY valid JSON — no markdown fences, no explanation, no prose. Use thi
 }}
 
 Guidelines:
-- Return 1–4 dead zones that are realistic for this specific route and geography.
+- Return 1-4 dead zones that are realistic for this specific route and geography.
 - Use accurate lat/lon for the named locations (you know real coordinates).
 - Dead zones typically occur at: tunnels, bridges, mountainous terrain, rural highways,
   underground road segments, dense urban canyons, ferry crossings.
@@ -244,7 +244,7 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
 
     last_error: Exception | None = None
 
-    # 1. OpenRouter (primary) — skipped if its per-provider breaker is open
+    # 1. OpenRouter (primary), skipped if its per-provider breaker is open
     if _OPENROUTER_KEY and not llm_circuit.is_open("openrouter"):
         try:
             data = await _call_llm("OpenRouter", "https://openrouter.ai/api/v1", _OPENROUTER_KEY, _OPENROUTER_MODEL, route, departure_time)
@@ -257,7 +257,7 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
     elif _OPENROUTER_KEY:
         print(f"[agent1] OpenRouter circuit open ({llm_circuit.seconds_remaining('openrouter')}s); skipping", flush=True)
 
-    # 2. Groq (fallback — free tier, fast LPU inference)
+    # 2. Groq (fallback, free tier, fast LPU inference)
     if _GROQ_KEY and not llm_circuit.is_open("groq"):
         try:
             data = await _call_llm("Groq", "https://api.groq.com/openai/v1", _GROQ_KEY, _GROQ_MODEL, route, departure_time)
@@ -270,7 +270,7 @@ async def _llm_predict(route: str, departure_time: str) -> dict:
     elif _GROQ_KEY:
         print(f"[agent1] Groq circuit open ({llm_circuit.seconds_remaining('groq')}s); skipping", flush=True)
 
-    # 3. Cerebras (final fallback — generous free tier, instant signup)
+    # 3. Cerebras (final fallback, generous free tier, instant signup)
     if _CEREBRAS_KEY and not llm_circuit.is_open("cerebras"):
         try:
             data = await _call_llm("Cerebras", "https://api.cerebras.ai/v1", _CEREBRAS_KEY, _CEREBRAS_MODEL, route, departure_time)
@@ -412,7 +412,7 @@ _DRIVING_ZONES: dict[str, list[dict]] = {
         {"location": {"lat": 35.7707, "lon": -121.3210, "description": "Gorda / Ragged Point"},
          "start_time": "19:10", "duration_minutes": 5, "severity": "high"},
     ],
-    # US-50 Nevada (Ely to Fallon — Loneliest Road)
+    # US-50 Nevada (Ely to Fallon, Loneliest Road)
     "ely to fallon": [
         {"location": {"lat": 39.4583, "lon": -117.3658, "description": "Bob Scott Summit"},
          "start_time": "18:10", "duration_minutes": 4, "severity": "high"},
@@ -504,7 +504,7 @@ async def predict(route: str, departure_time: str) -> dict:
     """
     payload = {"route": route, "departure_time": departure_time}
 
-    # 1. LLM — the primary agentic prediction. Skipped only if EVERY
+    # 1. LLM, the primary agentic prediction. Skipped only if EVERY
     # provider's breaker is open (i.e. no provider has any chance of
     # responding). Per-provider skipping happens inside _llm_predict.
     if not llm_circuit.is_open():
@@ -525,7 +525,7 @@ async def predict(route: str, departure_time: str) -> dict:
     else:
         print(f"[agent1] All LLM provider breakers open; skipping LLM for '{route}'", flush=True)
 
-    # 2. CoverageMap real signal data — only if both keys present
+    # 2. CoverageMap real signal data, only if both keys present
     if _COVERAGEMAP_KEY and _GOOGLE_MAPS_KEY:
         try:
             data = await _coveragemap_predict(route, departure_time)
@@ -546,7 +546,7 @@ async def predict(route: str, departure_time: str) -> dict:
         except Exception as e:
             print(f"[agent1] CoverageMap failed ({type(e).__name__}: {e}); trying hardcoded fail-safe", flush=True)
 
-    # 3. Transit hardcoded fail-safe — known transit lines (tunnels)
+    # 3. Transit hardcoded fail-safe, known transit lines (tunnels)
     transit = _transit_hardcoded(route, departure_time)
     if transit is not None:
         try:
@@ -560,7 +560,7 @@ async def predict(route: str, departure_time: str) -> dict:
             pass
         return transit
 
-    # 4. Driving hardcoded fail-safe — curated routes in the trip planner
+    # 4. Driving hardcoded fail-safe, curated routes in the trip planner
     driving = _driving_hardcoded(route, departure_time)
     if driving is not None:
         try:

@@ -77,7 +77,7 @@ export default function Page() {
   // UI panels
   // Detect small viewports so we can collapse the log drawer and give the
   // overlay cards (Prepare Pack / Open Continuity Pack) the full width on
-  // phones — otherwise the 300px log column eats the buttons.
+  // phones, otherwise the 300px log column eats the buttons.
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -123,7 +123,7 @@ export default function Page() {
   const [wsConnected, setWsConnected]     = useState(false);
 
   // ── Split-entry hero (Design B winner from 30-agent test) ──
-  // Shows on every URL visit — no memory. User dismisses by clicking either
+  // Shows on every URL visit, no memory. User dismisses by clicking either
   // CTA, which sets it to false for the current page-view only. Reload = split.
   const [showSplitEntry, setShowSplitEntry] = useState(true);
 
@@ -142,7 +142,7 @@ export default function Page() {
       const zone = nextZone || plannedZones[0];
       if (zone) {
         // Eagerly fire /signal even if the dot hasn't physically reached the
-        // zone radius yet — the countdown is the demo's source of truth, not
+        // zone radius yet, the countdown is the demo's source of truth, not
         // the polyline geometry.
         const alreadyTriggered = trips.user_a.triggered.has(zone.id);
         if (!alreadyTriggered) {
@@ -217,7 +217,7 @@ export default function Page() {
           setEvents((prev) => [...prev.slice(-200), ev]);
 
           // Only accept zones_ready while actively planning our OWN scan.
-          // Block in "ready" and "tripping" states — other users' concurrent scans
+          // Block in "ready" and "tripping" states, other users' concurrent scans
           // on the shared WS channel would otherwise overwrite our plannedZones.
           if (ev.type === "zones_ready" && Array.isArray(ev.zones) &&
               (planStateRef.current === "idle" || planStateRef.current === "planning")) {
@@ -251,7 +251,7 @@ export default function Page() {
             // Filter: only accept pack_ready events that belong to THIS session's route.
             // The backend now emits route_id in every pack_ready event. If it doesn't
             // match our current routeId, this pack came from another user's concurrent
-            // scan on the shared WS channel — discard it.
+            // scan on the shared WS channel, discard it.
             const evRouteId = String(ev.route_id || "");
             const isOurPack = !evRouteId || evRouteId === routeIdRef.current;
             if (isOurPack) {
@@ -464,7 +464,7 @@ export default function Page() {
   const showPlanner       = showPlannerModal || showPlannerCard;
   const showCountdown  = planState === "tripping" && nextZone !== null && countdownSeconds !== null;
   // Derive pack status from overlay state so CountdownBanner and ReadyCard
-  // are always in sync — avoids the desync where overlay shows "ready" but
+  // are always in sync, avoids the desync where overlay shows "ready" but
   // banner still shows "building pack" (caused by deadzone_id mismatches).
   const currentPackStatus: "preparing" | "ready" | "cached" =
     overlay.kind === "ready"        ? (overlay.cached ? "cached" : "ready")
@@ -513,7 +513,7 @@ export default function Page() {
     setTimeout(() => {
       const poly = routePolylineRef.current;
       const start = poly[0] || DEFAULT_ROUTE_POLYLINE[0];
-      // Stay in "ready" — compact card, map visible, zones still shown.
+      // Stay in "ready", compact card, map visible, zones still shown.
       // User must explicitly click "Re-plan" in TripPlanner to go idle.
       setPlanState("ready");
       setOverlay({ kind: "none" });
@@ -533,7 +533,7 @@ export default function Page() {
   useEffect(() => {
     if (overlay.kind !== "ready" || planState !== "tripping") return;
     const timer = setTimeout(() => {
-      // Only resume the animation — do NOT close the ReadyCard.
+      // Only resume the animation, do NOT close the ReadyCard.
       setTrips((prev) => {
         const t = prev.user_a;
         return t.running ? prev : { ...prev, user_a: { ...t, running: true } };
@@ -665,12 +665,12 @@ export default function Page() {
         />
       </div>
 
-      {/* ── Trip planner — single stable instance, repositions modal→card ── */}
+      {/* ── Trip planner, single stable instance, repositions modal→card ── */}
       {/* Keeping one component tree node ensures React never unmounts TripPlanner
           when planState flips idle→ready, so detectedZones/mode/selected survive. */}
       {showPlanner && (
         <>
-          {/* Backdrop — only in modal mode, has no state so safe to mount/unmount */}
+          {/* Backdrop, only in modal mode, has no state so safe to mount/unmount */}
           {showPlannerModal && (
             <div
               className="absolute inset-0 z-[1499]"
@@ -792,7 +792,7 @@ export default function Page() {
         <Dashboard />
       </div>
 
-      {/* ── Split-entry hero — shows on every visit (no memory) ── */}
+      {/* ── Split-entry hero, shows on every visit (no memory) ── */}
       {showSplitEntry && (
         <SplitEntry
           onTryDemo={() => setShowSplitEntry(false)}

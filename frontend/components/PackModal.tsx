@@ -82,7 +82,7 @@ export default function PackModal({
           </div>
         )}
 
-        {/* Footer — URL + offline badge */}
+        {/* Footer, URL + offline badge */}
         <div
           className="px-3 py-2 shrink-0 flex items-center gap-2 text-[10px] font-mono"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)", color: "#334155" }}

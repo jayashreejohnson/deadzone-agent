@@ -3,7 +3,7 @@ import Link from "next/link";
 
 /**
  * Shared top-navigation tabs used on both / (demo) and /mobile pages.
- * The visitor can switch between sections anytime — both presented as peers,
+ * The visitor can switch between sections anytime, both presented as peers,
  * per the winning design from the 30-agent test.
  */
 
@@ -11,7 +11,7 @@ type ActiveTab = "demo" | "mobile";
 
 type Props = {
   active: ActiveTab;
-  /** Extra slot (right side) for page-specific controls — e.g. demo buttons. */
+  /** Extra slot (right side) for page-specific controls, e.g. demo buttons. */
   rightSlot?: React.ReactNode;
   /** Optional live-status indicator (only used on the demo page). */
   wsConnected?: boolean;
@@ -28,7 +28,7 @@ export default function TopNavTabs({ active, rightSlot, wsConnected }: Props) {
         boxShadow:     "0 1px 40px rgba(0,0,0,0.4)",
       }}
     >
-      {/* Left — logo + status */}
+      {/* Left, logo + status */}
       <div className="flex items-center gap-3">
         <Link href="/" className="flex items-center gap-2">
           <div className="relative">
@@ -65,7 +65,7 @@ export default function TopNavTabs({ active, rightSlot, wsConnected }: Props) {
         )}
       </div>
 
-      {/* Center — tabs */}
+      {/* Center, tabs */}
       <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-1 p-1 rounded-xl"
         style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
       >
@@ -94,7 +94,7 @@ export default function TopNavTabs({ active, rightSlot, wsConnected }: Props) {
         </Link>
       </div>
 
-      {/* Right — page-specific controls */}
+      {/* Right, page-specific controls */}
       <div className="flex items-center gap-1.5">
         {rightSlot}
       </div>

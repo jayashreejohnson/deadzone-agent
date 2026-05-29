@@ -2,7 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "DeadZone — Neural Highway",
+  title: "DeadZone, Neural Highway",
   description: "AI-powered offline continuity for connectivity dead zones.",
 };
 

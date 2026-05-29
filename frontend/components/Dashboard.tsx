@@ -65,12 +65,12 @@ export default function Dashboard() {
   }, []);
 
   // Empty-state numbers feel more intentional than em-dashes (which 4 reviewers
-  // flagged as "looks broken"). Show 0 / "—ms" rather than naked em-dashes.
+  // flagged as "looks broken"). Show 0 / ", ms" rather than naked em-dashes.
   const isLoading = data === null;
   const stats: StatDef[] = [
     { icon: "⚡", label: "trips covered", value: isLoading ? "0" : String(data?.packs_built ?? 0),               color: "#00d4ff" },
     { icon: "💾", label: "instant packs", value: isLoading ? "0" : String(data?.packs_sold  ?? 0),               color: "#8b5cf6" },
-    { icon: "⏱", label: "avg ready",     value: isLoading || !data?.avg_build_ms ? "—ms" : `${Number(data.avg_build_ms).toFixed(0)}ms`, color: "#f59e0b" },
+    { icon: "⏱", label: "avg ready",     value: isLoading || !data?.avg_build_ms ? ", ms" : `${Number(data.avg_build_ms).toFixed(0)}ms`, color: "#f59e0b" },
   ];
 
   const actionColor = (a: string) =>
@@ -125,7 +125,7 @@ export default function Dashboard() {
 
       {/* Stats bar */}
       <div className="flex items-center gap-6 px-4 py-2.5">
-        {/* Context label — plain English, per agent feedback */}
+        {/* Context label, plain English, per agent feedback */}
         <div
           className="shrink-0 text-[9px] uppercase tracking-[0.2em] pr-3 hidden sm:block"
           style={{ color: "#334155", borderRight: "1px solid rgba(0,212,255,0.08)" }}

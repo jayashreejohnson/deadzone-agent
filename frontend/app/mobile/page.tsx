@@ -20,7 +20,7 @@ function useFadeIn(threshold = 0.12) {
   return { ref, visible };
 }
 
-/* ── Scroll arrow — lives inside each panel at the bottom ── */
+/* ── Scroll arrow, lives inside each panel at the bottom ── */
 const NAV_H = 62;
 
 function ScrollArrow({ targetId }: { targetId: string }) {
@@ -63,7 +63,7 @@ function ScrollArrow({ targetId }: { targetId: string }) {
   );
 }
 
-/* ── Mobile phone wrapper — scales full-size phone to 75% ── */
+/* ── Mobile phone wrapper, scales full-size phone to 75% ── */
 // Renders Phone at its native 560px (so all screen content looks identical
 // to desktop) then shrinks it via CSS transform. No squashing.
 const MOBILE_SCALE = 0.75;
@@ -80,7 +80,7 @@ function MobilePhone({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ── Phone frame — height-aware ──────────────────────────── */
+/* ── Phone frame, height-aware ──────────────────────────── */
 function Phone({ children, height = 560 }: { children: React.ReactNode; height?: number }) {
   const sc = height / 590;
   const w  = Math.round(290 * sc);
@@ -204,7 +204,7 @@ function CarPlayFrame() {
   );
 }
 
-/* ── Screen 1 — GPS Auto-Detection ───────────────────────── */
+/* ── Screen 1, GPS Auto-Detection ───────────────────────── */
 function GPSScreen() {
   return (
     <div className="h-full flex flex-col" style={{ background: "#060b14", fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -250,7 +250,7 @@ function GPSScreen() {
   );
 }
 
-/* ── Screen 2 — Countdown (phone half of the dual panel) ─── */
+/* ── Screen 2, Countdown (phone half of the dual panel) ─── */
 function CountdownScreen() {
   return (
     <div className="h-full flex flex-col items-center relative"
@@ -285,12 +285,12 @@ function CountdownScreen() {
   );
 }
 
-/* ── Screen 3 — Contact Alerts ───────────────────────────── */
+/* ── Screen 3, Contact Alerts ───────────────────────────── */
 function ContactScreen() {
   const contacts = [
     { name: "Mom",       checked: true,  msg: "Going underground, back in ~10 min ❤️" },
     { name: "Sarah",     checked: true,  msg: "Heading into the tunnel, back at [time]" },
-    { name: "Work",      checked: true,  msg: "In transit — will reply when I surface" },
+    { name: "Work",      checked: true,  msg: "In transit, will reply when I surface" },
     { name: "Darius",    checked: false, msg: null },
     { name: "Marco 📸",  checked: false, msg: null },
   ];
@@ -345,7 +345,7 @@ function ContactScreen() {
   );
 }
 
-/* ── Screen 4 — Traffic + Offline Maps ───────────────────── */
+/* ── Screen 4, Traffic + Offline Maps ───────────────────── */
 function TrafficScreen() {
   return (
     <div className="h-full flex flex-col" style={{ background: "#060b14", fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -398,7 +398,7 @@ function TrafficScreen() {
   );
 }
 
-/* ── Screen 5 — AI Content Pre-fetch ─────────────────────── */
+/* ── Screen 5, AI Content Pre-fetch ─────────────────────── */
 function ContentScreen() {
   return (
     <div className="h-full flex flex-col items-center justify-center relative overflow-hidden"
@@ -428,7 +428,7 @@ function ContentScreen() {
   );
 }
 
-/* ── Screen 6 — Seamless Re-emergence ────────────────────── */
+/* ── Screen 6, Seamless Re-emergence ────────────────────── */
 function SeamlessScreen() {
   const events = [
     { icon: "💬", label: "3 messages delivered",            color: "#a78bfa" },
@@ -492,7 +492,7 @@ const FEATURES: Feature[] = [
     title: "GPS Auto-Detection",
     tagline: "It just knows.",
     description:
-      "DeadZone runs silently in the background the moment you start moving. For drivers, it reads your speed and heading and identifies your route from GPS alone. For transit riders, it recognises your subway line or rail corridor from your movement pattern. Either way — no app to open, no destination to type. By the time a dead zone appears on the horizon, whether it's a mountain pass or a subway tunnel, your offline pack is already being assembled behind the scenes.",
+      "DeadZone runs silently in the background the moment you start moving. For drivers, it reads your speed and heading and identifies your route from GPS alone. For transit riders, it recognises your subway line or rail corridor from your movement pattern. Either way, no app to open, no destination to type. By the time a dead zone appears on the horizon, whether it's a mountain pass or a subway tunnel, your offline pack is already being assembled behind the scenes.",
     accent: "#00d4ff",
     screen: <GPSScreen />,
   },
@@ -501,7 +501,7 @@ const FEATURES: Feature[] = [
     title: "Dead Zone Countdown",
     tagline: "Every surface. At the right moment.",
     description:
-      "Three minutes before you lose signal, DeadZone reaches every screen you have. Your phone lock screen confirms the blackout duration and that your pack is ready. Drivers get a live countdown on CarPlay and Android Auto — spoken aloud through the cabin speakers so hands stay on the wheel. Transit riders get a tap on Apple Watch and an audio cue through headphones. One last clear moment before you go dark. None of this requires you to touch anything.",
+      "Three minutes before you lose signal, DeadZone reaches every screen you have. Your phone lock screen confirms the blackout duration and that your pack is ready. Drivers get a live countdown on CarPlay and Android Auto, spoken aloud through the cabin speakers so hands stay on the wheel. Transit riders get a tap on Apple Watch and an audio cue through headphones. One last clear moment before you go dark. None of this requires you to touch anything.",
     accent: "#a78bfa",
     screen: <CountdownScreen />,
     extraFrame: <CarPlayFrame />,
@@ -511,7 +511,7 @@ const FEATURES: Feature[] = [
     title: "Contact Alerts",
     tagline: "Nobody wonders where you went.",
     description:
-      "Before you go underground, DeadZone handles the two things that matter most when you disappear mid-conversation. First, it checks who you have been actively messaging and offers to send each of them a personalised update — by iMessage, SMS, or email. You write your templates once and forget. Mom gets one message, your partner gets another, and your boss gets the professional version. DeadZone fills in your exact location and estimated return time automatically, every single time. Second, it drops a precise GPS location pin to your selected contacts the instant before signal drops. If you are already heading into the dead zone, DeadZone falls back to SMS automatically, because SMS reaches signal levels where data simply cannot.",
+      "Before you go underground, DeadZone handles the two things that matter most when you disappear mid-conversation. First, it checks who you have been actively messaging and offers to send each of them a personalised update, by iMessage, SMS, or email. You write your templates once and forget. Mom gets one message, your partner gets another, and your boss gets the professional version. DeadZone fills in your exact location and estimated return time automatically, every single time. Second, it drops a precise GPS location pin to your selected contacts the instant before signal drops. If you are already heading into the dead zone, DeadZone falls back to SMS automatically, because SMS reaches signal levels where data simply cannot.",
     accent: "#00d4ff",
     screen: <ContactScreen />,
   },
@@ -520,7 +520,7 @@ const FEATURES: Feature[] = [
     title: "Traffic Detection",
     tagline: "Reroutes you above. Navigates you below.",
     description:
-      "For drivers, DeadZone watches your speed in real time. Hit a traffic jam and it immediately recalculates your dead zone ETA, adjusts the pack build, and checks whether a faster route buys you more signal window before you go dark. For transit riders, it maps the exact underground segment ahead — which station you lose signal, which station it returns — and downloads your offline pack before you board. Either way, your navigation keeps running at zero signal: the blue dot moves, turn-by-turn continues, and your map stays live.",
+      "For drivers, DeadZone watches your speed in real time. Hit a traffic jam and it immediately recalculates your dead zone ETA, adjusts the pack build, and checks whether a faster route buys you more signal window before you go dark. For transit riders, it maps the exact underground segment ahead, which station you lose signal, which station it returns, and downloads your offline pack before you board. Either way, your navigation keeps running at zero signal: the blue dot moves, turn-by-turn continues, and your map stays live.",
     accent: "#22c55e",
     screen: <TrafficScreen />,
   },
@@ -529,7 +529,7 @@ const FEATURES: Feature[] = [
     title: "AI Content Pre-fetch",
     tagline: "Never freeze on a reel mid-tunnel.",
     description:
-      "The real problem with saving content offline is that you never know what you want until you want it. DeadZone monitors what you are currently watching, reading, and listening to, then stages the right amount before the signal drops — 22 minutes for a 20-minute subway tunnel, or a full hour for a long stretch through the Nevada desert. Reels keep playing. Articles open instantly. Your podcast continues from exactly where it was. You did not save anything. You did not have to. You just stop noticing the gaps.",
+      "The real problem with saving content offline is that you never know what you want until you want it. DeadZone monitors what you are currently watching, reading, and listening to, then stages the right amount before the signal drops, 22 minutes for a 20-minute subway tunnel, or a full hour for a long stretch through the Nevada desert. Reels keep playing. Articles open instantly. Your podcast continues from exactly where it was. You did not save anything. You did not have to. You just stop noticing the gaps.",
     accent: "#f97316",
     screen: <ContentScreen />,
   },
@@ -594,7 +594,7 @@ export default function MobilePage() {
         color: "#e2e8f0",
       }}
     >
-      {/* Nav — sticky inside the snap container, shared with the demo page */}
+      {/* Nav, sticky inside the snap container, shared with the demo page */}
       <div className="sticky top-0 z-50" style={{ minHeight: NAV_H }}>
         <TopNavTabs active="mobile" />
       </div>
@@ -614,7 +614,7 @@ export default function MobilePage() {
           <p className="text-xl mx-auto" style={{ color: "#475569", lineHeight: 1.8, maxWidth: 500 }}>
             Whether you drive through tunnels or ride the subway,
             DeadZone quietly prepares everything you need
-            before your signal drops — so you never have to.
+            before your signal drops, so you never have to.
           </p>
         </div>
         {/* Mobile → first phone panel; desktop → first feature section */}

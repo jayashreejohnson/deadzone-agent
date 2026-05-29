@@ -26,7 +26,7 @@ self-recover within a minute. Transient errors (429, 5xx, timeout) get
 the standard short cooldown so we retry quickly when things recover.
 
 Back-compat: `is_open()` with no argument returns True only if ALL
-known providers are currently open — i.e. the whole chain would skip
+known providers are currently open, i.e. the whole chain would skip
 the LLM. Useful for callers that want to go straight to a non-LLM
 fallback when nothing is reachable.
 """

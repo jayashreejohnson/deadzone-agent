@@ -14,7 +14,7 @@ function formatTime(s: number): string {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
-/** 4 signal bars — drain as we approach the dead zone */
+/** 4 signal bars, drain as we approach the dead zone */
 function SignalBars({ secondsUntil }: { secondsUntil: number }) {
   // full bars at 60 s, 0 bars at 0 s
   const filledBars = secondsUntil <= 0 ? 0 : Math.ceil(Math.min(secondsUntil / 15, 4));

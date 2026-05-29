@@ -9,7 +9,7 @@ type Line = { bullet: string; color: string; label: string; sub?: string; glow?:
 
 function classify(e: AgentEvent): Line | null {
   if (e.type === "status") {
-    return { bullet: "⚡", color: "#f59e0b", label: (e.msg as string) || "Dead zone ahead — preparing your pack", glow: "rgba(245,158,11,0.4)" };
+    return { bullet: "⚡", color: "#f59e0b", label: (e.msg as string) || "Dead zone ahead, preparing your pack", glow: "rgba(245,158,11,0.4)" };
   }
   if (e.type === "tool" && e.name === "nimble") {
     // Per 30-agent feedback: rewrite as completed wins ("Got X") rather than
@@ -36,7 +36,7 @@ function classify(e: AgentEvent): Line | null {
     return { bullet: "📦", color: "#10b981", label: "Saved your offline pack", glow: "rgba(16,185,129,0.4)" };
   }
   if (e.type === "payment") {
-    return null; // internal cache settlement — not surfaced to users
+    return null; // internal cache settlement, not surfaced to users
   }
   if (e.type === "pack_ready") {
     return { bullet: "✅", color: "#10b981", label: e.cached ? "Offline pack reused (cached)" : "Continuity pack assembled", glow: "rgba(16,185,129,0.5)" };
@@ -50,7 +50,7 @@ function classify(e: AgentEvent): Line | null {
   }
   if (e.type === "log") {
     const msg = String(e.msg || "");
-    // Hide internal LLM provider fallback warnings — they're operational noise
+    // Hide internal LLM provider fallback warnings, they're operational noise
     // (OpenRouter→Groq→scripted), not user-relevant signal.
     if (e.level === "warn" && /LLM|fallback|scripted flow|orchestrator failed|Rate limit|Insufficient credits|402|429/i.test(msg)) {
       return null;

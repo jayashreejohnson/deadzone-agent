@@ -27,12 +27,12 @@ const DRIVING_ROUTES: Route[] = [
   { label: "Manhattan → Newark",                    api: "Manhattan to Newark",                                region: "Northeast", hint: "Lincoln Tunnel",                      severity: "high", mode: "driving" },
   { label: "Denver → Vail",                         api: "Denver to Vail",                                    region: "Mountain",  hint: "Eisenhower Tunnel + I-70 canyons",    severity: "high", mode: "driving" },
   { label: "Los Angeles → Las Vegas",               api: "Los Angeles to Las Vegas",                          region: "West",      hint: "Mojave Desert dead zones",             severity: "high", mode: "driving" },
-  { label: "Big Sur — PCH",          api: "Carmel to San Luis Obispo via Highway 1 Big Sur",    region: "West",     hint: "PCH coastal cliffs, 90-mile gap",        severity: "high", mode: "driving" },
-  { label: "US-50 Nevada",           api: "Ely to Fallon via US Route 50 Nevada",               region: "West",     hint: "The Loneliest Road — 250mi no signal",   severity: "high", mode: "driving" },
+  { label: "Big Sur, PCH",          api: "Carmel to San Luis Obispo via Highway 1 Big Sur",    region: "West",     hint: "PCH coastal cliffs, 90-mile gap",        severity: "high", mode: "driving" },
+  { label: "US-50 Nevada",           api: "Ely to Fallon via US Route 50 Nevada",               region: "West",     hint: "The Loneliest Road, 250mi no signal",   severity: "high", mode: "driving" },
   { label: "Million Dollar Highway", api: "Ouray to Durango via US-550 Million Dollar Highway",  region: "Mountain", hint: "11,000ft hairpin turns, mining canyons",  severity: "high", mode: "driving" },
 ];
 
-// ── Transit routes — real lines, official MTA / agency colors ─────────────
+// ── Transit routes, real lines, official MTA / agency colors ─────────────
 const TRANSIT_ROUTES: Route[] = [
   // ── New York City Subway ──────────────────────────────────────────────
   {
@@ -109,7 +109,7 @@ function SeverityChip({ severity }: { severity?: string }) {
   );
 }
 
-/** Colored subway / transit line pill — e.g. [E] in MTA blue */
+/** Colored subway / transit line pill, e.g. [E] in MTA blue */
 function LinePill({ line }: { line: SubwayLine }) {
   const wide = line.code.length > 2;
   return (
@@ -131,7 +131,7 @@ function LinePill({ line }: { line: SubwayLine }) {
   );
 }
 
-/** Left-side indicator — LinePill for transit, SeverityDot for driving */
+/** Left-side indicator, LinePill for transit, SeverityDot for driving */
 function RouteIcon({ route }: { route: Route }) {
   if (route.line) return <LinePill line={route.line} />;
   return <SeverityDot severity={route.severity} />;
@@ -242,7 +242,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
     } catch (e) {
       setError(
         e instanceof Error && e.name === "AbortError"
-          ? "Scan timed out — please try again"
+          ? "Scan timed out, please try again"
           : e instanceof Error ? e.message : "Failed to reach planning API"
       );
     } finally {
@@ -274,7 +274,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
         </div>
         <div>
           <h2 className="text-base font-semibold text-slate-100 tracking-tight">Route Dead Zone Scan</h2>
-          <p className="text-[11px] text-slate-500 tracking-wide">Select a route — AI predicts coverage gaps</p>
+          <p className="text-[11px] text-slate-500 tracking-wide">Select a route, AI predicts coverage gaps</p>
         </div>
       </div>
 
@@ -327,7 +327,7 @@ export default function TripPlanner({ onPlanComplete, onStartTrip, apiBase, plan
                 </button>
               ))}
             </div>
-            {/* Cross-mode hint — makes the other mode discoverable */}
+            {/* Cross-mode hint, makes the other mode discoverable */}
             {mode === "driving" && (
               <button
                 onClick={() => switchMode("transit")}

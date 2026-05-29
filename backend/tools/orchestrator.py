@@ -41,18 +41,18 @@ _LLM_TIMEOUT_SEC  = float(os.getenv("LLM_TIMEOUT_SEC", "5"))
 
 # ORCHESTRATOR_MODE controls whether we use the LLM tool-calling loop or the
 # deterministic scripted flow.
-#   "agentic"  -> LLM picks tools. THE DEFAULT. This IS the project — the
+#   "agentic"  -> LLM picks tools. THE DEFAULT. This IS the project, the
 #                 agentic loop is what makes DeadZone DeadZone, not a glorified
 #                 cron job. Scripted is ONLY a real failsafe (used when every
 #                 provider's breaker is open AFTER an observed failure).
 #   "scripted" -> hardcoded tool sequence (10-15s, deterministic, no LLM hops).
 #                 Opt-in only.
 #   "auto"     -> agentic, but pre-emptively skip to scripted if OpenRouter
-#                 is unhealthy. NOT default — opt-in for situations where you
+#                 is unhealthy. NOT default, opt-in for situations where you
 #                 explicitly want speed over agentic behavior.
 _ORCHESTRATOR_MODE = os.getenv("ORCHESTRATOR_MODE", "agentic").strip().lower()
 
-# Pick the active provider — OpenRouter primary, Groq fallback, Cerebras final.
+# Pick the active provider, OpenRouter primary, Groq fallback, Cerebras final.
 # Set _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL at import time so the
 # rest of this module can stay simple.
 if _OPENROUTER_KEY:
@@ -199,7 +199,7 @@ TOOLS = [
             "name": "payments_pay",
             "description": (
                 "Agent-to-agent x402 payment. Call this when the user is BUYING an existing "
-                "cached pack — pay the original owner."
+                "cached pack, pay the original owner."
             ),
             "parameters": {
                 "type": "object",
@@ -295,7 +295,7 @@ async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
     if name == "senso_publish":
         # Defensive coercion: free-tier LLMs sometimes pass strings or
         # malformed entries inside `sections`. Senso's HTML renderer expects
-        # a list of dicts with heading/summary/sources keys — coerce here so
+        # a list of dicts with heading/summary/sources keys, coerce here so
         # the LLM doesn't have to waste another round-trip recovering.
         title    = args.get("title") or f"Offline pack: {ctx.signal.get('zone_description', 'route')}"
         route_id = args.get("route_id") or ctx.signal.get("route_id", "")
@@ -311,7 +311,7 @@ async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
                     "sources": s.get("sources") if isinstance(s.get("sources"), list) else [],
                 })
             elif isinstance(s, str):
-                # LLM passed a bare string — wrap it as a single section.
+                # LLM passed a bare string, wrap it as a single section.
                 clean_secs.append({"heading": "Notes", "summary": s, "sources": []})
         url = await senso.publish(title, route_id, clean_secs)
         ctx.pack_url = url
@@ -441,7 +441,7 @@ async def _timed_dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
 # ---------- Pack quality evaluator ----------
 
 async def _eval_pack(ctx: _Ctx) -> None:
-    """Run after delivery — emits eval_complete with coverage, SLA, and quality score."""
+    """Run after delivery, emits eval_complete with coverage, SLA, and quality score."""
     build_ms = _now_ms(ctx)
     eta_ms   = ctx.signal.get("eta_seconds", 240) * 1000
 
@@ -507,7 +507,7 @@ async def run(signal: dict) -> None:
 
     status_ev = {
         "type":     "status",
-        "msg":      f"Dead zone in {eta // 60}m {eta % 60:02d}s — preparing pack",
+        "msg":      f"Dead zone in {eta // 60}m {eta % 60:02d}s, preparing pack",
         "user_id":  signal["user_id"],
         "trace_id": ctx.trace_id,
         "t_ms":     _now_ms(ctx),
@@ -531,14 +531,14 @@ async def run(signal: dict) -> None:
     # The LLM tool loop is more adaptive but each iteration costs one LLM
     # round-trip. When the only available providers are slow (Cerebras
     # free-tier queue) or unreliable (Groq 429s), a single pack can take
-    # 60-400+ seconds — past the user's 4-minute countdown. The scripted
+    # 60-400+ seconds, past the user's 4-minute countdown. The scripted
     # flow does the same parallel nimble searches and senso publish in
     # ~10-15s without any LLM hops.
     use_agentic = _OPENAI_KEY and not llm_circuit.is_open()
     if _ORCHESTRATOR_MODE == "scripted":
         use_agentic = False
     elif _ORCHESTRATOR_MODE == "agentic":
-        # Forced agentic — honor it even if breaker is open (the user explicitly opted in).
+        # Forced agentic, honor it even if breaker is open (the user explicitly opted in).
         use_agentic = bool(_OPENAI_KEY)
     elif _ORCHESTRATOR_MODE == "auto":
         # Auto: use agentic only if OpenRouter (the strongest tool-caller in
@@ -579,7 +579,7 @@ async def run(signal: dict) -> None:
 
 # ---------- LLM-driven path ----------
 
-# Base system prompt — common to every provider.
+# Base system prompt, common to every provider.
 _PROMPT_CORE = """You build offline content packs for drivers about to lose cell signal. Speed matters.
 
 INPUTS in signal: route, zone_description, duration_minutes, severity, lat, lng, user_id, route_id, deadzone_id.
@@ -588,7 +588,7 @@ THE ONE RULE: every run MUST end with deliver_pack. Without it the pack is lost.
 
 ROUTE TYPE: transit (train/subway/BART/metro) | mountain (pass/Vail/Big Sur/Million Dollar/PCH/US-550) | rural (US-50/Nevada/loneliest/duration>=15) | tunnel (tunnel/Lincoln/Holland) | default.
 
-STEP 1 — IN ONE PARALLEL BATCH, call clickhouse_find_recent_pack AND 2-4 nimble_search.
+STEP 1, IN ONE PARALLEL BATCH, call clickhouse_find_recent_pack AND 2-4 nimble_search.
 Queries (use zone_description and route in each):
   transit:  road="<zone> <route> service alerts delays", news="commuter news <zone>", poi="nearby exits <zone>", weather="weather <zone>"
   mountain: weather="mountain weather <zone> forecast", road="road conditions closures <zone>", poi="emergency contacts sheriff <zone>", news="local mountain news <zone>"
@@ -596,9 +596,9 @@ Queries (use zone_description and route in each):
   tunnel:   road="traffic <zone> <route>", news="local news <zone>", weather="weather <route>", poi="rest stops <zone>"
 Counts: duration>=5 → 4 topics; duration 2-4 → weather+road+news; duration<2 → road+news.
 
-STEP 2 — Cache HIT: in parallel call payments_pay (from=agent_<last char of user_id>, to=agent_<last char of cached.owner_user_id>, amount_usd=0.02, memo="buy cached pack") AND clickhouse_log_event (action="bought", pack_id=cached.pack_id, build_ms=0) AND deliver_pack (url=cached.url, cached=true, pack_id=cached.pack_id). STOP.
+STEP 2, Cache HIT: in parallel call payments_pay (from=agent_<last char of user_id>, to=agent_<last char of cached.owner_user_id>, amount_usd=0.02, memo="buy cached pack") AND clickhouse_log_event (action="bought", pack_id=cached.pack_id, build_ms=0) AND deliver_pack (url=cached.url, cached=true, pack_id=cached.pack_id). STOP.
 
-STEP 3 — Cache MISS path: call senso_publish.
+STEP 3, Cache MISS path: call senso_publish.
 senso_publish args (EXACT shape, no exceptions):
   title: "Offline pack: <zone_description>"
   route_id: signal.route_id
@@ -609,11 +609,11 @@ senso_publish args (EXACT shape, no exceptions):
   ]
 Each section is an OBJECT. Never a string. Never markdown.
 
-STEP 4 — Call clickhouse_save_pack(route_id, deadzone_id, url=<published url>, owner_user_id=signal.user_id, source_count=<total sources across sections>).
+STEP 4, Call clickhouse_save_pack(route_id, deadzone_id, url=<published url>, owner_user_id=signal.user_id, source_count=<total sources across sections>).
 
-STEP 5 — MANDATORY: call deliver_pack(url=<published url>, cached=false, pack_id=<pack_id from save_pack>).
+STEP 5, MANDATORY: call deliver_pack(url=<published url>, cached=false, pack_id=<pack_id from save_pack>).
 
-Parallel calls are cheap. Sequential calls cost a full round-trip — minimize them. No commentary between tool calls."""
+Parallel calls are cheap. Sequential calls cost a full round-trip, minimize them. No commentary between tool calls."""
 
 
 # Step-specific system prompts. Iter 0 uses the full _PROMPT_CORE so the
@@ -649,7 +649,7 @@ def _system_prompt_for(provider: str) -> str:
     return _PROMPT_CORE
 
 
-# Back-compat — some other module imports SYSTEM_PROMPT directly.
+# Back-compat, some other module imports SYSTEM_PROMPT directly.
 SYSTEM_PROMPT = _PROMPT_CORE
 
 
@@ -688,7 +688,7 @@ async def _call_llm_with_fallback(
             return {}
         # Cerebras's zai-glm-4.7 returns 400 ('Failed to generate tool_...')
         # when given a specific {type:function, function:{name:...}}
-        # tool_choice — it doesn't reliably handle the forced-function
+        # tool_choice, it doesn't reliably handle the forced-function
         # syntax. Downgrade to 'required' (model picks among the allowed
         # tools, which is fine because `tools` is already filtered to the
         # one we want). 'auto' is left alone.
@@ -698,7 +698,7 @@ async def _call_llm_with_fallback(
 
         kw: dict = {"tools": tools, "tool_choice": effective_choice}
         # Gemini (OpenRouter) and Llama (Groq) handle parallel tool calls
-        # well. Cerebras gpt-oss / GLM-4 do not — passing the flag returns
+        # well. Cerebras gpt-oss / GLM-4 do not, passing the flag returns
         # 400, so we omit it there.
         if provider != "cerebras":
             kw["parallel_tool_calls"] = True
@@ -781,7 +781,7 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
             f"Signal received:\n{json.dumps(signal, indent=2)}\n\nExecute the workflow now."},
     ]
 
-    # Search results gathered from iter 0 — used as focused context for
+    # Search results gathered from iter 0, used as focused context for
     # subsequent forced steps so we don't blow Groq's 6000 TPM budget
     # by dragging the rolling conversation forward.
     search_results: list[dict] = []
@@ -883,7 +883,7 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
 async def _focused_call(provider_msg_user: str, tool_name: str, ctx: _Ctx) -> dict:
     """One LLM round-trip with a tiny prompt and a single allowed tool.
     Used by the publish / save / deliver steps so each only consumes a few
-    hundred tokens — keeps Groq/Cerebras free-tier limits happy."""
+    hundred tokens, keeps Groq/Cerebras free-tier limits happy."""
     sys_prompt_map = {
         "senso_publish":          _PROMPT_PUBLISH,
         "clickhouse_save_pack":   _PROMPT_SAVE,
@@ -1108,7 +1108,7 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
     zone_desc   = signal.get("zone_description", "")
     route_label = signal.get("route", route_id.replace("_", " "))
 
-    # Human-readable location hint for search queries — prefer zone description, else route name
+    # Human-readable location hint for search queries, prefer zone description, else route name
     location = zone_desc if zone_desc else route_label
 
     # Step 1: cache lookup
@@ -1140,7 +1140,7 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
         await _eval_pack(ctx)
         return
 
-    # Step 2: parallel web searches — classify route type for targeted queries
+    # Step 2: parallel web searches, classify route type for targeted queries
     transit     = is_transit_route(route_label)
     mountain    = _is_mountain_route(route_label)
     long_rural  = _is_long_rural_route(route_label, dur_min)
@@ -1166,7 +1166,7 @@ async def _run_scripted(signal: dict, ctx: _Ctx) -> None:
                 ("news", f"local news {location}"),
             ]
     elif mountain:
-        # Mountain routes: safety is critical — always 4 searches including emergency contacts
+        # Mountain routes: safety is critical, always 4 searches including emergency contacts
         topics = [
             ("weather", f"high elevation mountain weather {location} {route_label} forecast storm alerts"),
             ("road",    f"road conditions closures rockslide avalanche {location} {route_label} CDOT"),

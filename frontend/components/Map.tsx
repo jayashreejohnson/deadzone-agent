@@ -15,7 +15,7 @@ type MapProps = {
   boundsVersion?: number;
 };
 
-/** Inner component — has access to the Leaflet map instance via useMap(). */
+/** Inner component, has access to the Leaflet map instance via useMap(). */
 function MapAutoBounds({ zones, route, boundsVersion }: {
   zones: DeadZone[];
   route: LatLng[];
@@ -31,7 +31,7 @@ function MapAutoBounds({ zones, route, boundsVersion }: {
       // Add padding so dead-zone circles aren't clipped
       map.fitBounds(pts, { padding: [48, 48], maxZoom: 14, animate: true });
     } catch {
-      // Leaflet can throw if the map isn't ready yet — silently ignore
+      // Leaflet can throw if the map isn't ready yet, silently ignore
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boundsVersion]);
@@ -47,7 +47,7 @@ function severityLabel(severity?: string): string {
 }
 
 /**
- * Static map layers — route polyline + dead-zone circles.
+ * Static map layers, route polyline + dead-zone circles.
  *
  * Pulled into its own memoized component so the animation loop (which
  * updates user position ~3x/sec) does NOT re-create these Leaflet layers
@@ -55,7 +55,7 @@ function severityLabel(severity?: string): string {
  * map to flash whenever the dot moved.
  *
  * Re-renders only when zones, route, or the highlighted "next" zone id
- * change — none of which happen during the per-tick animation.
+ * change, none of which happen during the per-tick animation.
  */
 const StaticLayers = memo(function StaticLayers({
   zones, polylinePos, nextZoneId,
@@ -117,12 +117,12 @@ const StaticLayers = memo(function StaticLayers({
 });
 
 export default function Map({ dots, activeUser, deadZones, routePolyline, nextZone, boundsVersion }: MapProps) {
-  // Use exactly what's passed in — never fall back to the default Manhattan/Newark data
+  // Use exactly what's passed in, never fall back to the default Manhattan/Newark data
   // so the map is clean before a route is scanned.
   const zones = deadZones ?? [];
   const route = routePolyline ?? [];
 
-  // Stable references — without these the memoized StaticLayers would
+  // Stable references, without these the memoized StaticLayers would
   // re-render every animation tick because the array identities change.
   const polylinePos: [number, number][] = useMemo(
     () => route.map((p) => [p.lat, p.lng]),
@@ -146,7 +146,7 @@ export default function Map({ dots, activeUser, deadZones, routePolyline, nextZo
       style={{ height: "100%", width: "100%" }}
       scrollWheelZoom={true}
     >
-      {/* CartoDB Dark Matter — free, no API key, cinematic dark aesthetic */}
+      {/* CartoDB Dark Matter, free, no API key, cinematic dark aesthetic */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
@@ -161,7 +161,7 @@ export default function Map({ dots, activeUser, deadZones, routePolyline, nextZo
           re-create the Leaflet polyline/circle layers (was causing flash). */}
       <StaticLayers zones={stableZones} polylinePos={polylinePos} nextZoneId={nextZone?.id} />
 
-      {/* User position dots — these intentionally update with every tick */}
+      {/* User position dots, these intentionally update with every tick */}
       {dots.map(
         (d) =>
           d.pos && (

@@ -130,7 +130,7 @@ export default function OfflineOverlay({ durationSeconds, onDone }: OfflineOverl
           style={{ animation: phase === "glitch" ? "fadeIn 0.5s ease-out" : "none" }}
         >
           <div>BSSID: ██:██:██:██:██:██</div>
-          <div>RSSI: –110 dBm · CHANNEL: –</div>
+          <div>RSSI: , 110 dBm · CHANNEL: , </div>
         </div>
       </div>
     </div>

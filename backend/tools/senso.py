@@ -1,7 +1,7 @@
 """Senso publish wrapper. Falls back to a self-hosted static HTML file so demo always returns a URL.
 
 A finished pack contains:
-  1. A curated, offline-readable SUMMARY for each section (the gist —
+  1. A curated, offline-readable SUMMARY for each section (the gist , 
      mile markers, phone numbers, procedures).
   2. CACHED SNAPSHOTS of each source URL, fetched at build time and
      embedded inline so the user can actually READ the underlying
@@ -301,12 +301,12 @@ def _render_html(title: str, route_id: str, sections: list[dict], snapshots: dic
                 )
 
         sources_block = (
-            f'<div class="src-lbl">Sources — readable offline when cached</div>'
+            f'<div class="src-lbl">Sources, readable offline when cached</div>'
             f'<div class="sources">{sources_inner}</div>'
         ) if srcs else ""
         # Preserve newlines and basic bullet formatting from the summary.
         # The curated content uses \n for paragraph breaks and "• " for
-        # bullets — we render those as proper HTML so the pack is
+        # bullets, we render those as proper HTML so the pack is
         # readable as a document, not a wall of text.
         summary_html = _render_summary(summary)
         sections_html_parts.append(
@@ -367,7 +367,7 @@ a{{color:inherit;text-decoration:none}}
                                     width:5px;height:5px;border-radius:50%;
                                     background:#00d4ff;box-shadow:0 0 6px rgba(0,212,255,.5)}}
 
-/* tel: links — call-from-deadzone affordance */
+/* tel: links, call-from-deadzone affordance */
 .sec-summary a.tel{{color:#6ee7b7;font-weight:600;text-decoration:none;
                     border-bottom:1px dotted rgba(110,231,183,.4);
                     padding:0 1px}}
@@ -494,7 +494,7 @@ async def publish(title: str, route_id: str, sections: list[dict]) -> str:
                         "msg": f"senso failed ({e!s}); using local static fallback"})
             backend = "static_fallback_after_error"
     # Fetch cached snapshots in parallel for every source URL.
-    # This is what makes the pack actually usable offline — the source
+    # This is what makes the pack actually usable offline, the source
     # content is baked into the HTML, not just linked.
     all_sources: list[dict] = []
     for s in sections:

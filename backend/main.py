@@ -1,9 +1,9 @@
-"""DeadZone Agent — FastAPI app, WebSocket bus, and signal entrypoint.
+"""DeadZone Agent, FastAPI app, WebSocket bus, and signal entrypoint.
 
-POST /signal      — frontend reports "user about to hit dead zone"; spawns orchestrator
-WS   /ws          — broadcasts every step the agent takes
-GET  /dashboard   — aggregate stats for the live dashboard
-GET  /static/...  — serves locally-published fallback packs
+POST /signal     , frontend reports "user about to hit dead zone"; spawns orchestrator
+WS   /ws         , broadcasts every step the agent takes
+GET  /dashboard  , aggregate stats for the live dashboard
+GET  /static/... , serves locally-published fallback packs
 """
 from __future__ import annotations
 import os
@@ -40,24 +40,24 @@ def _check_env() -> None:
 
     if not os.getenv("OPENROUTER_API_KEY", "").strip() and not os.getenv("GROQ_API_KEY", "").strip():
         missing_critical.append(
-            "OPENROUTER_API_KEY or GROQ_API_KEY — LLM orchestrator will fall back to scripted mode"
+            "OPENROUTER_API_KEY or GROQ_API_KEY, LLM orchestrator will fall back to scripted mode"
         )
     else:
         which = "OpenRouter" if os.getenv("OPENROUTER_API_KEY", "").strip() else "Groq"
         print(f"[startup] LLM provider: {which} (Groq fallback ready)" if os.getenv("GROQ_API_KEY", "").strip() and os.getenv("OPENROUTER_API_KEY", "").strip() else f"[startup] LLM provider: {which}")
     if not os.getenv("AGENT1_URL", "").strip():
         missing_optional.append(
-            "AGENT1_URL — dead-zone predictions will use the built-in stub (default: localhost:8001)"
+            "AGENT1_URL, dead-zone predictions will use the built-in stub (default: localhost:8001)"
         )
     if not os.getenv("PUBLIC_BASE_URL", "").strip():
         missing_optional.append(
-            "PUBLIC_BASE_URL — static pack URLs will default to http://localhost:8000 "
+            "PUBLIC_BASE_URL, static pack URLs will default to http://localhost:8000 "
             "(set to https://sunny-appreciation-production.up.railway.app in production)"
         )
     if not os.getenv("NIMBLE_API_KEY", "").strip():
-        missing_optional.append("NIMBLE_API_KEY — web search will use stub data")
+        missing_optional.append("NIMBLE_API_KEY, web search will use stub data")
     if not os.getenv("DD_API_KEY", "").strip() and not os.getenv("DATADOG_API_KEY", "").strip():
-        missing_optional.append("DD_API_KEY — Datadog LLM Observability disabled")
+        missing_optional.append("DD_API_KEY, Datadog LLM Observability disabled")
 
     for msg in missing_critical:
         print(f"[startup] WARNING: {msg}")
@@ -109,7 +109,7 @@ class Signal(BaseModel):
     eta_seconds: int = 240
     route_id: str
     deadzone_id: str
-    # New fields — passed from Agent 1 predictions
+    # New fields, passed from Agent 1 predictions
     duration_minutes: int = 4
     severity: str = "medium"  # "high" | "medium" | "low"
     zone_description: str = ""  # e.g. "Lincoln Tunnel Mid"
