@@ -699,21 +699,38 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
             f"Signal received:\n{json.dumps(signal, indent=2)}\n\nExecute the workflow now."},
     ]
 
-    # Max 5 iterations is enough for the prescribed flow (cache + searches
-    # in parallel → publish → save → deliver). 8 was generous for
-    # exploration; we want tighter bounds so the loop can't drag.
-    for _iter in range(5):
-        # Once the pack URL exists (senso_publish succeeded) AND the
-        # pack_id has been minted (clickhouse_save_pack succeeded), the
-        # ONLY thing left is deliver_pack. Force the LLM to call it by
-        # restricting tool_choice — no more chances to forget.
-        force_deliver = bool(ctx.pack_url) and bool(ctx.pack_id) and not ctx.delivered
-        if force_deliver:
-            call_tools  = [t for t in TOOLS if t["function"]["name"] == "deliver_pack"]
-            tool_choice = {"type": "function", "function": {"name": "deliver_pack"}}
+    # State-machine forcing: free-tier LLMs (Groq Llama, Cerebras gpt-oss)
+    # tend to stop mid-flow after searches without publishing or delivering.
+    # We let the LLM pick CONTENT (search queries, pack sections, summaries)
+    # but we use tool_choice to guarantee CALL SEQUENCE progresses:
+    #
+    #   has searches, no pack_url   -> force senso_publish
+    #   has pack_url, no pack_id    -> force clickhouse_save_pack
+    #   has pack_id, not delivered  -> force deliver_pack
+    #
+    # This keeps the flow agentic where it matters (the model still
+    # composes the actual pack contents) while removing the failure modes
+    # we keep seeing in traces.
+    for _iter in range(6):
+        searched     = "nimble_search" in ctx.tools_called
+        has_pack_url = bool(ctx.pack_url)
+        has_pack_id  = bool(ctx.pack_id)
+        delivered    = ctx.delivered
+
+        def _only(name: str) -> tuple[list[dict], object]:
+            return (
+                [t for t in TOOLS if t["function"]["name"] == name],
+                {"type": "function", "function": {"name": name}},
+            )
+
+        if has_pack_id and not delivered:
+            call_tools, tool_choice = _only("deliver_pack")
+        elif has_pack_url and not has_pack_id:
+            call_tools, tool_choice = _only("clickhouse_save_pack")
+        elif searched and not has_pack_url:
+            call_tools, tool_choice = _only("senso_publish")
         else:
-            call_tools  = TOOLS
-            tool_choice = "auto"
+            call_tools, tool_choice = TOOLS, "auto"
 
         resp, _provider = await _call_llm_with_fallback(
             messages, tools=call_tools, tool_choice=tool_choice,
