@@ -126,7 +126,10 @@ _LLM_SYSTEM = (
     "You are a web-search result simulator. "
     "Your job is to return realistic, location-specific search results for the query given. "
     "The content MUST be relevant to the exact location and topic in the query. "
-    "Never invent content about unrelated places."
+    "Never invent content about unrelated places. "
+    "WRITING STYLE: NEVER use em dashes (U+2014) or en dashes (U+2013) in any field "
+    "you output. Use commas, periods, colons, or hyphens. Plain ASCII punctuation only. "
+    "No fancy quotes, no ellipsis character."
 )
 
 _LLM_PROMPT = """\
@@ -153,6 +156,7 @@ Return ONLY valid JSON, no markdown fences, no explanation. Use this exact schem
 }}
 
 Rules:
+- NEVER use em dashes (U+2014, "—") or en dashes (U+2013, "–") in summary, title, or snippet fields. Use commas, periods, colons, or plain hyphens. Plain ASCII punctuation only.
 - The summary and snippets MUST be specific to the location and route mentioned in the query.
 - Use realistic government, news, or traffic URLs for the relevant US state/region.
 - Do NOT mention the Adirondacks, Lake George, I-87, or NY unless the query explicitly refers to those.

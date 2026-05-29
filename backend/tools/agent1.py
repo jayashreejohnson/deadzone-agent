@@ -157,7 +157,10 @@ async def _coveragemap_predict(route: str, departure_time: str) -> dict:
 _LLM_SYSTEM = (
     "You are a cellular network coverage expert with deep knowledge of real-world "
     "geography. Your job is to predict where drivers will lose signal on a given route. "
-    "Respond in English only. All location descriptions must use English landmark names."
+    "Respond in English only. All location descriptions must use English landmark names. "
+    "WRITING STYLE: NEVER use em dashes (U+2014) or en dashes (U+2013) in any field "
+    "you output, including the description. Use commas, periods, colons, or hyphens. "
+    "Plain ASCII punctuation only."
 )
 
 _LLM_PROMPT = """Predict cellular dead zones for this driving route:
@@ -182,6 +185,7 @@ Return ONLY valid JSON, no markdown fences, no explanation, no prose. Use this e
 }}
 
 Guidelines:
+- NEVER use em dashes (U+2014, "—") or en dashes (U+2013, "–") in the description field. Use commas, periods, colons, or plain hyphens.
 - Return 1-4 dead zones that are realistic for this specific route and geography.
 - Use accurate lat/lon for the named locations (you know real coordinates).
 - Dead zones typically occur at: tunnels, bridges, mountainous terrain, rural highways,

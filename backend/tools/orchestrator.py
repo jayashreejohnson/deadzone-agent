@@ -297,7 +297,13 @@ async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
         # malformed entries inside `sections`. Senso's HTML renderer expects
         # a list of dicts with heading/summary/sources keys, coerce here so
         # the LLM doesn't have to waste another round-trip recovering.
-        title    = args.get("title") or f"Offline pack: {ctx.signal.get('zone_description', 'route')}"
+        # Also strip em/en dashes belt-and-suspenders, the system prompt
+        # tells the model not to use them, but models slip up.
+        def _scrub(x):
+            if isinstance(x, str):
+                return x.replace("—", ", ").replace("–", ", ")
+            return x
+        title    = _scrub(args.get("title") or f"Offline pack: {ctx.signal.get('zone_description', 'route')}")
         route_id = args.get("route_id") or ctx.signal.get("route_id", "")
         raw_secs = args.get("sections") or []
         if not isinstance(raw_secs, list):
@@ -305,14 +311,23 @@ async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
         clean_secs: list[dict] = []
         for s in raw_secs:
             if isinstance(s, dict):
+                srcs_in = s.get("sources") if isinstance(s.get("sources"), list) else []
+                clean_srcs = []
+                for src in srcs_in:
+                    if isinstance(src, dict):
+                        clean_srcs.append({
+                            "url":     str(src.get("url", "")),
+                            "title":   _scrub(str(src.get("title", "") or "")),
+                            "snippet": _scrub(str(src.get("snippet", "") or "")),
+                        })
                 clean_secs.append({
-                    "heading": str(s.get("heading") or s.get("title") or "Section"),
-                    "summary": str(s.get("summary") or s.get("content") or s.get("text") or ""),
-                    "sources": s.get("sources") if isinstance(s.get("sources"), list) else [],
+                    "heading": _scrub(str(s.get("heading") or s.get("title") or "Section")),
+                    "summary": _scrub(str(s.get("summary") or s.get("content") or s.get("text") or "")),
+                    "sources": clean_srcs,
                 })
             elif isinstance(s, str):
                 # LLM passed a bare string, wrap it as a single section.
-                clean_secs.append({"heading": "Notes", "summary": s, "sources": []})
+                clean_secs.append({"heading": "Notes", "summary": _scrub(s), "sources": []})
         url = await senso.publish(title, route_id, clean_secs)
         ctx.pack_url = url
         return {"url": url}
@@ -582,6 +597,11 @@ async def run(signal: dict) -> None:
 # Base system prompt, common to every provider.
 _PROMPT_CORE = """You build offline content packs for drivers about to lose cell signal. Speed matters.
 
+WRITING STYLE (applies to every string you generate, especially summaries and snippets):
+- NEVER use em dashes (U+2014) or en dashes (U+2013). Use a comma, period, colon, or hyphen instead.
+- Plain ASCII punctuation only. No fancy quotes, no ellipsis character, no special whitespace.
+- Short sentences. No marketing voice.
+
 INPUTS in signal: route, zone_description, duration_minutes, severity, lat, lng, user_id, route_id, deadzone_id.
 
 THE ONE RULE: every run MUST end with deliver_pack. Without it the pack is lost.
@@ -619,19 +639,31 @@ Parallel calls are cheap. Sequential calls cost a full round-trip, minimize them
 # Step-specific system prompts. Iter 0 uses the full _PROMPT_CORE so the
 # LLM can plan the workflow; subsequent forced steps use TINY focused
 # prompts so we don't burn through Groq's 6000 TPM limit in 10 seconds.
+# Style rule that goes in every focused prompt, the LLM should NOT use
+# em dashes or en dashes in any string it generates (summaries, snippets,
+# headings). Plain ASCII punctuation only.
+_NO_DASHES_RULE = (
+    "Writing style for every string you output: NEVER use em dashes (U+2014) "
+    "or en dashes (U+2013). Use commas, periods, colons, or hyphens. "
+    "Plain ASCII punctuation only."
+)
+
 _PROMPT_PUBLISH = (
     "Construct a senso_publish call. "
     "Args: title (string), route_id (string), sections (array of objects). "
     "Each section is {heading: string, summary: 2-3 sentence string, sources: array of {url,title,snippet}}. "
-    "Sections are OBJECTS, never strings or markdown."
+    "Sections are OBJECTS, never strings or markdown. "
+    + _NO_DASHES_RULE
 )
 _PROMPT_SAVE = (
     "Construct a clickhouse_save_pack call. "
-    "Args: route_id, deadzone_id, url, owner_user_id, source_count (integer)."
+    "Args: route_id, deadzone_id, url, owner_user_id, source_count (integer). "
+    + _NO_DASHES_RULE
 )
 _PROMPT_DELIVER = (
     "Construct a deliver_pack call. "
-    "Args: url (string), cached (boolean), pack_id (string)."
+    "Args: url (string), cached (boolean), pack_id (string). "
+    + _NO_DASHES_RULE
 )
 
 
