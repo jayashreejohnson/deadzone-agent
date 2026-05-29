@@ -660,10 +660,20 @@ async def _call_llm_with_fallback(
     def _tool_kwargs(provider: str) -> dict:
         if not tools:
             return {}
-        kw: dict = {"tools": tools, "tool_choice": tool_choice}
-        # Gemini (OpenRouter) and Llama (Groq) both handle parallel
-        # tool calls well. Cerebras's gpt-oss / GLM-4 do not — passing the
-        # flag returns 400 on some models, so we omit it there.
+        # Cerebras's zai-glm-4.7 returns 400 ('Failed to generate tool_...')
+        # when given a specific {type:function, function:{name:...}}
+        # tool_choice — it doesn't reliably handle the forced-function
+        # syntax. Downgrade to 'required' (model picks among the allowed
+        # tools, which is fine because `tools` is already filtered to the
+        # one we want). 'auto' is left alone.
+        effective_choice = tool_choice
+        if provider == "cerebras" and isinstance(tool_choice, dict):
+            effective_choice = "required"
+
+        kw: dict = {"tools": tools, "tool_choice": effective_choice}
+        # Gemini (OpenRouter) and Llama (Groq) handle parallel tool calls
+        # well. Cerebras gpt-oss / GLM-4 do not — passing the flag returns
+        # 400, so we omit it there.
         if provider != "cerebras":
             kw["parallel_tool_calls"] = True
         return kw
@@ -743,102 +753,198 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
             f"Signal received:\n{json.dumps(signal, indent=2)}\n\nExecute the workflow now."},
     ]
 
-    # State-machine forcing: free-tier LLMs (Groq Llama, Cerebras gpt-oss)
-    # tend to stop mid-flow after searches without publishing or delivering.
-    # We let the LLM pick CONTENT (search queries, pack sections, summaries)
-    # but we use tool_choice to guarantee CALL SEQUENCE progresses:
-    #
-    #   has searches, no pack_url   -> force senso_publish
-    #   has pack_url, no pack_id    -> force clickhouse_save_pack
-    #   has pack_id, not delivered  -> force deliver_pack
-    #
-    # This keeps the flow agentic where it matters (the model still
-    # composes the actual pack contents) while removing the failure modes
-    # we keep seeing in traces.
-    for _iter in range(6):
-        searched     = "nimble_search" in ctx.tools_called
-        has_pack_url = bool(ctx.pack_url)
-        has_pack_id  = bool(ctx.pack_id)
-        delivered    = ctx.delivered
+    # State-machine forcing — see commit history for design notes.
+    # The loop is wrapped in a try/except so that a mid-flow LLM failure
+    # (provider 400, all breakers open, etc.) doesn't dump us back to a
+    # cold _run_scripted. Instead we finalize from whatever the LLM
+    # already produced (search results in the messages stream), so the
+    # LLM's actual contribution is preserved.
+    llm_loop_failed = False
+    try:
+        for _iter in range(6):
+            searched     = "nimble_search" in ctx.tools_called
+            has_pack_url = bool(ctx.pack_url)
+            has_pack_id  = bool(ctx.pack_id)
+            delivered    = ctx.delivered
 
-        def _only(name: str) -> tuple[list[dict], object]:
-            return (
-                [t for t in TOOLS if t["function"]["name"] == name],
-                {"type": "function", "function": {"name": name}},
+            def _only(name: str) -> tuple[list[dict], object]:
+                return (
+                    [t for t in TOOLS if t["function"]["name"] == name],
+                    {"type": "function", "function": {"name": name}},
+                )
+
+            if has_pack_id and not delivered:
+                call_tools, tool_choice = _only("deliver_pack")
+            elif has_pack_url and not has_pack_id:
+                call_tools, tool_choice = _only("clickhouse_save_pack")
+            elif searched and not has_pack_url:
+                call_tools, tool_choice = _only("senso_publish")
+            else:
+                call_tools, tool_choice = TOOLS, "auto"
+
+            resp, _provider = await _call_llm_with_fallback(
+                messages, tools=call_tools, tool_choice=tool_choice,
             )
+            msg = resp.choices[0].message
+            messages.append(msg.model_dump(exclude_none=True))
 
-        if has_pack_id and not delivered:
-            call_tools, tool_choice = _only("deliver_pack")
-        elif has_pack_url and not has_pack_id:
-            call_tools, tool_choice = _only("clickhouse_save_pack")
-        elif searched and not has_pack_url:
-            call_tools, tool_choice = _only("senso_publish")
-        else:
-            call_tools, tool_choice = TOOLS, "auto"
+            tool_calls = msg.tool_calls or []
+            if not tool_calls:
+                break
 
-        resp, _provider = await _call_llm_with_fallback(
-            messages, tools=call_tools, tool_choice=tool_choice,
-        )
-        msg = resp.choices[0].message
-        messages.append(msg.model_dump(exclude_none=True))
+            async def _exec(tc):
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                except Exception:
+                    args = {}
+                result = await _timed_dispatch(tc.function.name, args, ctx)
+                if "error" in result:
+                    warn_ev = {
+                        "type": "log", "level": "warn",
+                        "msg":  f"tool {tc.function.name}: {result['error']}",
+                        "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
+                    }
+                    await emit(warn_ev)
+                    db.append_trace_event(ctx.trace_id, warn_ev)
+                return tc.id, tc.function.name, result
 
-        tool_calls = msg.tool_calls or []
-        if not tool_calls:
-            break
+            results = await asyncio.gather(*[_exec(tc) for tc in tool_calls], return_exceptions=False)
+            for tc_id, name, result in results:
+                messages.append({
+                    "role": "tool", "tool_call_id": tc_id,
+                    "name": name, "content": json.dumps(result, default=str),
+                })
 
-        async def _exec(tc):
-            try:
-                args = json.loads(tc.function.arguments or "{}")
-            except Exception:
-                args = {}
-            result = await _timed_dispatch(tc.function.name, args, ctx)
-            if "error" in result:
-                warn_ev = {
-                    "type": "log", "level": "warn",
-                    "msg":  f"tool {tc.function.name}: {result['error']}",
+            if ctx.delivered:
+                zone_desc  = ctx.signal.get("zone_description") or ctx.signal.get("route", "your route")
+                cached_str = "cached pack reused" if ctx.cached else "fresh pack assembled"
+                final_ev = {
+                    "type": "log", "level": "info",
+                    "msg":  f"Delivering {cached_str} for {zone_desc}",
                     "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
                 }
-                await emit(warn_ev)
-                db.append_trace_event(ctx.trace_id, warn_ev)
-            return tc.id, tc.function.name, result
-
-        results = await asyncio.gather(*[_exec(tc) for tc in tool_calls], return_exceptions=False)
-        for tc_id, name, result in results:
-            messages.append({
-                "role": "tool", "tool_call_id": tc_id,
-                "name": name, "content": json.dumps(result, default=str),
-            })
-
-        if ctx.delivered:
-            zone_desc  = ctx.signal.get("zone_description") or ctx.signal.get("route", "your route")
-            cached_str = "cached pack reused" if ctx.cached else "fresh pack assembled"
-            final_ev = {
-                "type": "log", "level": "info",
-                "msg":  f"Delivering {cached_str} for {zone_desc}",
-                "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
-            }
-            await emit(final_ev)
-            db.append_trace_event(ctx.trace_id, final_ev)
-            break
-
-    # Safety net: if the LLM never called deliver_pack despite the
-    # tool_choice forcing, do it now. Should be unreachable in practice
-    # but keeps the user from ever seeing a missing pack.
-    if not ctx.delivered and ctx.pack_url:
+                await emit(final_ev)
+                db.append_trace_event(ctx.trace_id, final_ev)
+                break
+    except Exception as e:
+        llm_loop_failed = True
         warn_ev = {
             "type": "log", "level": "warn",
-            "msg":  "LLM did not call deliver_pack; forcing delivery",
+            "msg":  f"LLM loop failed mid-flow ({type(e).__name__}); completing pack from accumulated state",
             "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
         }
         await emit(warn_ev)
         db.append_trace_event(ctx.trace_id, warn_ev)
-        await _timed_dispatch("deliver_pack", {
-            "url":      ctx.pack_url,
-            "cached":   ctx.cached,
-            "pack_id":  ctx.pack_id,
-        }, ctx)
+
+    # Finalize: walk forward through any missing steps using the work the
+    # LLM already did (search results in `messages`). This preserves the
+    # LLM's content decisions instead of throwing them away and starting
+    # over with the scripted flow.
+    if not ctx.delivered:
+        await _finalize_from_messages(signal, ctx, messages, llm_loop_failed)
 
     await _eval_pack(ctx)
+
+
+# ---------- Mid-flow finalizer ----------
+
+async def _finalize_from_messages(signal: dict, ctx: _Ctx, messages: list[dict], from_failure: bool) -> None:
+    """Walk forward through any remaining pack-building steps using the
+    nimble_search results the LLM already produced.
+
+    This is what runs when the LLM has done the agentic part (decided
+    queries, pulled results) but stalls or 400s on senso_publish / save /
+    deliver. The model's content decisions are preserved; we just glue
+    the rest together. Falls back to _run_scripted only if NOTHING
+    useful is in the messages stream (e.g. LLM died immediately)."""
+    # Extract any nimble_search results from the tool messages.
+    search_results: list[dict] = []
+    cached_hit: dict | None = None
+    for m in messages:
+        if m.get("role") != "tool":
+            continue
+        name = m.get("name")
+        try:
+            payload = json.loads(m.get("content") or "{}")
+        except Exception:
+            continue
+        if name == "nimble_search":
+            search_results.append({
+                "topic":   payload.get("topic", "info"),
+                "summary": payload.get("summary", ""),
+                "sources": payload.get("sources", []) or [],
+            })
+        elif name == "clickhouse_find_recent_pack" and payload.get("found"):
+            cached_hit = payload.get("pack") or {}
+
+    # Cache hit path: short-circuit pay + log + deliver.
+    if cached_hit and not ctx.delivered:
+        from_label = "agent_" + signal["user_id"].split("_")[-1]
+        to_label   = "agent_" + cached_hit.get("owner_user_id", "x").split("_")[-1]
+        ctx.pack_id = cached_hit["pack_id"]
+        await _timed_dispatch("payments_pay", {
+            "from_agent": from_label, "to_agent": to_label,
+            "amount_usd": PRICE_USD, "memo": "buy cached pack",
+        }, ctx)
+        await _timed_dispatch("clickhouse_log_event", {
+            "user_id": signal["user_id"], "route_id": signal["route_id"],
+            "deadzone_id": signal["deadzone_id"], "action": "bought",
+            "pack_id": cached_hit["pack_id"], "build_ms": 0,
+        }, ctx)
+        await _timed_dispatch("deliver_pack", {
+            "url": cached_hit["url"], "cached": True, "pack_id": cached_hit["pack_id"],
+        }, ctx)
+        return
+
+    # No searches and no cache result: fall back to scripted completely.
+    if not search_results and not ctx.pack_url:
+        if from_failure:
+            warn_ev = {
+                "type": "log", "level": "warn",
+                "msg":  "No LLM-produced search results to finalize; falling back to scripted flow",
+                "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
+            }
+            await emit(warn_ev)
+            db.append_trace_event(ctx.trace_id, warn_ev)
+        await _run_scripted(signal, ctx)
+        return
+
+    # Step: publish, if not yet published.
+    if not ctx.pack_url and search_results:
+        _HEADINGS = {
+            "weather": "Weather", "road": "Road conditions",
+            "news":    "Local news", "poi": "Nearby services",
+        }
+        sections = [{
+            "heading": _HEADINGS.get(r["topic"], r["topic"].title()),
+            "summary": r["summary"],
+            "sources": r["sources"],
+        } for r in search_results]
+        zone_desc = signal.get("zone_description") or signal.get("route", "route")
+        await _timed_dispatch("senso_publish", {
+            "title":    f"Offline pack: {zone_desc}",
+            "route_id": signal["route_id"],
+            "sections": sections,
+        }, ctx)
+
+    # Step: save, if not yet saved.
+    if ctx.pack_url and not ctx.pack_id:
+        source_count = sum(len(r["sources"]) for r in search_results)
+        await _timed_dispatch("clickhouse_save_pack", {
+            "route_id":      signal["route_id"],
+            "deadzone_id":   signal["deadzone_id"],
+            "url":           ctx.pack_url,
+            "owner_user_id": signal["user_id"],
+            "source_count":  source_count,
+        }, ctx)
+
+    # Step: deliver, mandatory.
+    if not ctx.delivered and ctx.pack_url:
+        await _timed_dispatch("deliver_pack", {
+            "url":     ctx.pack_url,
+            "cached":  False,
+            "pack_id": ctx.pack_id,
+        }, ctx)
 
 
 # ---------- Route type helpers ----------
