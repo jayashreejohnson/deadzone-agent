@@ -676,7 +676,7 @@ async def _call_llm_with_fallback(
 
     if _OPENROUTER_KEY and not llm_circuit.is_open("openrouter"):
         try:
-            c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=_LLM_TIMEOUT_SEC)
+            c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=_LLM_TIMEOUT_SEC, max_retries=0)
             kwargs = {"model": _OPENROUTER_MODEL, "messages": _msgs_for("openrouter"),
                       "temperature": 0, "max_tokens": _max_tokens_for("openrouter"),
                       **_tool_kwargs("openrouter")}
@@ -692,7 +692,7 @@ async def _call_llm_with_fallback(
 
     if _GROQ_KEY and not llm_circuit.is_open("groq"):
         try:
-            c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC)
+            c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC, max_retries=0)
             kwargs = {"model": _GROQ_MODEL, "messages": _msgs_for("groq"),
                       "temperature": 0, "max_tokens": _max_tokens_for("groq"),
                       **_tool_kwargs("groq")}
@@ -708,7 +708,7 @@ async def _call_llm_with_fallback(
 
     if _CEREBRAS_KEY and not llm_circuit.is_open("cerebras"):
         try:
-            c = AsyncOpenAI(api_key=_CEREBRAS_KEY, base_url="https://api.cerebras.ai/v1", timeout=_LLM_TIMEOUT_SEC)
+            c = AsyncOpenAI(api_key=_CEREBRAS_KEY, base_url="https://api.cerebras.ai/v1", timeout=_LLM_TIMEOUT_SEC, max_retries=0)
             kwargs = {"model": _CEREBRAS_MODEL, "messages": _msgs_for("cerebras"),
                       "temperature": 0, "max_tokens": _max_tokens_for("cerebras"),
                       **_tool_kwargs("cerebras")}
