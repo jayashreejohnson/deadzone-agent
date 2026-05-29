@@ -573,32 +573,67 @@ _DEFAULT_BY_TOPIC: dict[str, dict] = {
 def _classify_topic(q: str) -> str:
     """Map a query to one of: weather / road / poi / news / emergency.
 
+    Uses WORD-boundary matching for single-word keywords so that:
+      - "rain" doesn't match inside "train"
+      - "fog" doesn't match inside "Fogtown"
+      - "wind" doesn't match inside "Windsor"
+    Multi-word keywords (e.g. "rest stop", "service alert") still use
+    substring matching since they're unambiguous.
+
     Check specific topic words (news, rest stops, weather) BEFORE
-    generic road/tunnel/transit words — otherwise a query like
-    "local news Lincoln Tunnel" would match "tunnel" and resolve to
-    road, when it's really a news query.
+    generic road/tunnel/transit words.
     """
+    import re
+    tokens = set(re.findall(r"[a-z0-9]+", q))
+
+    def has_word(*words: str) -> bool:
+        return any(w in tokens for w in words)
+
+    def has_phrase(*phrases: str) -> bool:
+        return any(p in q for p in phrases)
+
     # Emergency markers
-    if any(kw in q for kw in ["emergency", "search rescue", "sheriff", "911", " sar ", "rescue", "evac"]):
+    if has_phrase("search rescue", "search and rescue") or has_word(
+        "emergency", "sheriff", "rescue", "evacuate", "evac", "911", "sar"
+    ):
         return "emergency"
-    # News markers — check first because "news Lincoln Tunnel" should
-    # win over the "tunnel" keyword in the road list.
-    if any(kw in q for kw in ["local news", "news ", "incident", "headline"]):
+
+    # News markers
+    if has_phrase("local news", "regional news") or has_word(
+        "news", "incident", "headline", "headlines"
+    ):
         return "news"
-    # POI markers — services, food, gas, exits.
-    if any(kw in q for kw in ["gas station", "rest stop", "rest area", "fuel", "lodge", "nearby services",
-                              "nearby exits", "services exits", "food", "restaurant", "lodging", "hot springs"]):
+
+    # POI / services markers
+    if has_phrase(
+        "gas station", "gas stations", "rest stop", "rest stops", "rest area",
+        "rest areas", "nearby services", "nearby exits", "services exits",
+        "hot springs", "service area",
+    ) or has_word(
+        "fuel", "lodge", "lodging", "restaurant", "restaurants", "food", "cafe",
+        "diner", "stop", "stops",
+    ):
         return "poi"
+
     # Weather markers
-    if any(kw in q for kw in ["weather", "forecast", "storm", "wind", "rain", "snow", "fog", "temperature",
-                              "visibility", "humidity"]):
+    if has_word(
+        "weather", "forecast", "storm", "storms", "wind", "winds", "rain",
+        "snow", "snowing", "fog", "foggy", "temperature", "temperatures",
+        "visibility", "humidity",
+    ):
         return "weather"
-    # Road markers — checked last so it doesn't steal queries that
-    # mention "tunnel" or "highway" as part of a different topic.
-    if any(kw in q for kw in ["road condition", "traffic", "construction", "closure",
-                              "service alert", "delay", "transit", "subway", "bart",
-                              "train", "dot ", " dot", "highway", "tube", "tunnel", "advisory"]):
+
+    # Road / transit markers — checked last.
+    if has_phrase(
+        "road condition", "road conditions", "service alert", "service alerts",
+        "service advisory", "service advisories", "traffic advisory",
+    ) or has_word(
+        "traffic", "construction", "closure", "closures", "delay", "delays",
+        "transit", "subway", "bart", "train", "trains", "dot", "highway",
+        "tube", "tunnel", "advisory", "advisories",
+    ):
         return "road"
+
     # Fallback: news is the safest generic.
     return "news"
 
