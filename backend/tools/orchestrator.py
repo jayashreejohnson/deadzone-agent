@@ -35,13 +35,16 @@ _LLM_TIMEOUT_SEC  = float(os.getenv("LLM_TIMEOUT_SEC", "8"))
 
 # ORCHESTRATOR_MODE controls whether we use the LLM tool-calling loop or the
 # deterministic scripted flow.
-#   "agentic"  -> LLM picks tools (slow but adaptive). Default historically.
+#   "agentic"  -> LLM picks tools. THE DEFAULT. This IS the project — the
+#                 agentic loop is what makes DeadZone DeadZone, not a glorified
+#                 cron job. Scripted is ONLY a real failsafe (used when every
+#                 provider's breaker is open AFTER an observed failure).
 #   "scripted" -> hardcoded tool sequence (10-15s, deterministic, no LLM hops).
-#   "auto"     -> agentic when OpenRouter is healthy; scripted otherwise.
-#                 This is the new default because free-tier LLMs (Groq queued,
-#                 Cerebras laggy) can't reliably finish the tool loop inside a
-#                 4-minute dead-zone countdown.
-_ORCHESTRATOR_MODE = os.getenv("ORCHESTRATOR_MODE", "auto").strip().lower()
+#                 Opt-in only.
+#   "auto"     -> agentic, but pre-emptively skip to scripted if OpenRouter
+#                 is unhealthy. NOT default — opt-in for situations where you
+#                 explicitly want speed over agentic behavior.
+_ORCHESTRATOR_MODE = os.getenv("ORCHESTRATOR_MODE", "agentic").strip().lower()
 
 # Pick the active provider — OpenRouter primary, Groq fallback, Cerebras final.
 # Set _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL at import time so the
