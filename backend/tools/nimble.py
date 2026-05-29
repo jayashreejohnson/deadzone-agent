@@ -585,26 +585,86 @@ def _classify_topic(q: str) -> str:
     return "news"  # default — most useful generic catch
 
 
+# Aliases — additional substrings that should resolve to the same zone
+# even if the LLM didn't include the literal zone name in its search query.
+# Maps "alias substring" -> "canonical zone key in _ZONE_SOURCES".
+_ZONE_ALIASES: dict[str, str] = {
+    "manhattan to newark":         "lincoln tunnel",
+    "weehawken":                   "lincoln tunnel",
+    "hudson river":                "lincoln tunnel",
+    "mccarter hwy":                "newark",
+    "mccarter highway":            "newark",
+    "denver to vail":              "eisenhower",
+    "i-70 colorado":               "eisenhower",
+    "i-70":                        "eisenhower",
+    "los angeles to las vegas":    "cajon pass",
+    "la to las vegas":             "cajon pass",
+    "i-15":                        "cajon pass",
+    "baker":                       "mojave",
+    "primm":                       "mojave",
+    "stateline":                   "mojave",
+    "carmel to san luis obispo":   "big sur",
+    "highway 1":                   "big sur",
+    "pch":                         "big sur",
+    "gorda":                       "big sur",
+    "ragged point":                "big sur",
+    "ely to fallon":               "us route 50 nevada",
+    "us-50":                       "us route 50 nevada",
+    "loneliest road":              "us route 50 nevada",
+    "bob scott summit":            "us route 50 nevada",
+    "austin summit":               "us route 50 nevada",
+    "middlegate":                  "us route 50 nevada",
+    "ouray to durango":            "million dollar highway",
+    "us-550":                      "million dollar highway",
+    "red mountain pass":           "million dollar highway",
+    "molas pass":                  "million dollar highway",
+    "coal bank pass":              "million dollar highway",
+    "silverton":                   "million dollar highway",
+    "l train":                     "canarsie tunnel",
+    "bedford av":                  "canarsie tunnel",
+    "bart":                        "transbay tube",
+    "embarcadero":                 "transbay tube",
+    "west oakland":                "transbay tube",
+}
+
+
+def _resolve_zone(q: str) -> str | None:
+    """Find a known zone key for this query — checks direct keys first,
+    then aliases (route names, alternate landmarks)."""
+    for zone_key in _ZONE_SOURCES:
+        if zone_key in q:
+            return zone_key
+    for alias, canonical in _ZONE_ALIASES.items():
+        if alias in q and canonical in _ZONE_SOURCES:
+            return canonical
+    return None
+
+
 def _generic_stub(query: str) -> dict:
     """Last-resort stub when both Nimble and the LLM are unavailable.
 
-    Now zone-aware: looks for a known dead zone substring in the query and
-    returns curated real authoritative sources (Port Authority, NWS,
-    CDOT, Caltrans, NDOT, MTA, BART). Falls back to deeper-linked generic
-    sources when no specific zone matches.
+    Zone-aware: looks for a known dead zone (direct match or alias —
+    route name, alternate landmark) in the query and returns curated
+    real authoritative sources (Port Authority, NWS, CDOT, Caltrans,
+    NDOT, MTA, BART). Falls back to deeper-linked generic sources when
+    no specific zone matches.
     """
     q = query.lower()
     topic = _classify_topic(q)
+    zone  = _resolve_zone(q)
 
-    # Try to match a known zone.
-    for zone_key, by_topic in _ZONE_SOURCES.items():
-        if zone_key in q and topic in by_topic:
-            entry = by_topic[topic]
-            return {"query": query, "summary": entry["summary"], "sources": list(entry["sources"])}
+    if zone and topic in _ZONE_SOURCES[zone]:
+        entry = _ZONE_SOURCES[zone][topic]
+        return {"query": query, "summary": entry["summary"], "sources": list(entry["sources"])}
 
-    # Fall back to the default-but-still-real entry for this topic.
+    # Fallback path B: if zone matched but THIS topic wasn't curated for
+    # that zone, still mention the zone in the default summary so the
+    # user sees specificity.
     default = _DEFAULT_BY_TOPIC.get(topic, _DEFAULT_BY_TOPIC["news"])
-    return {"query": query, "summary": default["summary"], "sources": list(default["sources"])}
+    summary = default["summary"]
+    if zone:
+        summary = f"For the {zone} area: {summary}"
+    return {"query": query, "summary": summary, "sources": list(default["sources"])}
 
 
 @tool(name="nimble_search")
