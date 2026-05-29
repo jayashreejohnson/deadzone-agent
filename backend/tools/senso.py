@@ -1,8 +1,19 @@
-"""Senso publish wrapper. Falls back to a self-hosted static HTML file so demo always returns a URL."""
+"""Senso publish wrapper. Falls back to a self-hosted static HTML file so demo always returns a URL.
+
+A finished pack contains:
+  1. A curated, offline-readable SUMMARY for each section (the gist —
+     mile markers, phone numbers, procedures).
+  2. CACHED SNAPSHOTS of each source URL, fetched at build time and
+     embedded inline so the user can actually READ the underlying
+     page when there's no signal. This is the whole DeadZone value
+     prop: the pack IS the offline copy, not a link to it.
+"""
 from __future__ import annotations
 import os
+import re
 import uuid
 import html
+import asyncio
 import httpx
 from bus import emit
 from ddtrace.llmobs import LLMObs
@@ -13,6 +24,20 @@ _API_KEY = os.getenv("SENSO_API_KEY", "").strip()
 _PUBLIC_BASE = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
 _PACKS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "packs")
 os.makedirs(_PACKS_DIR, exist_ok=True)
+
+# Snapshot fetcher knobs.
+_SNAPSHOT_TIMEOUT = float(os.getenv("PACK_SNAPSHOT_TIMEOUT_SEC", "6"))
+_SNAPSHOT_MAX_CHARS = int(os.getenv("PACK_SNAPSHOT_MAX_CHARS", "6000"))
+_SNAPSHOT_UA = (
+    "Mozilla/5.0 (compatible; DeadZonePackBuilder/1.0; "
+    "+https://deadzone.example/about)"
+)
+
+# Phone-number pattern for auto-linking. Matches US-style (XXX) XXX-XXXX
+# and XXX-XXX-XXXX, plus *NHP / 911 short codes.
+_PHONE_RE = re.compile(
+    r"\b(?:\(\d{3}\)\s*\d{3}-\d{4}|\d{3}-\d{3}-\d{4}|\*\d{2,4})\b"
+)
 
 
 def _section_icon(heading: str) -> str:
@@ -34,13 +59,28 @@ def _section_icon(heading: str) -> str:
     return "📋"
 
 
+def _linkify_phones(escaped_text: str) -> str:
+    """Wrap phone-number-like substrings in tel: links so they're tappable.
+
+    Operates on already-html-escaped text. Phones work even when offline
+    (cellular voice doesn't need data), so this makes the pack actionable
+    inside a dead zone.
+    """
+    def repl(m: re.Match) -> str:
+        raw = m.group(0)
+        # tel: needs digits only (preserve a leading * for short codes)
+        digits = re.sub(r"[^\d*]", "", raw)
+        return f'<a class="tel" href="tel:{digits}">{raw}</a>'
+    return _PHONE_RE.sub(repl, escaped_text)
+
+
 def _render_summary(summary: str) -> str:
     """Convert a plain-text summary to readable HTML.
 
     Preserves paragraph breaks (blank lines), bullet markers (lines
     starting with "• ", "- ", "* "), and bolded headings (all-caps
     or terminated with a colon) that appear at the start of paragraphs.
-    Everything else gets html.escape so we don't inject anything weird.
+    Auto-links phone numbers as tel: links.
     """
     if not summary:
         return ""
@@ -56,66 +96,212 @@ def _render_summary(summary: str) -> str:
                 stripped = l.lstrip()
                 if not stripped:
                     continue
-                # Drop the bullet marker
                 for marker in ("• ", "- ", "* "):
                     if stripped.startswith(marker):
                         stripped = stripped[len(marker):]
                         break
-                items.append(f"<li>{html.escape(stripped)}</li>")
+                items.append(f"<li>{_linkify_phones(html.escape(stripped))}</li>")
             out_parts.append(f'<ul class="sec-ul">{"".join(items)}</ul>')
             continue
         # Mixed paragraph: render with <br> for line breaks, and emphasize
         # a leading ALL-CAPS / "Heading:" line as a strong tag.
         rendered_lines = []
         for i, l in enumerate(lines):
-            esc = html.escape(l)
+            esc = _linkify_phones(html.escape(l))
             if i == 0 and (l.isupper() or l.endswith(":")):
                 esc = f"<strong>{esc}</strong>"
             elif l.lstrip().startswith(("• ", "- ", "* ")):
-                # Mid-paragraph bullet — treat as its own line
                 content = l.lstrip()[2:]
-                esc = f"&nbsp;&nbsp;&bull;&nbsp;{html.escape(content)}"
+                esc = f"&nbsp;&nbsp;&bull;&nbsp;{_linkify_phones(html.escape(content))}"
             rendered_lines.append(esc)
         out_parts.append("<p>" + "<br>".join(rendered_lines) + "</p>")
     return "".join(out_parts)
 
 
-def _render_html(title: str, route_id: str, sections: list[dict]) -> str:
+# ── Cached webpage snapshots ─────────────────────────────────────
+
+# Tags allowed inside an embedded cached snapshot. Everything else is
+# stripped to keep the pack lightweight, safe, and visually consistent.
+_ALLOWED_TAGS = {
+    "p", "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li", "blockquote",
+    "strong", "em", "b", "i", "u", "a", "br", "hr",
+    "table", "thead", "tbody", "tr", "td", "th",
+    "figure", "figcaption",
+}
+# Tags to wholesale drop along with their contents.
+_DROP_TAGS = {
+    "script", "style", "iframe", "noscript", "form", "input", "button",
+    "select", "textarea", "nav", "header", "footer", "aside",
+    "svg", "canvas", "video", "audio", "object", "embed", "link", "meta",
+}
+
+
+def _extract_main_content(html_text: str) -> str:
+    """Best-effort 'reader mode' extraction.
+
+    Strategy:
+      1. Parse the HTML with BeautifulSoup.
+      2. Drop all _DROP_TAGS (script/style/nav/footer/ads/etc).
+      3. Pick the densest <article>/<main>/<div> block by text length.
+      4. Whitelist a small set of tags; strip everything else but keep text.
+      5. Truncate to _SNAPSHOT_MAX_CHARS so packs stay small.
+
+    Returns sanitized HTML (a fragment, no <html>/<body>).
+    """
+    try:
+        from bs4 import BeautifulSoup, NavigableString
+    except Exception:
+        return ""
+    try:
+        soup = BeautifulSoup(html_text, "html.parser")
+    except Exception:
+        return ""
+    # Drop unwanted tags entirely.
+    for t in soup(list(_DROP_TAGS)):
+        t.decompose()
+    # Pick the best content container.
+    candidates = soup.find_all(["article", "main"])
+    if not candidates:
+        candidates = soup.find_all("div")
+    if not candidates:
+        candidates = [soup.body or soup]
+    best = max(candidates, key=lambda el: len(el.get_text(strip=True)) if el else 0)
+
+    # Walk and emit only whitelisted tags.
+    def emit(el) -> str:
+        if isinstance(el, NavigableString):
+            return html.escape(str(el))
+        name = (el.name or "").lower()
+        inner = "".join(emit(c) for c in el.children)
+        if name == "a":
+            href = el.get("href") or ""
+            if href.startswith("http"):
+                return f'<a href="{html.escape(href)}" target="_blank" rel="noopener">{inner}</a>'
+            return inner
+        if name in _ALLOWED_TAGS:
+            return f"<{name}>{inner}</{name}>"
+        return inner
+
+    out = emit(best).strip()
+    if len(out) > _SNAPSHOT_MAX_CHARS:
+        out = out[:_SNAPSHOT_MAX_CHARS] + "<p><em>… (truncated for pack size)</em></p>"
+    return out
+
+
+async def _fetch_snapshot(url: str) -> tuple[str | None, str | None]:
+    """Fetch a URL and return (sanitized_inner_html, fetched_title) or (None, None)."""
+    if not url or not url.startswith("http"):
+        return None, None
+    try:
+        async with httpx.AsyncClient(
+            timeout=_SNAPSHOT_TIMEOUT,
+            follow_redirects=True,
+            headers={"User-Agent": _SNAPSHOT_UA, "Accept": "text/html,*/*;q=0.5"},
+        ) as client:
+            r = await client.get(url)
+            if r.status_code >= 400 or "html" not in (r.headers.get("content-type") or ""):
+                return None, None
+            text = r.text
+    except Exception:
+        return None, None
+
+    # Pull <title> for fallback display.
+    title = None
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(text, "html.parser")
+        if soup.title and soup.title.string:
+            title = soup.title.string.strip()[:140]
+    except Exception:
+        pass
+
+    sanitized = _extract_main_content(text)
+    return (sanitized or None), title
+
+
+async def _fetch_all_snapshots(sources: list[dict]) -> dict[str, dict]:
+    """Fetch snapshots for all source URLs in parallel.
+    Returns {url: {"html": "...", "title": "..."}} for each that succeeded.
+    """
+    urls = [s.get("url", "") for s in sources if s.get("url", "").startswith("http")]
+    if not urls:
+        return {}
+    results = await asyncio.gather(*(_fetch_snapshot(u) for u in urls), return_exceptions=False)
+    out: dict[str, dict] = {}
+    for url, (snippet_html, title) in zip(urls, results):
+        if snippet_html:
+            out[url] = {"html": snippet_html, "title": title}
+    return out
+
+
+def _render_html(title: str, route_id: str, sections: list[dict], snapshots: dict[str, dict] | None = None) -> str:
     from datetime import datetime, timezone
+    snapshots = snapshots or {}
     ts = datetime.now(timezone.utc).strftime("%b %d, %Y at %H:%M UTC")
     total_sources = sum(len(s.get("sources") or []) for s in sections)
+    total_cached  = sum(
+        1 for s in sections for src in (s.get("sources") or [])
+        if snapshots.get(src.get("url", ""))
+    )
 
     sections_html_parts = []
-    for s in sections:
+    for sec_idx, s in enumerate(sections):
         heading = s.get("heading", "Section")
         summary = s.get("summary", "")
         srcs = s.get("sources") or []
         icon = _section_icon(heading)
 
         sources_inner = ""
-        for src in srcs:
+        for src_idx, src in enumerate(srcs):
             url       = src.get("url", "")
             reachable = src.get("reachable", True)
             t         = html.escape(src.get("title") or url or "Source")
             snip      = html.escape(src.get("snippet", ""))
+            snap      = snapshots.get(url)  # cached page content if we got one
+            row_id    = f"s{sec_idx}-{src_idx}"
+
+            # If we have a cached snapshot, show it inline (accordion).
+            snap_html = ""
+            if snap:
+                snap_title = html.escape(snap.get("title") or src.get("title") or "Cached page")
+                inner_html = snap.get("html", "")
+                snap_html = (
+                    f'<details class="snap"><summary class="snap-toggle">'
+                    f'<span class="snap-icon">📄</span>'
+                    f'<span class="snap-lbl">Read cached page</span>'
+                    f'<span class="snap-meta">{snap_title}</span>'
+                    f'<span class="snap-chev">▾</span>'
+                    f'</summary>'
+                    f'<div class="snap-body">{inner_html}</div>'
+                    f'</details>'
+                )
+
             snip_html = f'<div class="src-snip">{snip}</div>' if snip else ""
+            badge = ' <span class="src-cached">cached</span>' if snap else ''
             if url and reachable:
                 sources_inner += (
-                    f'<a href="{html.escape(url)}" target="_blank" class="src-row">'
+                    f'<div class="src-block">'
+                    f'<a href="{html.escape(url)}" target="_blank" rel="noopener" class="src-row">'
                     f'<span class="src-dot"></span>'
-                    f'<span class="src-body"><span class="src-title">{t}</span>{snip_html}</span>'
+                    f'<span class="src-body"><span class="src-title">{t}{badge}</span>{snip_html}</span>'
                     f'<span class="src-arrow">&#8599;</span></a>'
+                    f'{snap_html}'
+                    f'</div>'
                 )
             else:
                 sources_inner += (
+                    f'<div class="src-block">'
                     f'<div class="src-row src-dead">'
                     f'<span class="src-dot dead"></span>'
                     f'<span class="src-body"><span class="src-title dead">{t}</span>{snip_html}</span>'
                     f'</div>'
+                    f'{snap_html}'
+                    f'</div>'
                 )
 
         sources_block = (
-            f'<div class="src-lbl">When back online</div>'
+            f'<div class="src-lbl">Sources — readable offline when cached</div>'
             f'<div class="sources">{sources_inner}</div>'
         ) if srcs else ""
         # Preserve newlines and basic bullet formatting from the summary.
@@ -168,22 +354,67 @@ a{{color:inherit;text-decoration:none}}
 .sec-head{{display:flex;align-items:center;gap:.45rem;font-size:.62rem;font-weight:600;
            text-transform:uppercase;letter-spacing:.18em;color:#00d4ff;margin-bottom:.6rem}}
 .sec-icon{{font-size:.95rem;line-height:1}}
-.sec-summary{{font-size:.855rem;color:#cbd5e1;line-height:1.65;margin-bottom:.55rem}}
-.sec-summary p{{margin-bottom:.55rem}}
+.sec-summary{{font-size:.86rem;color:#cbd5e1;line-height:1.65;margin-bottom:.55rem}}
+.sec-summary p{{margin-bottom:.6rem}}
 .sec-summary p:last-child{{margin-bottom:0}}
-.sec-summary strong{{color:#e2e8f0;font-weight:600;display:block;
-                     font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;
-                     color:#7dd3fc;margin-bottom:.3rem}}
-.sec-summary ul.sec-ul{{list-style:none;padding-left:0;margin:.3rem 0 .55rem 0}}
-.sec-summary ul.sec-ul li{{padding-left:1rem;position:relative;margin-bottom:.28rem;color:#94a3b8}}
-.sec-summary ul.sec-ul li::before{{content:"•";position:absolute;left:.25rem;
-                                    color:#00d4ff;font-weight:700}}
+.sec-summary strong{{display:block;
+                     font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;
+                     color:#7dd3fc;font-weight:700;margin-bottom:.45rem;
+                     padding-bottom:.4rem;border-bottom:1px solid rgba(125,211,252,.12)}}
+.sec-summary ul.sec-ul{{list-style:none;padding-left:0;margin:.3rem 0 .6rem 0}}
+.sec-summary ul.sec-ul li{{padding-left:1.1rem;position:relative;margin-bottom:.32rem;color:#cbd5e1}}
+.sec-summary ul.sec-ul li::before{{content:"";position:absolute;left:.15rem;top:.55rem;
+                                    width:5px;height:5px;border-radius:50%;
+                                    background:#00d4ff;box-shadow:0 0 6px rgba(0,212,255,.5)}}
+
+/* tel: links — call-from-deadzone affordance */
+.sec-summary a.tel{{color:#6ee7b7;font-weight:600;text-decoration:none;
+                    border-bottom:1px dotted rgba(110,231,183,.4);
+                    padding:0 1px}}
+.sec-summary a.tel:hover{{color:#a7f3d0;border-bottom-style:solid}}
+.sec-summary a.tel::before{{content:"☎ ";font-size:.85em;opacity:.7}}
 
 .src-lbl{{font-size:.55rem;text-transform:uppercase;letter-spacing:.16em;
-          color:#475569;margin:.95rem 0 .35rem 0;font-weight:600;
+          color:#475569;margin:1rem 0 .4rem 0;font-weight:600;
           padding-top:.55rem;border-top:1px dashed rgba(255,255,255,.05)}}
 
-.sources{{display:flex;flex-direction:column;gap:.3rem;margin-top:.1rem}}
+.sources{{display:flex;flex-direction:column;gap:.5rem;margin-top:.1rem}}
+.src-block{{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);
+            border-radius:8px;overflow:hidden}}
+.src-block .src-row{{background:transparent;border:none;border-radius:0}}
+.src-block .src-row:hover{{background:rgba(0,212,255,.05)}}
+
+.src-cached{{display:inline-block;font-size:.55rem;font-weight:700;
+             text-transform:uppercase;letter-spacing:.1em;
+             background:rgba(16,185,129,.12);color:#6ee7b7;
+             border:1px solid rgba(16,185,129,.25);
+             padding:1px 6px;border-radius:999px;margin-left:.4rem;
+             vertical-align:middle}}
+
+/* Cached snapshot accordion */
+.snap{{border-top:1px solid rgba(255,255,255,.05);background:rgba(0,212,255,.02)}}
+.snap-toggle{{display:flex;align-items:center;gap:.5rem;padding:.55rem .65rem;
+              font-size:.7rem;color:#7dd3fc;cursor:pointer;list-style:none;
+              user-select:none;font-weight:500}}
+.snap-toggle::-webkit-details-marker{{display:none}}
+.snap-icon{{font-size:.85rem}}
+.snap-lbl{{text-transform:uppercase;letter-spacing:.1em;font-size:.6rem;
+           font-weight:700;color:#7dd3fc;flex-shrink:0}}
+.snap-meta{{flex:1;min-width:0;color:#64748b;font-size:.65rem;font-weight:400;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.snap-chev{{color:#475569;transition:transform .15s;flex-shrink:0}}
+details[open] .snap-chev{{transform:rotate(180deg)}}
+.snap-body{{padding:.7rem 1rem 1rem 1rem;font-size:.78rem;line-height:1.55;
+            color:#cbd5e1;background:rgba(5,8,16,.6);
+            max-height:60vh;overflow-y:auto}}
+.snap-body h1,.snap-body h2{{font-size:.95rem;color:#e2e8f0;margin:.6rem 0 .35rem}}
+.snap-body h3,.snap-body h4{{font-size:.85rem;color:#e2e8f0;margin:.5rem 0 .25rem}}
+.snap-body p{{margin-bottom:.5rem}}
+.snap-body ul,.snap-body ol{{padding-left:1.2rem;margin-bottom:.5rem}}
+.snap-body li{{margin-bottom:.25rem}}
+.snap-body a{{color:#7dd3fc;text-decoration:underline}}
+.snap-body table{{font-size:.72rem;border-collapse:collapse;margin:.5rem 0}}
+.snap-body th,.snap-body td{{padding:.3rem .5rem;border:1px solid rgba(255,255,255,.08)}}
 .src-row{{display:flex;align-items:flex-start;gap:.55rem;padding:.5rem .65rem;
           border-radius:8px;background:rgba(255,255,255,.02);
           border:1px solid rgba(255,255,255,.05);transition:border-color .15s,background .15s}}
@@ -215,7 +446,7 @@ a.src-row:hover{{border-color:rgba(0,212,255,.28);background:rgba(0,212,255,.05)
   <span class="logo">📡&nbsp;DeadZone</span>
   <div class="hdr-body">
     <div class="hdr-title">{html.escape(title)}</div>
-    <div class="hdr-meta">Generated {ts} &middot; Content reads offline &middot; Links require signal</div>
+    <div class="hdr-meta">Generated {ts} &middot; {total_cached} of {total_sources} sources cached for offline reading</div>
   </div>
   <span class="badge">&#10003; offline ready</span>
 </div>
@@ -262,10 +493,22 @@ async def publish(title: str, route_id: str, sections: list[dict]) -> str:
             await emit({"type": "log", "level": "warn",
                         "msg": f"senso failed ({e!s}); using local static fallback"})
             backend = "static_fallback_after_error"
+    # Fetch cached snapshots in parallel for every source URL.
+    # This is what makes the pack actually usable offline — the source
+    # content is baked into the HTML, not just linked.
+    all_sources: list[dict] = []
+    for s in sections:
+        all_sources.extend(s.get("sources") or [])
+    snapshots = await _fetch_all_snapshots(all_sources) if all_sources else {}
+    cached_n = len(snapshots)
+    total_n  = sum(1 for s in all_sources if s.get("url", "").startswith("http"))
+    await emit({"type": "log", "level": "info",
+                "msg": f"Cached {cached_n}/{total_n} source pages into pack"})
+
     fname = f"{uuid.uuid4().hex[:10]}.html"
     fpath = os.path.join(_PACKS_DIR, fname)
     with open(fpath, "w", encoding="utf-8") as f:
-        f.write(_render_html(title, route_id, sections))
+        f.write(_render_html(title, route_id, sections, snapshots))
     url = f"{_PUBLIC_BASE}/static/packs/{fname}"
     try:
         LLMObs.annotate(
