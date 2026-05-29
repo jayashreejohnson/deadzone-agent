@@ -22,8 +22,9 @@ _GROQ_MODEL     = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
 _CEREBRAS_KEY   = os.getenv("CEREBRAS_API_KEY", "").strip()
 _CEREBRAS_MODEL = os.getenv("CEREBRAS_MODEL", "llama-3.3-70b").strip()
 
-# Short per-request timeout so a dead provider doesn't burn 30s.
-_LLM_TIMEOUT_SEC = float(os.getenv("LLM_TIMEOUT_SEC", "8"))
+# Short per-request timeout so a dead/queued provider can't drag the
+# nimble stub. Matches orchestrator's 5s default.
+_LLM_TIMEOUT_SEC = float(os.getenv("LLM_TIMEOUT_SEC", "5"))
 
 # Pick provider — OpenRouter primary, Groq fallback, Cerebras final.
 if _OPENROUTER_KEY:
@@ -175,7 +176,7 @@ async def _call_llm_with_fallback(query: str):
 
     if _OPENROUTER_KEY and not llm_circuit.is_open("openrouter"):
         try:
-            c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=_LLM_TIMEOUT_SEC)
+            c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=_LLM_TIMEOUT_SEC, max_retries=0)
             r = await c.chat.completions.create(
                 model=_OPENROUTER_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
             )
@@ -190,7 +191,7 @@ async def _call_llm_with_fallback(query: str):
 
     if _GROQ_KEY and not llm_circuit.is_open("groq"):
         try:
-            c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC)
+            c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC, max_retries=0)
             r = await c.chat.completions.create(
                 model=_GROQ_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
             )
@@ -205,7 +206,7 @@ async def _call_llm_with_fallback(query: str):
 
     if _CEREBRAS_KEY and not llm_circuit.is_open("cerebras"):
         try:
-            c = AsyncOpenAI(api_key=_CEREBRAS_KEY, base_url="https://api.cerebras.ai/v1", timeout=_LLM_TIMEOUT_SEC)
+            c = AsyncOpenAI(api_key=_CEREBRAS_KEY, base_url="https://api.cerebras.ai/v1", timeout=_LLM_TIMEOUT_SEC, max_retries=0)
             r = await c.chat.completions.create(
                 model=_CEREBRAS_MODEL, messages=messages, temperature=0.3, max_tokens=1024,
             )

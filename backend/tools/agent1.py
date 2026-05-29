@@ -35,7 +35,7 @@ _GOOGLE_MAPS_KEY   = os.getenv("GOOGLE_MAPS_API_KEY", "").strip()
 
 # Per-provider HTTP timeout. Short on purpose so a dead provider doesn't
 # hold up the next provider in the chain.
-_LLM_TIMEOUT_SEC   = float(os.getenv("LLM_TIMEOUT_SEC", "8"))
+_LLM_TIMEOUT_SEC   = float(os.getenv("LLM_TIMEOUT_SEC", "5"))
 
 _COVERAGEMAP_URL   = "https://enterprise.coveragemap.com/api/v1/signal-strength/lookup"
 _GMAPS_URL         = "https://maps.googleapis.com/maps/api/directions/json"
@@ -210,7 +210,7 @@ def _extract_json(raw: str) -> dict:
 async def _call_llm(provider: str, base_url: str, api_key: str, model: str, route: str, departure_time: str) -> dict:
     """Single attempt against one provider. Raises on any failure."""
     from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=_LLM_TIMEOUT_SEC)
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=_LLM_TIMEOUT_SEC, max_retries=0)
     prompt = _LLM_PROMPT.format(route=route, departure_time=departure_time)
 
     resp = await client.chat.completions.create(
