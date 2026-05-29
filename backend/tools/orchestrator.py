@@ -611,24 +611,36 @@ STEP 5 — MANDATORY: call deliver_pack(url=<published url>, cached=false, pack_
 Parallel calls are cheap. Sequential calls cost a full round-trip — minimize them. No commentary between tool calls."""
 
 
-# Per-provider system prompt variants. Different models have different
-# strengths and quirks; tailor the wrapper around the shared core.
+# Step-specific system prompts. Iter 0 uses the full _PROMPT_CORE so the
+# LLM can plan the workflow; subsequent forced steps use TINY focused
+# prompts so we don't burn through Groq's 6000 TPM limit in 10 seconds.
+_PROMPT_PUBLISH = (
+    "Construct a senso_publish call. "
+    "Args: title (string), route_id (string), sections (array of objects). "
+    "Each section is {heading: string, summary: 2-3 sentence string, sources: array of {url,title,snippet}}. "
+    "Sections are OBJECTS, never strings or markdown."
+)
+_PROMPT_SAVE = (
+    "Construct a clickhouse_save_pack call. "
+    "Args: route_id, deadzone_id, url, owner_user_id, source_count (integer)."
+)
+_PROMPT_DELIVER = (
+    "Construct a deliver_pack call. "
+    "Args: url (string), cached (boolean), pack_id (string)."
+)
+
+
+# Per-provider system prompt variants for the INITIAL planning step.
 def _system_prompt_for(provider: str) -> str:
     if provider == "groq":
-        # Llama 3.3 70B follows numbered imperatives well but can be sloppy
-        # with required JSON fields. Drill the schema and the "must call
-        # every step" rule extra hard.
+        # Llama 3.3 70B follows numbered imperatives but is sloppy with
+        # required JSON fields. Drill schema discipline.
         return (
             "You are a precise tool-calling agent. Follow every numbered step. "
-            "Skipping a step means the user gets nothing — that's a critical failure. "
+            "Skipping a step means the user gets nothing. "
             "Always include every required argument. JSON shape matters.\n\n"
             + _PROMPT_CORE
         )
-    if provider == "cerebras":
-        # gpt-oss-120b / zai-glm-4.7 on Cerebras. Smaller prompts get faster
-        # responses on their hardware. Strip the "you are" framing.
-        return _PROMPT_CORE
-    # OpenRouter / Gemini: handles natural language well, takes the core as-is.
     return _PROMPT_CORE
 
 
@@ -747,103 +759,189 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
     except Exception:
         pass
 
-    messages: list[dict] = [
+    # Iter 0 (planning): full conversation. The LLM picks cache_find +
+    # which nimble_searches to fire, then we collect the results.
+    plan_messages: list[dict] = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content":
             f"Signal received:\n{json.dumps(signal, indent=2)}\n\nExecute the workflow now."},
     ]
 
-    # State-machine forcing — see commit history for design notes.
-    # The loop is wrapped in a try/except so that a mid-flow LLM failure
-    # (provider 400, all breakers open, etc.) doesn't dump us back to a
-    # cold _run_scripted. Instead we finalize from whatever the LLM
-    # already produced (search results in the messages stream), so the
-    # LLM's actual contribution is preserved.
+    # Search results gathered from iter 0 — used as focused context for
+    # subsequent forced steps so we don't blow Groq's 6000 TPM budget
+    # by dragging the rolling conversation forward.
+    search_results: list[dict] = []
+    cached_hit: dict | None = None
+
     llm_loop_failed = False
     try:
-        for _iter in range(6):
-            searched     = "nimble_search" in ctx.tools_called
-            has_pack_url = bool(ctx.pack_url)
-            has_pack_id  = bool(ctx.pack_id)
-            delivered    = ctx.delivered
+        # ── ITER 0: planning (LLM-driven, all tools available) ─────────
+        resp, _provider = await _call_llm_with_fallback(
+            plan_messages, tools=TOOLS, tool_choice="auto",
+        )
+        plan_msg = resp.choices[0].message
+        plan_messages.append(plan_msg.model_dump(exclude_none=True))
+        plan_calls = plan_msg.tool_calls or []
 
-            def _only(name: str) -> tuple[list[dict], object]:
-                return (
-                    [t for t in TOOLS if t["function"]["name"] == name],
-                    {"type": "function", "function": {"name": name}},
-                )
-
-            if has_pack_id and not delivered:
-                call_tools, tool_choice = _only("deliver_pack")
-            elif has_pack_url and not has_pack_id:
-                call_tools, tool_choice = _only("clickhouse_save_pack")
-            elif searched and not has_pack_url:
-                call_tools, tool_choice = _only("senso_publish")
-            else:
-                call_tools, tool_choice = TOOLS, "auto"
-
-            resp, _provider = await _call_llm_with_fallback(
-                messages, tools=call_tools, tool_choice=tool_choice,
-            )
-            msg = resp.choices[0].message
-            messages.append(msg.model_dump(exclude_none=True))
-
-            tool_calls = msg.tool_calls or []
-            if not tool_calls:
-                break
-
-            async def _exec(tc):
-                try:
-                    args = json.loads(tc.function.arguments or "{}")
-                except Exception:
-                    args = {}
-                result = await _timed_dispatch(tc.function.name, args, ctx)
-                if "error" in result:
-                    warn_ev = {
-                        "type": "log", "level": "warn",
-                        "msg":  f"tool {tc.function.name}: {result['error']}",
-                        "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
-                    }
-                    await emit(warn_ev)
-                    db.append_trace_event(ctx.trace_id, warn_ev)
-                return tc.id, tc.function.name, result
-
-            results = await asyncio.gather(*[_exec(tc) for tc in tool_calls], return_exceptions=False)
-            for tc_id, name, result in results:
-                messages.append({
-                    "role": "tool", "tool_call_id": tc_id,
-                    "name": name, "content": json.dumps(result, default=str),
-                })
-
-            if ctx.delivered:
-                zone_desc  = ctx.signal.get("zone_description") or ctx.signal.get("route", "your route")
-                cached_str = "cached pack reused" if ctx.cached else "fresh pack assembled"
-                final_ev = {
-                    "type": "log", "level": "info",
-                    "msg":  f"Delivering {cached_str} for {zone_desc}",
+        async def _exec(tc):
+            try:
+                args = json.loads(tc.function.arguments or "{}")
+            except Exception:
+                args = {}
+            result = await _timed_dispatch(tc.function.name, args, ctx)
+            if "error" in result:
+                warn_ev = {
+                    "type": "log", "level": "warn",
+                    "msg":  f"tool {tc.function.name}: {result['error']}",
                     "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
                 }
-                await emit(final_ev)
-                db.append_trace_event(ctx.trace_id, final_ev)
-                break
+                await emit(warn_ev)
+                db.append_trace_event(ctx.trace_id, warn_ev)
+            return tc.id, tc.function.name, result, args
+
+        results = await asyncio.gather(*[_exec(tc) for tc in plan_calls])
+
+        # Capture search results and cache hit from iter 0.
+        for tc_id, name, result, args in results:
+            if name == "nimble_search":
+                search_results.append({
+                    "topic":   args.get("topic") or result.get("topic", "info"),
+                    "summary": (result.get("summary") or "")[:400],
+                    "sources": (result.get("sources") or [])[:3],
+                })
+            elif name == "clickhouse_find_recent_pack" and result.get("found"):
+                cached_hit = result.get("pack")
+
+        # ── CACHE HIT path: pay + log + deliver via focused LLM calls. ──
+        if cached_hit and not ctx.delivered:
+            ctx.pack_id = cached_hit["pack_id"]
+            await _step_payment_for_cached(cached_hit, signal, ctx)
+            await _step_log_bought(cached_hit, signal, ctx)
+            await _step_deliver(cached_hit["url"], True, cached_hit["pack_id"], ctx)
+
+        # ── CACHE MISS path: publish → save → deliver, each its own LLM call.
+        elif search_results and not ctx.delivered:
+            if not ctx.pack_url:
+                await _step_publish(signal, search_results, ctx)
+            if ctx.pack_url and not ctx.pack_id:
+                await _step_save(signal, search_results, ctx)
+            if ctx.pack_id and not ctx.delivered:
+                await _step_deliver(ctx.pack_url, False, ctx.pack_id, ctx)
+
+        # Success log
+        if ctx.delivered:
+            zone_desc  = ctx.signal.get("zone_description") or ctx.signal.get("route", "your route")
+            cached_str = "cached pack reused" if ctx.cached else "fresh pack assembled"
+            final_ev = {
+                "type": "log", "level": "info",
+                "msg":  f"Delivering {cached_str} for {zone_desc}",
+                "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
+            }
+            await emit(final_ev)
+            db.append_trace_event(ctx.trace_id, final_ev)
+
     except Exception as e:
         llm_loop_failed = True
         warn_ev = {
             "type": "log", "level": "warn",
-            "msg":  f"LLM loop failed mid-flow ({type(e).__name__}); completing pack from accumulated state",
+            "msg":  f"LLM loop failed mid-flow ({type(e).__name__}: {str(e)[:120]}); finalizing from collected state",
             "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
         }
         await emit(warn_ev)
         db.append_trace_event(ctx.trace_id, warn_ev)
 
-    # Finalize: walk forward through any missing steps using the work the
-    # LLM already did (search results in `messages`). This preserves the
-    # LLM's content decisions instead of throwing them away and starting
-    # over with the scripted flow.
+    # Last-resort finalizer: only fires if the agentic chain bailed before
+    # delivery. Uses the search results the LLM produced; falls fully to
+    # _run_scripted only when nothing useful is available.
     if not ctx.delivered:
-        await _finalize_from_messages(signal, ctx, messages, llm_loop_failed)
+        await _finalize_from_messages(signal, ctx, plan_messages, llm_loop_failed)
 
     await _eval_pack(ctx)
+
+
+# ---------- Per-step focused LLM calls ----------
+
+async def _focused_call(provider_msg_user: str, tool_name: str, ctx: _Ctx) -> dict:
+    """One LLM round-trip with a tiny prompt and a single allowed tool.
+    Used by the publish / save / deliver steps so each only consumes a few
+    hundred tokens — keeps Groq/Cerebras free-tier limits happy."""
+    sys_prompt_map = {
+        "senso_publish":          _PROMPT_PUBLISH,
+        "clickhouse_save_pack":   _PROMPT_SAVE,
+        "deliver_pack":           _PROMPT_DELIVER,
+        "payments_pay":           "Construct a payments_pay call. Args: from_agent, to_agent, amount_usd (number), memo (string).",
+        "clickhouse_log_event":   "Construct a clickhouse_log_event call. Args: user_id, route_id, deadzone_id, action, pack_id, build_ms (integer).",
+    }
+    sys_prompt = sys_prompt_map.get(tool_name, f"Call {tool_name}.")
+    only_tools = [t for t in TOOLS if t["function"]["name"] == tool_name]
+
+    messages = [
+        {"role": "system", "content": sys_prompt},
+        {"role": "user",   "content": provider_msg_user},
+    ]
+    resp, _provider = await _call_llm_with_fallback(
+        messages, tools=only_tools,
+        tool_choice={"type": "function", "function": {"name": tool_name}},
+    )
+    tc_list = resp.choices[0].message.tool_calls or []
+    if not tc_list:
+        raise RuntimeError(f"LLM did not produce a {tool_name} call")
+    args = json.loads(tc_list[0].function.arguments or "{}")
+    return await _timed_dispatch(tool_name, args, ctx)
+
+
+async def _step_publish(signal: dict, search_results: list[dict], ctx: _Ctx) -> None:
+    zone_desc = signal.get("zone_description") or signal.get("route", "route")
+    user_msg = (
+        f"Build the pack for the {zone_desc} dead zone on route {signal.get('route')}.\n"
+        f"title: \"Offline pack: {zone_desc}\"\n"
+        f"route_id: {signal['route_id']}\n"
+        f"Search results to turn into sections (one section per result, heading = capitalized topic):\n"
+        + json.dumps(search_results, default=str)
+    )
+    await _focused_call(user_msg, "senso_publish", ctx)
+
+
+async def _step_save(signal: dict, search_results: list[dict], ctx: _Ctx) -> None:
+    source_count = sum(len(r.get("sources") or []) for r in search_results)
+    user_msg = (
+        f"Save the pack.\n"
+        f"route_id: {signal['route_id']}\n"
+        f"deadzone_id: {signal['deadzone_id']}\n"
+        f"url: {ctx.pack_url}\n"
+        f"owner_user_id: {signal['user_id']}\n"
+        f"source_count: {source_count}"
+    )
+    await _focused_call(user_msg, "clickhouse_save_pack", ctx)
+
+
+async def _step_deliver(url: str, cached: bool, pack_id: str, ctx: _Ctx) -> None:
+    user_msg = (
+        f"Deliver the pack to the user.\n"
+        f"url: {url}\ncached: {str(cached).lower()}\npack_id: {pack_id}"
+    )
+    await _focused_call(user_msg, "deliver_pack", ctx)
+
+
+async def _step_payment_for_cached(cached: dict, signal: dict, ctx: _Ctx) -> None:
+    from_agent = "agent_" + signal["user_id"].split("_")[-1]
+    to_agent   = "agent_" + cached.get("owner_user_id", "x").split("_")[-1]
+    user_msg = (
+        f"Pay the cached pack's owner.\n"
+        f"from_agent: {from_agent}\nto_agent: {to_agent}\n"
+        f"amount_usd: {PRICE_USD}\nmemo: buy cached pack"
+    )
+    await _focused_call(user_msg, "payments_pay", ctx)
+
+
+async def _step_log_bought(cached: dict, signal: dict, ctx: _Ctx) -> None:
+    user_msg = (
+        f"Log the purchase.\n"
+        f"user_id: {signal['user_id']}\nroute_id: {signal['route_id']}\n"
+        f"deadzone_id: {signal['deadzone_id']}\naction: bought\n"
+        f"pack_id: {cached['pack_id']}\nbuild_ms: 0"
+    )
+    await _focused_call(user_msg, "clickhouse_log_event", ctx)
 
 
 # ---------- Mid-flow finalizer ----------
