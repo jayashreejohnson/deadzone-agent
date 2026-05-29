@@ -325,6 +325,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://forecast.weather.gov/MapClick.php?lat=40.7614&lon=-74.0085", "title": "NWS, Manhattan Forecast", "snippet": "hourly forecast updated every 60 min."},
                 {"url": "https://www.weather.gov/okx/", "title": "NWS NY/Upton Office", "snippet": "Severe weather alerts for the NYC metro area."},
+                {"url": "https://en.wikipedia.org/wiki/Lincoln_Tunnel", "title": "Lincoln Tunnel, Wikipedia", "snippet": "Background and engineering details for the Manhattan-Weehawken tunnel."},
             ],
         },
         "road": {
@@ -342,6 +343,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://www.panynj.gov/bridges-tunnels/en/lincoln-tunnel.html", "title": "Port Authority, Lincoln Tunnel", "snippet": "live traffic and toll updates."},
                 {"url": "https://511nj.org/", "title": "511 NJ, Live Road Conditions", "snippet": "Statewide NJ traffic and DOT alerts."},
+                {"url": "https://en.wikipedia.org/wiki/Lincoln_Tunnel", "title": "Lincoln Tunnel, Wikipedia", "snippet": "Background and engineering details for the Manhattan-Weehawken tunnel."},
             ],
         },
         "poi": {
@@ -358,6 +360,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://www.njta.com/travel-resources/service-areas/vince-lombardi", "title": "Vince Lombardi Service Area page", "snippet": "Hours, amenities, exact NJTP milepost."},
+                {"url": "https://en.wikipedia.org/wiki/Lincoln_Tunnel", "title": "Lincoln Tunnel, Wikipedia", "snippet": "Background and engineering details for the Manhattan-Weehawken tunnel."},
             ],
         },
         "news": {
@@ -374,6 +377,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://www.nj.com/hudson/", "title": "NJ.com Hudson County", "snippet": "Local Weehawken/Hoboken/JC news."},
                 {"url": "https://www.northjersey.com/news/", "title": "NorthJersey.com", "snippet": "Daily Port Authority coverage."},
+                {"url": "https://en.wikipedia.org/wiki/Lincoln_Tunnel", "title": "Lincoln Tunnel, Wikipedia", "snippet": "Background and engineering details for the Manhattan-Weehawken tunnel."},
             ],
         },
     },
@@ -385,6 +389,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://www.state.nj.us/transportation/commuter/roads/", "title": "NJDOT, Commuter Road Info", "snippet": "Live construction and incident updates for NJ state roads including NJ 21 / McCarter Hwy."},
                 {"url": "https://511nj.org/", "title": "511 NJ", "snippet": "Statewide traffic conditions and incident reports."},
+                {"url": "https://en.wikipedia.org/wiki/Newark,_New_Jersey", "title": "Newark NJ, Wikipedia", "snippet": "City context, transportation hubs, neighborhoods."},
             ],
         },
         "news": {
@@ -392,6 +397,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://www.nj.com/essex/", "title": "NJ.com, Essex County / Newark", "snippet": "Daily coverage of Newark, Essex County and Port Newark."},
                 {"url": "https://www.tapinto.net/towns/newark", "title": "TAPinto Newark", "snippet": "Hyperlocal Newark news and events."},
+                {"url": "https://en.wikipedia.org/wiki/Newark,_New_Jersey", "title": "Newark NJ, Wikipedia", "snippet": "City context, transportation hubs, neighborhoods."},
             ],
         },
     },
@@ -412,6 +418,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://forecast.weather.gov/MapClick.php?lat=39.6805&lon=-105.9111", "title": "NWS Loveland Pass Forecast", "snippet": "11,000 ft elevation zone forecast."},
                 {"url": "https://avalanche.state.co.us/forecasts/backcountry-avalanche/vail-summit-county", "title": "CAIC Vail/Summit Avalanche", "snippet": "Daily backcountry avalanche advisory."},
+                {"url": "https://en.wikipedia.org/wiki/Eisenhower_Tunnel", "title": "Eisenhower-Johnson Memorial Tunnel, Wikipedia", "snippet": "11,158 ft elevation tunnel on I-70 west of Denver."},
             ],
         },
         "road": {
@@ -429,6 +436,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://www.codot.gov/travel/eisenhower-tunnel", "title": "CDOT Eisenhower Tunnel Page", "snippet": "live tunnel status when reconnected."},
                 {"url": "https://cotrip.org/", "title": "COTrip Live I-70 Cameras", "snippet": "CDOT cameras for Eisenhower and Loveland Pass approaches."},
+                {"url": "https://en.wikipedia.org/wiki/Eisenhower_Tunnel", "title": "Eisenhower-Johnson Memorial Tunnel, Wikipedia", "snippet": "11,158 ft elevation tunnel on I-70 west of Denver."},
             ],
         },
         "poi": {
@@ -449,6 +457,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://www.summitcountyco.gov/", "title": "Summit County, CO Services", "snippet": "county services and emergency contacts."},
+                {"url": "https://en.wikipedia.org/wiki/Eisenhower_Tunnel", "title": "Eisenhower-Johnson Memorial Tunnel, Wikipedia", "snippet": "11,158 ft elevation tunnel on I-70 west of Denver."},
             ],
         },
         "news": {
@@ -463,6 +472,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://summitdaily.com/", "title": "Summit Daily News", "snippet": "Local news Frisco/Dillon/Breckenridge."},
                 {"url": "https://denverpost.com/news/transportation/", "title": "Denver Post Transportation", "snippet": "Daily I-70 corridor coverage."},
+                {"url": "https://en.wikipedia.org/wiki/Eisenhower_Tunnel", "title": "Eisenhower-Johnson Memorial Tunnel, Wikipedia", "snippet": "11,158 ft elevation tunnel on I-70 west of Denver."},
             ],
         },
     },
@@ -474,6 +484,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://forecast.weather.gov/MapClick.php?lat=39.5286&lon=-106.2189", "title": "NWS, Vail Pass Forecast", "snippet": "Zone forecast for Vail Pass and the upper I-70 corridor."},
                 {"url": "https://avalanche.state.co.us/", "title": "Colorado Avalanche Information Center", "snippet": "Statewide avalanche forecasts including the Vail Pass zone."},
+                {"url": "https://en.wikipedia.org/wiki/Vail_Pass", "title": "Vail Pass, Wikipedia", "snippet": "10,662 ft pass on I-70 between Vail and Copper Mountain."},
             ],
         },
         "road": {
@@ -481,6 +492,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://cotrip.org/", "title": "COTrip, I-70 Vail Pass Conditions", "snippet": "CDOT cameras and live status for Vail Pass."},
                 {"url": "https://www.codot.gov/travel", "title": "CDOT Travel Center", "snippet": "Statewide closures, chain laws and mountain pass operations."},
+                {"url": "https://en.wikipedia.org/wiki/Vail_Pass", "title": "Vail Pass, Wikipedia", "snippet": "10,662 ft pass on I-70 between Vail and Copper Mountain."},
             ],
         },
     },
@@ -500,6 +512,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://forecast.weather.gov/MapClick.php?lat=34.3061&lon=-117.4742", "title": "NWS Cajon Pass Forecast", "snippet": "hourly wind + visibility forecast."},
+                {"url": "https://en.wikipedia.org/wiki/Cajon_Pass", "title": "Cajon Pass, Wikipedia", "snippet": "I-15 mountain pass connecting LA Basin to High Desert."},
             ],
         },
         "road": {
@@ -517,6 +530,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap I-15", "snippet": "live cameras + incidents."},
+                {"url": "https://en.wikipedia.org/wiki/Cajon_Pass", "title": "Cajon Pass, Wikipedia", "snippet": "I-15 mountain pass connecting LA Basin to High Desert."},
             ],
         },
         "poi": {
@@ -533,7 +547,9 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Barstow (exit 184, ~45 mi north of summit), last full services before deep Mojave\n\n"
                 "Rest areas: NONE on I-15 between Devore and Victorville (use exits)"
             ),
-            "sources": [],
+            "sources": [
+                {"url": "https://en.wikipedia.org/wiki/Cajon_Pass", "title": "Cajon Pass, Wikipedia", "snippet": "I-15 mountain pass connecting LA Basin to High Desert."},
+            ],
         },
     },
 
@@ -551,6 +567,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://forecast.weather.gov/MapClick.php?lat=35.2680&lon=-116.0697", "title": "NWS Baker / Mojave Forecast", "snippet": "desert zone heat advisories."},
+                {"url": "https://en.wikipedia.org/wiki/Mojave_Desert", "title": "Mojave Desert, Wikipedia", "snippet": "Desert region, climate, key landmarks along I-15."},
             ],
         },
         "poi": {
@@ -572,7 +589,9 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• San Bernardino Co Sheriff (Baker substation): (760) 733-4448\n"
                 "• If broken down: stay with vehicle, run AC sparingly, conserve fuel"
             ),
-            "sources": [],
+            "sources": [
+                {"url": "https://en.wikipedia.org/wiki/Mojave_Desert", "title": "Mojave Desert, Wikipedia", "snippet": "Desert region, climate, key landmarks along I-15."},
+            ],
         },
         "road": {
             "summary": (
@@ -585,7 +604,9 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Closures: dust storm and crash both cause multi-hour shutdowns\n"
                 "• Detour: NONE practical, Hwy 95 + Hwy 58 adds 4+ hours"
             ),
-            "sources": [],
+            "sources": [
+                {"url": "https://en.wikipedia.org/wiki/Mojave_Desert", "title": "Mojave Desert, Wikipedia", "snippet": "Desert region, climate, key landmarks along I-15."},
+            ],
         },
     },
 
@@ -602,6 +623,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://forecast.weather.gov/MapClick.php?lat=36.2461&lon=-121.7714", "title": "NWS Big Sur Coastal Forecast", "snippet": "marine and coastal hourly forecast."},
+                {"url": "https://en.wikipedia.org/wiki/Big_Sur", "title": "Big Sur, Wikipedia", "snippet": "Coastal region between Carmel and San Simeon, geography and points of interest."},
             ],
         },
         "road": {
@@ -623,6 +645,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://www.bigsurcalifornia.org/highway1.html", "title": "Big Sur Chamber Hwy 1 Status", "snippet": "Community-maintained closure status."},
                 {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap", "snippet": "Live state-route conditions when back online."},
+                {"url": "https://en.wikipedia.org/wiki/Big_Sur", "title": "Big Sur, Wikipedia", "snippet": "Coastal region between Carmel and San Simeon, geography and points of interest."},
             ],
         },
         "poi": {
@@ -647,6 +670,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://www.bigsurlodge.com/", "title": "Big Sur Lodge", "snippet": "Reservations and current status."},
                 {"url": "https://gordaspringsresort.com/", "title": "Gorda Springs Resort", "snippet": "Last fuel for ~60 mi heading south."},
+                {"url": "https://en.wikipedia.org/wiki/Big_Sur", "title": "Big Sur, Wikipedia", "snippet": "Coastal region between Carmel and San Simeon, geography and points of interest."},
             ],
         },
     },
@@ -656,6 +680,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "summary": "Bixby Creek Bridge on Highway 1 (mile marker 59.1, Big Sur). Open-spandrel concrete arch built 1932. Single lane each direction. Stop only at pullouts.",
             "sources": [
                 {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap, Bixby Bridge", "snippet": "Live conditions and any restrictions for Bixby Bridge."},
+                {"url": "https://en.wikipedia.org/wiki/Bixby_Creek_Bridge", "title": "Bixby Creek Bridge, Wikipedia", "snippet": "Open-spandrel concrete arch bridge on Highway 1, built 1932."},
             ],
         },
     },
@@ -675,6 +700,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://forecast.weather.gov/MapClick.php?lat=39.4583&lon=-117.3658", "title": "NWS Central Nevada Forecast", "snippet": "Austin/Eureka zone forecast."},
+                {"url": "https://en.wikipedia.org/wiki/U.S._Route_50_in_Nevada", "title": "US Route 50 in Nevada, Wikipedia", "snippet": "The Loneliest Road in America, route history and notable stops."},
             ],
         },
         "road": {
@@ -696,6 +722,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://www.nvroads.com/", "title": "Nevada 511", "snippet": "live NDOT cameras + incidents."},
+                {"url": "https://en.wikipedia.org/wiki/U.S._Route_50_in_Nevada", "title": "US Route 50 in Nevada, Wikipedia", "snippet": "The Loneliest Road in America, route history and notable stops."},
             ],
         },
         "poi": {
@@ -716,6 +743,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://middlegatestation.net/", "title": "Middlegate Station", "snippet": "Iconic US-50 cafe + the shoe tree."},
+                {"url": "https://en.wikipedia.org/wiki/U.S._Route_50_in_Nevada", "title": "US Route 50 in Nevada, Wikipedia", "snippet": "The Loneliest Road in America, route history and notable stops."},
             ],
         },
         "news": {
@@ -730,6 +758,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://thisisreno.com/", "title": "This Is Reno", "snippet": "Northern NV news including US-50 corridor."},
+                {"url": "https://en.wikipedia.org/wiki/U.S._Route_50_in_Nevada", "title": "US Route 50 in Nevada, Wikipedia", "snippet": "The Loneliest Road in America, route history and notable stops."},
             ],
         },
     },
@@ -752,6 +781,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://forecast.weather.gov/MapClick.php?lat=37.8967&lon=-107.7128", "title": "NWS Red Mountain Pass Forecast", "snippet": "11,000 ft elevation forecast."},
                 {"url": "https://avalanche.state.co.us/", "title": "CAIC", "snippet": "daily backcountry avalanche advisory."},
+                {"url": "https://en.wikipedia.org/wiki/Million_Dollar_Highway", "title": "Million Dollar Highway, Wikipedia", "snippet": "US-550 section from Ouray to Silverton, passes and history."},
             ],
         },
         "road": {
@@ -773,6 +803,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://cotrip.org/", "title": "COTrip US-550", "snippet": "CDOT live conditions."},
+                {"url": "https://en.wikipedia.org/wiki/Million_Dollar_Highway", "title": "Million Dollar Highway, Wikipedia", "snippet": "US-550 section from Ouray to Silverton, passes and history."},
             ],
         },
         "poi": {
@@ -800,6 +831,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             "sources": [
                 {"url": "https://www.ouraycolorado.com/", "title": "Visit Ouray", "snippet": "Ouray services + lodging."},
                 {"url": "https://silvertoncolorado.com/", "title": "Silverton CO", "snippet": "mid-route services."},
+                {"url": "https://en.wikipedia.org/wiki/Million_Dollar_Highway", "title": "Million Dollar Highway, Wikipedia", "snippet": "US-550 section from Ouray to Silverton, passes and history."},
             ],
         },
     },
@@ -824,6 +856,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://new.mta.info/alerts/subway", "title": "MTA Subway Alerts L Train", "snippet": "live alerts when reconnected."},
+                {"url": "https://en.wikipedia.org/wiki/Canarsie_Tunnel", "title": "Canarsie Tunnel, Wikipedia", "snippet": "L train tunnel under the East River, 1924 construction history."},
             ],
         },
         "news": {
@@ -842,6 +875,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://www.bkmag.com/", "title": "Brooklyn Magazine", "snippet": "Williamsburg/N. Brooklyn news."},
+                {"url": "https://en.wikipedia.org/wiki/Canarsie_Tunnel", "title": "Canarsie Tunnel, Wikipedia", "snippet": "L train tunnel under the East River, 1924 construction history."},
             ],
         },
     },
@@ -867,6 +901,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://www.bart.gov/schedules/advisories", "title": "BART Service Advisories", "snippet": "live delays when reconnected."},
+                {"url": "https://en.wikipedia.org/wiki/Transbay_Tube", "title": "Transbay Tube, Wikipedia", "snippet": "3.6 mi BART tunnel under San Francisco Bay, opened 1974."},
             ],
         },
         "news": {
@@ -881,6 +916,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
             ),
             "sources": [
                 {"url": "https://www.sfchronicle.com/transportation/", "title": "SF Chronicle Transportation", "snippet": "Bay Area transit coverage."},
+                {"url": "https://en.wikipedia.org/wiki/Transbay_Tube", "title": "Transbay Tube, Wikipedia", "snippet": "3.6 mi BART tunnel under San Francisco Bay, opened 1974."},
             ],
         },
     },

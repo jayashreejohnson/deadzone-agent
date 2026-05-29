@@ -291,6 +291,15 @@ def _render_html(title: str, route_id: str, sections: list[dict], snapshots: dic
     from datetime import datetime, timezone
     snapshots = snapshots or {}
     ts = datetime.now(timezone.utc).strftime("%b %d, %Y at %H:%M UTC")
+
+    # Drop sources we know don't work (blocked / 404 / paywall) BEFORE
+    # we render anything. The user shouldn't see dead rows in the pack;
+    # if a source can't be cached or visited offline, it shouldn't be
+    # listed at all.
+    for s in sections:
+        srcs = s.get("sources") or []
+        s["sources"] = [src for src in srcs if src.get("reachable", True)]
+
     total_sources = sum(len(s.get("sources") or []) for s in sections)
     total_cached  = sum(
         1 for s in sections for src in (s.get("sources") or [])
