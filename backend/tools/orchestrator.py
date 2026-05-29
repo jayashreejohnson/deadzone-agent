@@ -33,6 +33,16 @@ _CEREBRAS_MODEL   = os.getenv("CEREBRAS_MODEL",     "llama-3.3-70b").strip()
 # we try the next one in the chain.
 _LLM_TIMEOUT_SEC  = float(os.getenv("LLM_TIMEOUT_SEC", "8"))
 
+# ORCHESTRATOR_MODE controls whether we use the LLM tool-calling loop or the
+# deterministic scripted flow.
+#   "agentic"  -> LLM picks tools (slow but adaptive). Default historically.
+#   "scripted" -> hardcoded tool sequence (10-15s, deterministic, no LLM hops).
+#   "auto"     -> agentic when OpenRouter is healthy; scripted otherwise.
+#                 This is the new default because free-tier LLMs (Groq queued,
+#                 Cerebras laggy) can't reliably finish the tool loop inside a
+#                 4-minute dead-zone countdown.
+_ORCHESTRATOR_MODE = os.getenv("ORCHESTRATOR_MODE", "auto").strip().lower()
+
 # Pick the active provider — OpenRouter primary, Groq fallback, Cerebras final.
 # Set _LLM_PROVIDER, _LLM_KEY, _LLM_BASE_URL, _LLM_MODEL at import time so the
 # rest of this module can stay simple.
@@ -487,20 +497,34 @@ async def run(signal: dict) -> None:
     except Exception:
         pass
 
-    # Agentic-first: try the LLM unless EVERY provider's per-provider
-    # breaker is open (i.e. there's literally no provider with a chance of
-    # responding). _call_llm_with_fallback does per-provider skipping
-    # inside the chain, so we only short-circuit here when the whole
-    # fleet is down.
-    if _OPENAI_KEY and not llm_circuit.is_open():
+    # Decide between the LLM tool loop and the scripted flow.
+    #
+    # The LLM tool loop is more adaptive but each iteration costs one LLM
+    # round-trip. When the only available providers are slow (Cerebras
+    # free-tier queue) or unreliable (Groq 429s), a single pack can take
+    # 60-400+ seconds — past the user's 4-minute countdown. The scripted
+    # flow does the same parallel nimble searches and senso publish in
+    # ~10-15s without any LLM hops.
+    use_agentic = _OPENAI_KEY and not llm_circuit.is_open()
+    if _ORCHESTRATOR_MODE == "scripted":
+        use_agentic = False
+    elif _ORCHESTRATOR_MODE == "agentic":
+        # Forced agentic — honor it even if breaker is open (the user explicitly opted in).
+        use_agentic = bool(_OPENAI_KEY)
+    elif _ORCHESTRATOR_MODE == "auto":
+        # Auto: use agentic only if OpenRouter (the strongest tool-caller in
+        # our chain) is currently healthy. Otherwise the free-tier fallbacks
+        # are too slow/sloppy for the tool loop; go scripted to hit the SLA.
+        openrouter_alive = bool(_OPENROUTER_KEY) and not llm_circuit.is_open("openrouter")
+        use_agentic = openrouter_alive
+
+    if use_agentic:
         try:
             await _run_with_llm(signal, ctx)
             return
         except Exception as e:
             # Per-provider tripping already happened inside
-            # _call_llm_with_fallback. No extra global trip needed here —
-            # that would have been over-aggressive (one failure from a
-            # single provider tripping the whole stack).
+            # _call_llm_with_fallback. Fall through to scripted.
             warn_ev = {
                 "type": "log", "level": "warn",
                 "msg":  f"LLM orchestrator failed ({e!s}); falling back to scripted flow",
@@ -508,10 +532,15 @@ async def run(signal: dict) -> None:
             }
             await emit(warn_ev)
             db.append_trace_event(ctx.trace_id, warn_ev)
-    elif _OPENAI_KEY and llm_circuit.is_open():
+    else:
+        reason = (
+            "ORCHESTRATOR_MODE=scripted"             if _ORCHESTRATOR_MODE == "scripted" else
+            "OpenRouter unhealthy; free-tier LLMs too slow for tool loop" if _ORCHESTRATOR_MODE == "auto" else
+            "all LLM providers' breakers open"
+        )
         skip_ev = {
-            "type": "log", "level": "warn",
-            "msg":  "All LLM providers' breakers open; using scripted flow",
+            "type": "log", "level": "info",
+            "msg":  f"Using scripted flow ({reason})",
             "trace_id": ctx.trace_id, "t_ms": _now_ms(ctx),
         }
         await emit(skip_ev)
