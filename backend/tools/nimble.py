@@ -278,8 +278,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "Emergency closure alerts: tune AM 1630 (Port Authority radio) inside tunnel."
             ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=40.7614&lon=-74.0085", "title": "NWS, Manhattan Forecast (online)", "snippet": "Reference when back online: hourly forecast updated every 60 min."},
-                {"url": "https://www.weather.gov/okx/", "title": "NWS NY/Upton Office (online)", "snippet": "Severe weather alerts for the NYC metro area."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=40.7614&lon=-74.0085", "title": "NWS, Manhattan Forecast", "snippet": "hourly forecast updated every 60 min."},
+                {"url": "https://www.weather.gov/okx/", "title": "NWS NY/Upton Office", "snippet": "Severe weather alerts for the NYC metro area."},
             ],
         },
         "road": {
@@ -295,8 +295,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Manhattan exit: 40th St / 39th St (3 lanes each direction)"
             ),
             "sources": [
-                {"url": "https://www.panynj.gov/bridges-tunnels/en/lincoln-tunnel.html", "title": "Port Authority, Lincoln Tunnel (online)", "snippet": "Reference when back online: live traffic and toll updates."},
-                {"url": "https://511nj.org/", "title": "511 NJ, Live Road Conditions (online)", "snippet": "Statewide NJ traffic and DOT alerts."},
+                {"url": "https://www.panynj.gov/bridges-tunnels/en/lincoln-tunnel.html", "title": "Port Authority, Lincoln Tunnel", "snippet": "live traffic and toll updates."},
+                {"url": "https://511nj.org/", "title": "511 NJ, Live Road Conditions", "snippet": "Statewide NJ traffic and DOT alerts."},
             ],
         },
         "poi": {
@@ -312,7 +312,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Times Square subway: 42nd St (1/2/3, N/Q/R/W, 7, S), 1 block from tunnel exit"
             ),
             "sources": [
-                {"url": "https://www.njta.com/travel-resources/service-areas/vince-lombardi", "title": "Vince Lombardi Service Area page (online)", "snippet": "Hours, amenities, exact NJTP milepost."},
+                {"url": "https://www.njta.com/travel-resources/service-areas/vince-lombardi", "title": "Vince Lombardi Service Area page", "snippet": "Hours, amenities, exact NJTP milepost."},
             ],
         },
         "news": {
@@ -327,8 +327,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "When back online: NJ.com Hudson County, NorthJersey.com, ABC7 Eyewitness News for live updates."
             ),
             "sources": [
-                {"url": "https://www.nj.com/hudson/", "title": "NJ.com Hudson County (online)", "snippet": "Local Weehawken/Hoboken/JC news."},
-                {"url": "https://www.northjersey.com/news/", "title": "NorthJersey.com (online)", "snippet": "Daily Port Authority coverage."},
+                {"url": "https://www.nj.com/hudson/", "title": "NJ.com Hudson County", "snippet": "Local Weehawken/Hoboken/JC news."},
+                {"url": "https://www.northjersey.com/news/", "title": "NorthJersey.com", "snippet": "Daily Port Authority coverage."},
             ],
         },
     },
@@ -365,8 +365,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Tune AM 1610 inside tunnel for live closure updates"
             ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.6805&lon=-105.9111", "title": "NWS Loveland Pass Forecast (online)", "snippet": "Reference: 11,000 ft elevation zone forecast."},
-                {"url": "https://avalanche.state.co.us/forecasts/backcountry-avalanche/vail-summit-county", "title": "CAIC Vail/Summit Avalanche (online)", "snippet": "Daily backcountry avalanche advisory."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.6805&lon=-105.9111", "title": "NWS Loveland Pass Forecast", "snippet": "11,000 ft elevation zone forecast."},
+                {"url": "https://avalanche.state.co.us/forecasts/backcountry-avalanche/vail-summit-county", "title": "CAIC Vail/Summit Avalanche", "snippet": "Daily backcountry avalanche advisory."},
             ],
         },
         "road": {
@@ -382,8 +382,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Common closure trigger: I-70 corridor accidents, not the tunnel itself"
             ),
             "sources": [
-                {"url": "https://www.codot.gov/travel/eisenhower-tunnel", "title": "CDOT Eisenhower Tunnel Page (online)", "snippet": "Reference: live tunnel status when reconnected."},
-                {"url": "https://cotrip.org/", "title": "COTrip Live I-70 Cameras (online)", "snippet": "CDOT cameras for Eisenhower and Loveland Pass approaches."},
+                {"url": "https://www.codot.gov/travel/eisenhower-tunnel", "title": "CDOT Eisenhower Tunnel Page", "snippet": "live tunnel status when reconnected."},
+                {"url": "https://cotrip.org/", "title": "COTrip Live I-70 Cameras", "snippet": "CDOT cameras for Eisenhower and Loveland Pass approaches."},
             ],
         },
         "poi": {
@@ -403,7 +403,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Vail Mountain Rescue: (970) 569-2191"
             ),
             "sources": [
-                {"url": "https://www.summitcountyco.gov/", "title": "Summit County, CO Services (online)", "snippet": "Reference: county services and emergency contacts."},
+                {"url": "https://www.summitcountyco.gov/", "title": "Summit County, CO Services", "snippet": "county services and emergency contacts."},
             ],
         },
         "news": {
@@ -416,8 +416,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "When back online: Summit Daily News (Frisco/Dillon area), Denver Post Transportation."
             ),
             "sources": [
-                {"url": "https://summitdaily.com/", "title": "Summit Daily News (online)", "snippet": "Local news Frisco/Dillon/Breckenridge."},
-                {"url": "https://denverpost.com/news/transportation/", "title": "Denver Post Transportation (online)", "snippet": "Daily I-70 corridor coverage."},
+                {"url": "https://summitdaily.com/", "title": "Summit Daily News", "snippet": "Local news Frisco/Dillon/Breckenridge."},
+                {"url": "https://denverpost.com/news/transportation/", "title": "Denver Post Transportation", "snippet": "Daily I-70 corridor coverage."},
             ],
         },
     },
@@ -454,7 +454,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Tune AM 1700 for desert highway advisories (intermittent)"
             ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=34.3061&lon=-117.4742", "title": "NWS Cajon Pass Forecast (online)", "snippet": "Reference: hourly wind + visibility forecast."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=34.3061&lon=-117.4742", "title": "NWS Cajon Pass Forecast", "snippet": "hourly wind + visibility forecast."},
             ],
         },
         "road": {
@@ -471,7 +471,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "  - CHP enhanced emergency dial: *11 from any cell"
             ),
             "sources": [
-                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap I-15 (online)", "snippet": "Reference: live cameras + incidents."},
+                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap I-15", "snippet": "live cameras + incidents."},
             ],
         },
         "poi": {
@@ -505,7 +505,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Cell coverage essentially zero between Yermo and Primm"
             ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=35.2680&lon=-116.0697", "title": "NWS Baker / Mojave Forecast (online)", "snippet": "Reference: desert zone heat advisories."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=35.2680&lon=-116.0697", "title": "NWS Baker / Mojave Forecast", "snippet": "desert zone heat advisories."},
             ],
         },
         "poi": {
@@ -556,7 +556,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Tsunami warning zone, if you feel a strong earthquake, drive INLAND immediately"
             ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=36.2461&lon=-121.7714", "title": "NWS Big Sur Coastal Forecast (online)", "snippet": "Reference: marine and coastal hourly forecast."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=36.2461&lon=-121.7714", "title": "NWS Big Sur Coastal Forecast", "snippet": "marine and coastal hourly forecast."},
             ],
         },
         "road": {
@@ -576,8 +576,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Cell coverage essentially ZERO between Carmel and San Simeon"
             ),
             "sources": [
-                {"url": "https://www.bigsurcalifornia.org/highway1.html", "title": "Big Sur Chamber Hwy 1 Status (online)", "snippet": "Community-maintained closure status."},
-                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap (online)", "snippet": "Live state-route conditions when back online."},
+                {"url": "https://www.bigsurcalifornia.org/highway1.html", "title": "Big Sur Chamber Hwy 1 Status", "snippet": "Community-maintained closure status."},
+                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap", "snippet": "Live state-route conditions when back online."},
             ],
         },
         "poi": {
@@ -600,8 +600,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Coast Guard (Monterey): (831) 647-7300"
             ),
             "sources": [
-                {"url": "https://www.bigsurlodge.com/", "title": "Big Sur Lodge (online)", "snippet": "Reservations and current status."},
-                {"url": "https://gordaspringsresort.com/", "title": "Gorda Springs Resort (online)", "snippet": "Last fuel for ~60 mi heading south."},
+                {"url": "https://www.bigsurlodge.com/", "title": "Big Sur Lodge", "snippet": "Reservations and current status."},
+                {"url": "https://gordaspringsresort.com/", "title": "Gorda Springs Resort", "snippet": "Last fuel for ~60 mi heading south."},
             ],
         },
     },
@@ -629,7 +629,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Carry: 5+ gallons of water, blankets, full tank of fuel before each leg"
             ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.4583&lon=-117.3658", "title": "NWS Central Nevada Forecast (online)", "snippet": "Reference: Austin/Eureka zone forecast."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.4583&lon=-117.3658", "title": "NWS Central Nevada Forecast", "snippet": "Austin/Eureka zone forecast."},
             ],
         },
         "road": {
@@ -650,7 +650,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "  - REAL ID-style help: download the Nevada 511 app BEFORE leaving"
             ),
             "sources": [
-                {"url": "https://www.nvroads.com/", "title": "Nevada 511 (online)", "snippet": "Reference: live NDOT cameras + incidents."},
+                {"url": "https://www.nvroads.com/", "title": "Nevada 511", "snippet": "live NDOT cameras + incidents."},
             ],
         },
         "poi": {
@@ -670,7 +670,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Highland Trail Lodge (Eureka): (775) 237-5331"
             ),
             "sources": [
-                {"url": "https://middlegatestation.net/", "title": "Middlegate Station (online)", "snippet": "Iconic US-50 cafe + the shoe tree."},
+                {"url": "https://middlegatestation.net/", "title": "Middlegate Station", "snippet": "Iconic US-50 cafe + the shoe tree."},
             ],
         },
         "news": {
@@ -684,7 +684,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "When back online: This Is Reno, Eureka Sentinel, Reese River Reveille (Austin) for local updates."
             ),
             "sources": [
-                {"url": "https://thisisreno.com/", "title": "This Is Reno (online)", "snippet": "Northern NV news including US-50 corridor."},
+                {"url": "https://thisisreno.com/", "title": "This Is Reno", "snippet": "Northern NV news including US-50 corridor."},
             ],
         },
     },
@@ -705,8 +705,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Carry tow strap, sand/kitty litter, emergency blankets year-round"
             ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=37.8967&lon=-107.7128", "title": "NWS Red Mountain Pass Forecast (online)", "snippet": "Reference: 11,000 ft elevation forecast."},
-                {"url": "https://avalanche.state.co.us/", "title": "CAIC (online)", "snippet": "Reference: daily backcountry avalanche advisory."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=37.8967&lon=-107.7128", "title": "NWS Red Mountain Pass Forecast", "snippet": "11,000 ft elevation forecast."},
+                {"url": "https://avalanche.state.co.us/", "title": "CAIC", "snippet": "daily backcountry avalanche advisory."},
             ],
         },
         "road": {
@@ -727,7 +727,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "  - San Juan SAR (Silverton): dial 911"
             ),
             "sources": [
-                {"url": "https://cotrip.org/", "title": "COTrip US-550 (online)", "snippet": "Reference: CDOT live conditions."},
+                {"url": "https://cotrip.org/", "title": "COTrip US-550", "snippet": "CDOT live conditions."},
             ],
         },
         "poi": {
@@ -753,8 +753,8 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "Hospital: Mercy Hospital Durango, (970) 247-4311"
             ),
             "sources": [
-                {"url": "https://www.ouraycolorado.com/", "title": "Visit Ouray (online)", "snippet": "Reference: Ouray services + lodging."},
-                {"url": "https://silvertoncolorado.com/", "title": "Silverton CO (online)", "snippet": "Reference: mid-route services."},
+                {"url": "https://www.ouraycolorado.com/", "title": "Visit Ouray", "snippet": "Ouray services + lodging."},
+                {"url": "https://silvertoncolorado.com/", "title": "Silverton CO", "snippet": "mid-route services."},
             ],
         },
     },
@@ -778,7 +778,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• Subway emergency hotline: (888) 692-7233 (works above ground)"
             ),
             "sources": [
-                {"url": "https://new.mta.info/alerts/subway", "title": "MTA Subway Alerts L Train (online)", "snippet": "Reference: live alerts when reconnected."},
+                {"url": "https://new.mta.info/alerts/subway", "title": "MTA Subway Alerts L Train", "snippet": "live alerts when reconnected."},
             ],
         },
         "news": {
@@ -796,7 +796,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "When back online: Brooklyn Magazine (Williamsburg news), amNewYork Transit, MTA twitter @NYCTSubway"
             ),
             "sources": [
-                {"url": "https://www.bkmag.com/", "title": "Brooklyn Magazine (online)", "snippet": "Reference: Williamsburg/N. Brooklyn news."},
+                {"url": "https://www.bkmag.com/", "title": "Brooklyn Magazine", "snippet": "Williamsburg/N. Brooklyn news."},
             ],
         },
     },
@@ -821,7 +821,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "• BART Police: (510) 464-7000 (works above ground)"
             ),
             "sources": [
-                {"url": "https://www.bart.gov/schedules/advisories", "title": "BART Service Advisories (online)", "snippet": "Reference: live delays when reconnected."},
+                {"url": "https://www.bart.gov/schedules/advisories", "title": "BART Service Advisories", "snippet": "live delays when reconnected."},
             ],
         },
         "news": {
@@ -835,7 +835,7 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
                 "When back online: SF Chronicle Transportation, BART Twitter @SFBART, 511 SF Bay app"
             ),
             "sources": [
-                {"url": "https://www.sfchronicle.com/transportation/", "title": "SF Chronicle Transportation (online)", "snippet": "Reference: Bay Area transit coverage."},
+                {"url": "https://www.sfchronicle.com/transportation/", "title": "SF Chronicle Transportation", "snippet": "Bay Area transit coverage."},
             ],
         },
     },
