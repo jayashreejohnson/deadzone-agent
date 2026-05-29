@@ -26,6 +26,11 @@ _OPENROUTER_KEY   = os.getenv("OPENROUTER_API_KEY", "").strip()
 _OPENROUTER_MODEL = os.getenv("OPENAI_MODEL",       "google/gemini-2.0-flash-001").strip()
 _GROQ_KEY         = os.getenv("GROQ_API_KEY",       "").strip()
 _GROQ_MODEL       = os.getenv("GROQ_MODEL",         "llama-3.3-70b-versatile").strip()
+# Small/fast Groq model with a SEPARATE daily token budget from
+# llama-3.3-70b-versatile. Used for the focused per-step calls
+# (publish/save/deliver) so they don't compete with iter 0 planning
+# for the same quota bucket.
+_GROQ_MODEL_SMALL = os.getenv("GROQ_MODEL_SMALL",   "llama-3.1-8b-instant").strip()
 _CEREBRAS_KEY     = os.getenv("CEREBRAS_API_KEY",   "").strip()
 _CEREBRAS_MODEL   = os.getenv("CEREBRAS_MODEL",     "llama-3.3-70b").strip()
 
@@ -652,12 +657,21 @@ async def _call_llm_with_fallback(
     messages: list[dict],
     tools: list[dict] | None = None,
     tool_choice: object = "auto",
+    *,
+    prefer_small: bool = False,
 ):
     """Try OpenRouter, then Groq, then Cerebras. Each provider gets its own
     system prompt (different models follow instructions differently) and
-    its own per-call kwargs (parallel_tool_calls, max_tokens, etc.)."""
+    its own per-call kwargs (parallel_tool_calls, max_tokens, etc.).
+
+    When `prefer_small=True`, use the smaller/cheaper model on each provider
+    where one is configured (currently only Groq has _MODEL_SMALL set).
+    This lets focused per-step calls hit a separate daily quota bucket
+    from the planning step, so iter-0 token usage doesn't starve later
+    steps."""
     from openai import AsyncOpenAI
     last_error: Exception | None = None
+    groq_model = _GROQ_MODEL_SMALL if prefer_small else _GROQ_MODEL
 
     def _msgs_for(provider: str) -> list[dict]:
         """Swap the system prompt for the provider-specific variant."""
@@ -715,7 +729,7 @@ async def _call_llm_with_fallback(
     if _GROQ_KEY and not llm_circuit.is_open("groq"):
         try:
             c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC, max_retries=0)
-            kwargs = {"model": _GROQ_MODEL, "messages": _msgs_for("groq"),
+            kwargs = {"model": groq_model, "messages": _msgs_for("groq"),
                       "temperature": 0, "max_tokens": _max_tokens_for("groq"),
                       **_tool_kwargs("groq")}
             resp = await c.chat.completions.create(**kwargs)
@@ -887,6 +901,7 @@ async def _focused_call(provider_msg_user: str, tool_name: str, ctx: _Ctx) -> di
     resp, _provider = await _call_llm_with_fallback(
         messages, tools=only_tools,
         tool_choice={"type": "function", "function": {"name": tool_name}},
+        prefer_small=True,  # focused steps use the small-model quota bucket
     )
     tc_list = resp.choices[0].message.tool_calls or []
     if not tc_list:
