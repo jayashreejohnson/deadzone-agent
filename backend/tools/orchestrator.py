@@ -850,11 +850,16 @@ async def _run_with_llm(signal: dict, ctx: _Ctx) -> None:
         await emit(warn_ev)
         db.append_trace_event(ctx.trace_id, warn_ev)
 
-    # Last-resort finalizer: only fires if the agentic chain bailed before
-    # delivery. Uses the search results the LLM produced; falls fully to
-    # _run_scripted only when nothing useful is available.
+    # Last-resort finalizer: fires if the agentic chain bailed before
+    # delivery. Prefers the search results captured locally from iter 0
+    # (the LLM's actual contribution); falls back to scanning the message
+    # stream; goes fully to _run_scripted only when nothing is available.
     if not ctx.delivered:
-        await _finalize_from_messages(signal, ctx, plan_messages, llm_loop_failed)
+        await _finalize_from_messages(
+            signal, ctx, plan_messages, llm_loop_failed,
+            captured_searches=search_results,
+            captured_cache_hit=cached_hit,
+        )
 
     await _eval_pack(ctx)
 
@@ -946,18 +951,27 @@ async def _step_log_bought(cached: dict, signal: dict, ctx: _Ctx) -> None:
 
 # ---------- Mid-flow finalizer ----------
 
-async def _finalize_from_messages(signal: dict, ctx: _Ctx, messages: list[dict], from_failure: bool) -> None:
+async def _finalize_from_messages(
+    signal: dict,
+    ctx: _Ctx,
+    messages: list[dict],
+    from_failure: bool,
+    *,
+    captured_searches: list[dict] | None = None,
+    captured_cache_hit: dict | None = None,
+) -> None:
     """Walk forward through any remaining pack-building steps using the
     nimble_search results the LLM already produced.
 
-    This is what runs when the LLM has done the agentic part (decided
-    queries, pulled results) but stalls or 400s on senso_publish / save /
-    deliver. The model's content decisions are preserved; we just glue
-    the rest together. Falls back to _run_scripted only if NOTHING
-    useful is in the messages stream (e.g. LLM died immediately)."""
-    # Extract any nimble_search results from the tool messages.
-    search_results: list[dict] = []
-    cached_hit: dict | None = None
+    Prefers `captured_searches` (passed in directly from the iter-0 result
+    set) since the new per-step LLM flow does not append tool results to
+    the message stream. Falls back to scanning `messages` for legacy
+    callers. Goes fully to _run_scripted only when nothing is available."""
+    # Prefer the directly-captured iter-0 results.
+    search_results: list[dict] = list(captured_searches or [])
+    cached_hit: dict | None = captured_cache_hit
+    # Backstop: also scan the message stream for any tool results that
+    # may have landed there (legacy path).
     for m in messages:
         if m.get("role") != "tool":
             continue
@@ -966,13 +980,13 @@ async def _finalize_from_messages(signal: dict, ctx: _Ctx, messages: list[dict],
             payload = json.loads(m.get("content") or "{}")
         except Exception:
             continue
-        if name == "nimble_search":
+        if name == "nimble_search" and not search_results:
             search_results.append({
                 "topic":   payload.get("topic", "info"),
                 "summary": payload.get("summary", ""),
                 "sources": payload.get("sources", []) or [],
             })
-        elif name == "clickhouse_find_recent_pack" and payload.get("found"):
+        elif name == "clickhouse_find_recent_pack" and payload.get("found") and not cached_hit:
             cached_hit = payload.get("pack") or {}
 
     # Cache hit path: short-circuit pay + log + deliver.
