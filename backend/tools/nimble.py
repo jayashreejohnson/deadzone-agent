@@ -439,40 +439,104 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
     # Cajon Pass / I-15
     "cajon pass": {
         "weather": {
-            "summary": "Cajon Pass on I-15 (4,190 ft) experiences strong cross-winds. Truck rollovers in high-wind events. Watch for sudden visibility drops from fog or dust.",
+            "summary": (
+                "CAJON PASS WEATHER — I-15 between San Bernardino and Victorville (4,190 ft summit).\n"
+                "• Strong sustained CROSS-WINDS year-round, peaking 40–60 mph fall/winter\n"
+                "• HIGH-PROFILE VEHICLE warnings issued via I-15 message boards when winds exceed 35 mph sustained\n"
+                "• Dust storm potential: visibility can drop to <100 ft in seconds\n"
+                "• Fog: thick at the SUMMIT in early morning Nov–Feb\n"
+                "• Summer: ambient 95–110°F at the desert end (Victorville). Carry water.\n"
+                "• If a truck rollover is reported ahead, stay in vehicle until CHP clears scene\n"
+                "• Tune AM 1700 for desert highway advisories (intermittent)"
+            ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=34.3061&lon=-117.4742", "title": "NWS — Cajon Pass Forecast", "snippet": "Cajon Pass weather and wind advisories."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=34.3061&lon=-117.4742", "title": "NWS Cajon Pass Forecast (online)", "snippet": "Reference: hourly wind + visibility forecast."},
             ],
         },
         "road": {
-            "summary": "Cajon Pass is the primary I-15 connector between LA Basin and the High Desert. Heavy truck traffic. Caltrans incident alerts updated frequently.",
+            "summary": (
+                "CAJON PASS — I-15, primary LA Basin ↔ High Desert / Vegas corridor.\n"
+                "• Climb from ~1,200 ft (San Bernardino) to 4,190 ft summit in ~20 mi\n"
+                "• 5 lanes each direction at the bottom, narrows to 4 at summit\n"
+                "• HEAVY truck traffic 24/7 — stay out of the right lane on the climb\n"
+                "• Key exits (SB → NB): 138 (Glen Helen), 131 (Cajon Blvd/Old 66), 129 (Hwy 138), 123 (Hesperia/Main St)\n"
+                "• Cleghorn Pass alternate (Hwy 138 → Hwy 18) when I-15 closes — adds ~30 min\n"
+                "• Emergency contacts:\n"
+                "  - CHP Inland Division: (909) 383-4247\n"
+                "  - San Bernardino Co Sheriff (Victorville): (760) 552-6800\n"
+                "  - CHP enhanced emergency dial: *11 from any cell"
+            ),
             "sources": [
-                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap", "snippet": "Live traffic, camera feeds, and incident reports for I-15 / Cajon Pass."},
-                {"url": "https://dot.ca.gov/programs/traffic-operations/road-information", "title": "Caltrans — Road Information", "snippet": "Statewide closures and construction including Cajon Pass."},
+                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap I-15 (online)", "snippet": "Reference: live cameras + incidents."},
             ],
+        },
+        "poi": {
+            "summary": (
+                "SERVICES ON CAJON PASS (I-15)\n\n"
+                "Southbound (Vegas → LA) — last fuel before LA Basin:\n"
+                "• Hesperia (exit 153A, Main St) — Shell, Chevron, Arco. Multiple 24/7 stations.\n"
+                "• Victorville (exit 147–150) — full services, In-N-Out, fast food\n"
+                "• Oak Hills (exit 138/139) — limited\n"
+                "• Glen Helen (exit 138) — last stop before SB City\n\n"
+                "Northbound (LA → Vegas) — last fuel before Mojave desert:\n"
+                "• Victorville (exit 147) — full services, last cheap fuel\n"
+                "• Hesperia / Main St — fuel + food\n"
+                "• Barstow (exit 184, ~45 mi north of summit) — last full services before deep Mojave\n\n"
+                "Rest areas: NONE on I-15 between Devore and Victorville (use exits)"
+            ),
+            "sources": [],
         },
     },
 
     # Mojave Desert / Baker
     "mojave": {
         "weather": {
-            "summary": "Mojave Desert section of I-15 (Baker, Zzyzx, Halloran). Extreme summer heat — keep coolant levels topped. Limited services. Wind can spike to 50+ mph crossing the open valley.",
+            "summary": (
+                "MOJAVE DESERT WEATHER — I-15 between Barstow and Primm NV.\n"
+                "• Summer (Jun–Sep): 100–120°F daytime. Heat advisories near-daily.\n"
+                "• Winter (Dec–Feb): can drop below 30°F overnight at higher elevation (Halloran Summit, 4,400 ft)\n"
+                "• High wind warnings: 50+ mph sustained, dust storms reduce visibility to zero\n"
+                "• If stranded in summer: stay WITH the vehicle (not under it — heat reflects up), wait for CHP\n"
+                "• Carry 1 gallon water per person per day MINIMUM. Sun protection critical.\n"
+                "• Cell coverage essentially zero between Yermo and Primm"
+            ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=35.2680&lon=-116.0697", "title": "NWS — Baker / Mojave Forecast", "snippet": "Desert zone forecast with heat advisories."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=35.2680&lon=-116.0697", "title": "NWS Baker / Mojave Forecast (online)", "snippet": "Reference: desert zone heat advisories."},
             ],
         },
         "poi": {
-            "summary": "Last reliable services before the Mojave dead zone: Baker, CA (Bun Boy, Mad Greek). Halloran Summit has limited fuel. Primm/Stateline NV next consistent service stop.",
-            "sources": [
-                {"url": "https://www.gasbuddy.com/gasprices/california/baker", "title": "GasBuddy — Baker, CA", "snippet": "Fuel prices and station hours for the Mojave I-15 corridor."},
-                {"url": "https://www.bakerca.com/", "title": "Visit Baker CA", "snippet": "Town services and the famous World's Tallest Thermometer."},
-            ],
+            "summary": (
+                "MOJAVE I-15 SERVICES — LAST CHANCE STOPS\n\n"
+                "Heading north (LA → Vegas):\n"
+                "• Barstow (exit 184) — last full services for 50+ mi. Full fuel, Del Taco, Carl's Jr, In-N-Out.\n"
+                "• Yermo (exit 191) — Eddie World (big convenience store), fuel\n"
+                "• Calico Ghost Town (exit 191) — tourist stop, limited\n"
+                "• Baker (exit 246) — FAMOUS midway stop:\n"
+                "  - Bun Boy / Bun Boy Motel — diner since 1926\n"
+                "  - Mad Greek Cafe — gyros, open 24/7\n"
+                "  - World's Tallest Thermometer (134 ft) landmark\n"
+                "  - Shell + Arco fuel\n"
+                "• Halloran Summit (no exit number, 4,400 ft) — single closed truck stop, no services\n"
+                "• Primm NV (exit 1, state line) — full services, Whiskey Pete's casino, fuel + food\n\n"
+                "Emergency:\n"
+                "• Mojave National Preserve dispatch: (760) 252-6100\n"
+                "• San Bernardino Co Sheriff (Baker substation): (760) 733-4448\n"
+                "• If broken down: stay with vehicle, run AC sparingly, conserve fuel"
+            ),
+            "sources": [],
         },
         "road": {
-            "summary": "I-15 across the Mojave is a long, sparsely-trafficked stretch. CHP responses can be 20–30 min. Carry water, check fuel before Baker.",
-            "sources": [
-                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap — I-15", "snippet": "Live conditions across the Mojave desert section of I-15."},
-            ],
+            "summary": (
+                "I-15 ACROSS THE MOJAVE — Barstow to Primm NV (~145 mi)\n"
+                "• Speed limit: 70 mph most of route\n"
+                "• 2 lanes each direction, generally lightly trafficked except weekends\n"
+                "• CHP response can take 20–45 minutes due to distance\n"
+                "• Vegas-bound Friday afternoon (3–8 PM) backups at Primm + state-line\n"
+                "• LA-bound Sunday afternoon (12–6 PM) backups at Primm + Baker\n"
+                "• Closures: dust storm and crash both cause multi-hour shutdowns\n"
+                "• Detour: NONE practical — Hwy 95 + Hwy 58 adds 4+ hours"
+            ),
+            "sources": [],
         },
     },
 
@@ -550,29 +614,73 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
     # US-50 Nevada / Bob Scott Summit / Austin Summit / Middlegate Station
     "us route 50 nevada": {
         "weather": {
-            "summary": "US-50 in Nevada — the Loneliest Road in America. Sub-freezing temps in winter, extreme heat in summer. Carry water and extra fuel.",
+            "summary": (
+                "US-50 NEVADA — THE LONELIEST ROAD IN AMERICA (Ely → Fallon, ~260 mi)\n"
+                "• Summer (Jun–Aug): 90–105°F daytime in valleys, 75–85°F at passes\n"
+                "• Winter (Nov–Mar): sub-zero overnight at passes, ice + snow drifts common\n"
+                "• Wind: strong in afternoons, dust devils across playas\n"
+                "• Visibility hazard: smoke from western wildfires Jul–Oct\n"
+                "• Lightning: thunderstorms Jun–Aug afternoons, mountain summits dangerous\n"
+                "• If stranded: stay with vehicle. CHP/NHP can take 1–2 hrs to respond.\n"
+                "• Carry: 5+ gallons of water, blankets, full tank of fuel before each leg"
+            ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.4583&lon=-117.3658", "title": "NWS — Central Nevada Forecast", "snippet": "Zone forecast for the US-50 central Nevada corridor."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.4583&lon=-117.3658", "title": "NWS Central Nevada Forecast (online)", "snippet": "Reference: Austin/Eureka zone forecast."},
             ],
         },
         "road": {
-            "summary": "US-50 across Nevada — sparse traffic, 70+ mph speed limits, snow drifts common winter. NDOT 511 for closures.",
+            "summary": (
+                "US-50 NEVADA — STAYING ALIVE ON THE LONELIEST ROAD\n"
+                "• Speed limit: 70 mph open desert, 25–45 mph through small towns\n"
+                "• Cell coverage: essentially ZERO between Ely and Fallon (Verizon spotty at Austin only)\n"
+                "• Three major passes east to west:\n"
+                "  - Bob Scott Summit (7,195 ft, MM 51 from Austin)\n"
+                "  - Austin Summit (7,484 ft, MM 41 from Austin)\n"
+                "  - Middlegate / Eastgate area (no high pass)\n"
+                "• Snow chains: Dec–Mar over passes\n"
+                "• Wildlife: deer/elk most active dawn/dusk, antelope herds cross unexpectedly\n"
+                "• Emergency:\n"
+                "  - Nevada Highway Patrol: *NHP (*647) from cell, (775) 689-4600 office\n"
+                "  - Lander County Sheriff (Austin): (775) 964-2380\n"
+                "  - Churchill County Sheriff (Fallon): (775) 423-3116\n"
+                "  - REAL ID-style help: download the Nevada 511 app BEFORE leaving"
+            ),
             "sources": [
-                {"url": "https://www.nvroads.com/", "title": "Nevada 511 — Road Conditions", "snippet": "Live NDOT camera feeds and incident reports including US-50."},
-                {"url": "https://www.dot.nv.gov/", "title": "Nevada DOT", "snippet": "Statewide road operations and construction notices."},
+                {"url": "https://www.nvroads.com/", "title": "Nevada 511 (online)", "snippet": "Reference: live NDOT cameras + incidents."},
             ],
         },
         "poi": {
-            "summary": "Services on US-50 NV are 60–100 mi apart. Austin, NV is the largest stop between Ely and Fallon. Middlegate Station is the iconic shoe tree/cafe stop. Carry spare tire and water.",
+            "summary": (
+                "US-50 SERVICES — ELY TO FALLON\n\n"
+                "From east to west (most reliable stops):\n"
+                "• Ely, NV — full services, eastern endpoint. Last full fuel station east.\n"
+                "• Eureka, NV (~80 mi west of Ely) — Owl Club Casino, fuel, motel, cafe\n"
+                "• Austin, NV (~70 mi west of Eureka) — MIDPOINT. International Cafe, Cozy Mountain Motel, Chevron fuel. (775) 964-2200\n"
+                "• Bob Scott Summit — small picnic area, no services\n"
+                "• Cold Springs Station (~50 mi west of Austin) — fuel + cafe + bar (limited hours)\n"
+                "• Middlegate Station — ICONIC. Cafe + bar + gas + the famous SHOE TREE landmark. (775) 423-7134\n"
+                "• Fallon, NV — western endpoint, full services, Walmart\n\n"
+                "RULE: Top off fuel at EVERY stop. The next one is 60+ miles away.\n\n"
+                "Emergency / lodging:\n"
+                "• Pony Express RV Park (Austin): (775) 964-2014\n"
+                "• Highland Trail Lodge (Eureka): (775) 237-5331"
+            ),
             "sources": [
-                {"url": "https://travelnevada.com/cities/austin/", "title": "Travel Nevada — Austin NV", "snippet": "Services, lodging and fuel in Austin, the midpoint of US-50."},
-                {"url": "https://middlegatestation.net/", "title": "Middlegate Station", "snippet": "Iconic US-50 cafe, gas and the famous shoe tree."},
+                {"url": "https://middlegatestation.net/", "title": "Middlegate Station (online)", "snippet": "Iconic US-50 cafe + the shoe tree."},
             ],
         },
         "news": {
-            "summary": "Central Nevada and US-50 news — sparse but covers tourism, mining, and BLM/forest service operations along the corridor.",
+            "summary": (
+                "US-50 / CENTRAL NEVADA CONTEXT\n\n"
+                "• Highway 50 named the Loneliest Road by Life Magazine in 1986\n"
+                "• Most closures: winter snow on passes (Bob Scott + Austin), spring flash floods\n"
+                "• Tourism boom Jun–Sep — passport-stamp drivers + national-park visitors\n"
+                "• Mining country: watch for slow-moving heavy equipment\n"
+                "• Wildfire season Jul–Oct closes lateral roads (95/93), forcing US-50 detours\n\n"
+                "When back online: This Is Reno, Eureka Sentinel, Reese River Reveille (Austin) for local updates."
+            ),
             "sources": [
-                {"url": "https://thisisreno.com/", "title": "This Is Reno", "snippet": "Northern Nevada news including US-50 corridor coverage."},
+                {"url": "https://thisisreno.com/", "title": "This Is Reno (online)", "snippet": "Northern NV news including US-50 corridor."},
             ],
         },
     },
@@ -580,58 +688,150 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
     # Million Dollar Highway / US-550 Colorado / Red Mountain Pass / Molas / Coal Bank
     "million dollar highway": {
         "weather": {
-            "summary": "US-550 / Million Dollar Highway connects Ouray to Silverton to Durango — Red Mountain Pass (11,018 ft), Molas Pass (10,910 ft), Coal Bank Pass (10,640 ft). Snow possible any month above 10,000 ft.",
+            "summary": (
+                "MILLION DOLLAR HIGHWAY (US-550) WEATHER — Ouray → Silverton → Durango\n"
+                "• Three passes above 10,000 ft. Snow POSSIBLE ANY MONTH.\n"
+                "  - Red Mountain Pass: 11,018 ft\n"
+                "  - Molas Pass: 10,910 ft\n"
+                "  - Coal Bank Pass: 10,640 ft\n"
+                "• Most avalanche-prone highway in Colorado. Avoid after fresh snow Nov–May.\n"
+                "• Summer: thunderstorms afternoon, lightning above treeline\n"
+                "• Winter: chain laws + frequent closures\n"
+                "• Pre-storm rule: if CDOT mentions closure on US-550 forecast, turn around\n"
+                "• Carry tow strap, sand/kitty litter, emergency blankets year-round"
+            ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=37.8967&lon=-107.7128", "title": "NWS — Red Mountain Pass Forecast", "snippet": "Mountain forecast for the US-550 corridor."},
-                {"url": "https://avalanche.state.co.us/", "title": "Colorado Avalanche Information Center", "snippet": "Daily avalanche forecast — Red Mountain Pass is one of CO's most avalanche-prone zones."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=37.8967&lon=-107.7128", "title": "NWS Red Mountain Pass Forecast (online)", "snippet": "Reference: 11,000 ft elevation forecast."},
+                {"url": "https://avalanche.state.co.us/", "title": "CAIC (online)", "snippet": "Reference: daily backcountry avalanche advisory."},
             ],
         },
         "road": {
-            "summary": "Million Dollar Highway has no guardrails on long stretches, hairpin switchbacks, and 1,000+ ft drop-offs. CDOT closes during major snowstorms.",
+            "summary": (
+                "US-550 MILLION DOLLAR HIGHWAY — NO GUARDRAILS, NO MARGIN FOR ERROR\n"
+                "• 25 miles of switchbacks Ouray → Silverton\n"
+                "• Hairpin turns 15 mph posted, narrow lanes, NO guardrails on long stretches\n"
+                "• 1,000+ ft drop-offs on the outside lane (southbound = outside)\n"
+                "• Speed limit: 25–50 mph, drops to 15 mph on switchbacks\n"
+                "• Avalanche shed at Riverside Slide protects Red Mtn Pass — but pass closes anyway during big slide events\n"
+                "• Cell coverage: essentially ZERO between Ouray and Silverton\n"
+                "• In an accident: do NOT stand on the road shoulder — there often isn't one. Move uphill side.\n"
+                "• Emergency contacts:\n"
+                "  - San Miguel Co Sheriff (Ouray): (970) 626-5670\n"
+                "  - San Juan Co Sheriff (Silverton): (970) 387-5531\n"
+                "  - La Plata Co Sheriff (Durango): (970) 247-1157\n"
+                "  - Ouray Mountain Rescue: (970) 325-7000\n"
+                "  - San Juan SAR (Silverton): dial 911"
+            ),
             "sources": [
-                {"url": "https://cotrip.org/", "title": "COTrip — US-550 Conditions", "snippet": "Live CDOT data including Red Mountain Pass status."},
-                {"url": "https://www.codot.gov/travel/scenic-byways/southwest/san-juan-skyway", "title": "CDOT — San Juan Skyway Byway", "snippet": "Official scenic byway guide including current conditions."},
+                {"url": "https://cotrip.org/", "title": "COTrip US-550 (online)", "snippet": "Reference: CDOT live conditions."},
             ],
         },
         "poi": {
-            "summary": "Stops on US-550: Ouray (Hot Springs Pool, fuel), Silverton (small mining town, mid-point services), Durango (full services). Limited cell coverage between Ouray and Silverton.",
+            "summary": (
+                "MILLION DOLLAR HIGHWAY SERVICES (north to south)\n\n"
+                "OURAY (northern endpoint):\n"
+                "• Switzerland of America Motel: (970) 325-4577\n"
+                "• Wiesbaden Hot Springs Spa: natural hot springs, (970) 325-4347\n"
+                "• Maggie's Kitchen — diner, breakfast/lunch\n"
+                "• True Grit Cafe — full menu\n"
+                "• Last gas before Red Mountain Pass: Ouray Conoco (425 Main St)\n\n"
+                "ON THE WAY:\n"
+                "• Idarado Mine ruins (mile MP 88) — photo stop only\n"
+                "• Red Mountain Pass summit (MP 80) — no services\n"
+                "• Molas Pass overlook (MP 64) — Andrews Lake parking\n\n"
+                "SILVERTON (mid-point, 9,318 ft):\n"
+                "• Silverton Standard / Wyman Hotel\n"
+                "• Avon Hotel: (970) 387-5454\n"
+                "• Brown Bear Cafe — lunch + dinner\n"
+                "• Pickle Barrel — bar/grill\n"
+                "• Fuel: Conoco at 1228 Greene St (limited winter hours)\n\n"
+                "DURANGO (southern endpoint): full services\n\n"
+                "Hospital: Mercy Hospital Durango — (970) 247-4311"
+            ),
             "sources": [
-                {"url": "https://www.ouraycolorado.com/", "title": "Visit Ouray, CO", "snippet": "Services, lodging and hot springs in Ouray — northern endpoint."},
-                {"url": "https://silvertoncolorado.com/", "title": "Silverton, CO", "snippet": "Mid-route services in historic mining town."},
+                {"url": "https://www.ouraycolorado.com/", "title": "Visit Ouray (online)", "snippet": "Reference: Ouray services + lodging."},
+                {"url": "https://silvertoncolorado.com/", "title": "Silverton CO (online)", "snippet": "Reference: mid-route services."},
             ],
         },
     },
 
     # Transit
     "canarsie tunnel": {
-        "road": {  # we use "road" for transit-alert topic mapping
-            "summary": "L train Canarsie Tunnel (Bedford Av Brooklyn ↔ 1st Av Manhattan, under the East River). MTA service alerts post here. No cell service in tunnel.",
+        "road": {  # transit-alert topic
+            "summary": (
+                "L TRAIN — CANARSIE TUNNEL (Bedford Av Brooklyn ↔ 1st Av Manhattan)\n"
+                "• 1.4 mi under the East River, opened 1924\n"
+                "• Run time Bedford ↔ 1st Av: ~5 min normally, no intermediate stops\n"
+                "• Headways: 4 min peak, 6–10 min off-peak, 20 min late-night\n"
+                "• ZERO cell service in tunnel — your phone reconnects at 1st Av or Bedford\n"
+                "• Service interruptions usually announced via train PA\n"
+                "• L train at Union Sq connects: 4/5/6, N/Q/R/W, F/M, PATH (14th St 6 Av)\n"
+                "• L train at 1st Av: standalone — closest connection is M14 SBS at 14th St + 1st Av\n"
+                "• L train at Bedford Av: walk 5 min to J/M/Z at Marcy Av\n\n"
+                "IF STUCK IN TUNNEL:\n"
+                "• Stay on train. Do NOT exit unless directed by MTA personnel.\n"
+                "• MTA Emergency: 511 (when reconnected), or use train intercom\n"
+                "• Subway emergency hotline: (888) 692-7233 (works above ground)"
+            ),
             "sources": [
-                {"url": "https://new.mta.info/alerts/subway", "title": "MTA — Subway Alerts (L Train)", "snippet": "Live MTA service status, planned work, and alerts for the L line."},
-                {"url": "https://new.mta.info/maps/subway", "title": "MTA Subway Map", "snippet": "Official map with the L train and connections."},
+                {"url": "https://new.mta.info/alerts/subway", "title": "MTA Subway Alerts L Train (online)", "snippet": "Reference: live alerts when reconnected."},
             ],
         },
         "news": {
-            "summary": "Local commuter news for the L line corridor — Bedford to Union Square to Canarsie.",
+            "summary": (
+                "L LINE CORRIDOR CONTEXT\n\n"
+                "Stations Brooklyn to Manhattan (the dead-zone stretch):\n"
+                "• Bedford Av (J/M/Z connect 5-min walk)\n"
+                "• 1st Av (M14 SBS bus connect)\n"
+                "• 3rd Av (M101/M102/M103 bus)\n"
+                "• Union Sq–14 St (massive transfer hub)\n\n"
+                "Service history:\n"
+                "• Canarsie Tunnel rebuilt 2019–2020 after Sandy damage\n"
+                "• Current 'shutdown' fears reduced — incremental work continues nights/weekends\n"
+                "• Weekend service changes COMMON — check before Friday PM rush\n\n"
+                "When back online: Brooklyn Magazine (Williamsburg news), amNewYork Transit, MTA twitter @NYCTSubway"
+            ),
             "sources": [
-                {"url": "https://www.bkmag.com/", "title": "Brooklyn Magazine", "snippet": "Williamsburg / North Brooklyn news and culture."},
-                {"url": "https://www.amny.com/", "title": "amNewYork — Transit", "snippet": "Daily NYC transit news including MTA decisions."},
+                {"url": "https://www.bkmag.com/", "title": "Brooklyn Magazine (online)", "snippet": "Reference: Williamsburg/N. Brooklyn news."},
             ],
         },
     },
 
     "transbay tube": {
         "road": {
-            "summary": "BART Transbay Tube (Embarcadero SF ↔ West Oakland, under SF Bay). No cell service in tube. Live BART status for delays.",
+            "summary": (
+                "BART TRANSBAY TUBE (Embarcadero SF ↔ West Oakland)\n"
+                "• 3.6 mi underwater tunnel, opened 1974\n"
+                "• Deepest point: 135 ft below SF Bay water\n"
+                "• Run time Embarcadero ↔ West Oakland: ~7 min, no intermediate stops\n"
+                "• ZERO cell service in tube. Reconnects at Embarcadero or West Oakland.\n"
+                "• Service: 6 lines run through tube (Yellow/Red/Blue/Green/Orange + Coliseum-OAK)\n"
+                "• Headways: 5 min peak, 10–15 min off-peak, 20 min nights\n"
+                "• Service ends ~midnight weeknights, ~1 AM weekends\n\n"
+                "TRANSFERS:\n"
+                "• Embarcadero (SF): Muni Metro, F-Market streetcar, Ferry Building\n"
+                "• West Oakland: AC Transit transbay buses\n\n"
+                "IF STUCK IN TUBE:\n"
+                "• Stay on train. Tube is engineered to handle most emergencies.\n"
+                "• Emergency intercom on each car (red button).\n"
+                "• BART Police: (510) 464-7000 (works above ground)"
+            ),
             "sources": [
-                {"url": "https://www.bart.gov/schedules/advisories", "title": "BART — Service Advisories", "snippet": "Live BART delays, maintenance, and service updates."},
-                {"url": "https://www.511.org/transit", "title": "511.org Transit", "snippet": "Bay Area transit status across BART, Muni, AC Transit and Caltrain."},
+                {"url": "https://www.bart.gov/schedules/advisories", "title": "BART Service Advisories (online)", "snippet": "Reference: live delays when reconnected."},
             ],
         },
         "news": {
-            "summary": "Bay Area transit news — BART operations, ridership, and Bay Bridge / Tube corridor issues.",
+            "summary": (
+                "BAY AREA TRANSIT CONTEXT\n\n"
+                "• Tube was closed nights for seismic retrofit 2019–2024\n"
+                "• Bay Bridge closures cascade to BART tube overcrowding\n"
+                "• Giants games (Oracle Park, near Embarcadero) = packed trains 7–11 PM\n"
+                "• Warriors games (Chase Center) = packed trains via Embarcadero\n"
+                "• Last train from SF: ~11:40 PM weekdays, ~12:10 AM Fri-Sat\n\n"
+                "When back online: SF Chronicle Transportation, BART Twitter @SFBART, 511 SF Bay app"
+            ),
             "sources": [
-                {"url": "https://www.sfchronicle.com/transportation/", "title": "SF Chronicle — Transportation", "snippet": "Bay Area transit coverage including BART."},
+                {"url": "https://www.sfchronicle.com/transportation/", "title": "SF Chronicle Transportation (online)", "snippet": "Reference: Bay Area transit coverage."},
             ],
         },
     },
