@@ -54,22 +54,61 @@ _SOFT_404_PATTERNS = (
     b"article not found",
 )
 
+# Patterns that mean the response is a bot-block / WAF challenge / login wall
+# rather than the actual content. Scanned across the first ~4KB of the body
+# (not just 512 bytes, since Cloudflare's challenge HTML is more than a
+# header line). If matched, the URL is treated as unreachable.
+_BLOCKED_PATTERNS = (
+    b"just a moment",                          # Cloudflare challenge
+    b"checking your browser",                  # CF, others
+    b"enable javascript",                      # JS-only sites
+    b"please verify you are human",            # CF Turnstile
+    b"please verify you are a human",
+    b"verify you are a human",
+    b"are you a robot",
+    b"are you human",
+    b"access denied",
+    b"access to this page has been denied",
+    b"forbidden",
+    b"403 forbidden",
+    b"sorry, you have been blocked",           # CF block
+    b"your access has been blocked",
+    b"captcha",
+    b"recaptcha",
+    b"hcaptcha",
+    b"cf-browser-verification",                # Cloudflare class names
+    b"cf-challenge-running",
+    b"perimeterx",                             # PerimeterX
+    b"datadome",                               # DataDome bot mitigation
+    b"sucuri website firewall",                # Sucuri WAF
+    b"incapsula incident id",                  # Imperva
+    b"akamai reference",                       # Akamai bot manager
+    b"this site can\xe2\x80\x99t be reached",  # Chrome offline placeholder (utf-8)
+    b"subscribe to continue",                  # paywall
+    b"sign in to continue",
+    b"login to view",
+)
+
+
+def _is_blocked_body(body: bytes) -> bool:
+    """True if the response body looks like a bot-block / paywall / WAF page."""
+    if not body:
+        return False
+    sample = body[:4096].lower()
+    return any(p in sample for p in _BLOCKED_PATTERNS)
+
 
 async def _is_reachable(url: str) -> bool:
     """Return True only when the URL serves real, accessible content.
 
-    Strategy
-    --------
-    1. HEAD request, cheap, no body downloaded.
-       • 2xx  →  reachable ✓
-       • 4xx / 5xx (except 405 "HEAD not allowed")  →  unreachable immediately;
-         no point retrying with GET when the server already said the page is gone.
-       • 405 or connection error  →  fall through to GET.
-
-    2. Streaming GET with a Range header, reads only the first 512 bytes.
-       • Non-2xx status  →  unreachable.
-       • 2xx but body starts with a known soft-404 phrase  →  unreachable.
-         (Catches sites that return HTTP 200 for "Page Not Found" pages.)
+    HEAD-only is no longer enough. Many CDN/WAF setups (Cloudflare, Akamai,
+    DataDome, PerimeterX) return HTTP 200 with a bot-challenge HTML body,
+    so we always sniff the first few KB of the actual response and
+    reject:
+      1. Non-2xx status.
+      2. Soft-404 phrases ("page not found", etc).
+      3. Bot-block / WAF / paywall phrases ("just a moment",
+         "access denied", "captcha", "subscribe to continue", etc).
     """
     if not url or not url.startswith("http"):
         return False
@@ -77,28 +116,34 @@ async def _is_reachable(url: str) -> bool:
         async with httpx.AsyncClient(
             timeout=_URL_CHECK_TIMEOUT,
             follow_redirects=True,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; DeadZonePackBuilder/1.0)"},
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/121.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.7",
+            },
         ) as client:
-            try:
-                r = await client.head(url)
-                if 200 <= r.status_code < 300:
-                    return True
-                if r.status_code != 405:
-                    # Definitive failure (404, 403, 410, 5xx …), skip GET
-                    return False
-            except Exception:
-                pass  # HEAD timed out or connection refused, try GET
-
-            # HEAD returned 405 ("not allowed") or failed, use a minimal GET
-            async with client.stream("GET", url, headers={"Range": "bytes=0-511"}) as r:
+            # GET the first 4KB so we can both verify HTTP status and inspect
+            # the body for soft-404 / bot-block patterns. Range header keeps
+            # bandwidth low; servers that ignore it still get truncated by
+            # our stream reader.
+            async with client.stream("GET", url, headers={"Range": "bytes=0-4095"}) as r:
                 if not (200 <= r.status_code < 300):
                     return False
-                # Read the first chunk to detect soft-404 pages
-                chunk = b""
-                async for c in r.aiter_bytes(512):
-                    chunk = c
-                    break
-                return not any(pat in chunk.lower() for pat in _SOFT_404_PATTERNS)
+                body = b""
+                async for c in r.aiter_bytes(4096):
+                    body += c
+                    if len(body) >= 4096:
+                        break
+                low = body.lower()
+                if any(p in low for p in _SOFT_404_PATTERNS):
+                    return False
+                if _is_blocked_body(body):
+                    return False
+                return True
     except Exception:
         return False
 

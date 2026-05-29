@@ -189,8 +189,45 @@ def _extract_main_content(html_text: str) -> str:
     return out
 
 
+# Bot-block / WAF / paywall patterns. If any of these show up in the first
+# few KB of a response body, we treat the page as unreadable and skip
+# caching it, otherwise the pack would just embed a Cloudflare challenge
+# page next to a "Read cached page" button, which is the bug the user
+# is seeing right now.
+_BLOCKED_BODY_PATTERNS = (
+    "just a moment", "checking your browser", "enable javascript",
+    "please verify you are human", "please verify you are a human",
+    "verify you are a human", "are you a robot", "are you human",
+    "access denied", "access to this page has been denied",
+    "forbidden", "403 forbidden",
+    "sorry, you have been blocked", "your access has been blocked",
+    "captcha", "recaptcha", "hcaptcha",
+    "cf-browser-verification", "cf-challenge-running",
+    "perimeterx", "datadome", "sucuri website firewall",
+    "incapsula incident id", "akamai reference",
+    "subscribe to continue", "sign in to continue", "login to view",
+)
+
+
+def _looks_blocked(html_text: str) -> bool:
+    if not html_text:
+        return True
+    sample = html_text[:4096].lower()
+    return any(p in sample for p in _BLOCKED_BODY_PATTERNS)
+
+
 async def _fetch_snapshot(url: str) -> tuple[str | None, str | None]:
-    """Fetch a URL and return (sanitized_inner_html, fetched_title) or (None, None)."""
+    """Fetch a URL and return (sanitized_inner_html, fetched_title) or (None, None).
+
+    Returns (None, None) for:
+      - non-http(s) URLs
+      - network errors / timeouts
+      - non-html responses
+      - non-2xx status
+      - bot-block / WAF / paywall pages (so we don't bake a Cloudflare
+        challenge into the pack)
+      - extracted content too short to be useful (< 200 chars)
+    """
     if not url or not url.startswith("http"):
         return None, None
     try:
@@ -206,6 +243,9 @@ async def _fetch_snapshot(url: str) -> tuple[str | None, str | None]:
     except Exception:
         return None, None
 
+    if _looks_blocked(text):
+        return None, None
+
     # Pull <title> for fallback display.
     title = None
     try:
@@ -217,14 +257,26 @@ async def _fetch_snapshot(url: str) -> tuple[str | None, str | None]:
         pass
 
     sanitized = _extract_main_content(text)
-    return (sanitized or None), title
+    # Reject snapshots with so little extracted content that the accordion
+    # would look broken (often happens on JS-only sites where bs4 sees the
+    # shell page with no article body).
+    if not sanitized or len(sanitized.strip()) < 200:
+        return None, None
+    return sanitized, title
 
 
 async def _fetch_all_snapshots(sources: list[dict]) -> dict[str, dict]:
     """Fetch snapshots for all source URLs in parallel.
-    Returns {url: {"html": "...", "title": "..."}} for each that succeeded.
+
+    Skips sources marked `reachable: False` (nimble's reachability check
+    already flagged them as bot-blocked / 404 / dead, so we save the
+    network round-trip). Returns {url: {"html": "...", "title": "..."}}
+    for each that succeeded.
     """
-    urls = [s.get("url", "") for s in sources if s.get("url", "").startswith("http")]
+    urls = [
+        s.get("url", "") for s in sources
+        if s.get("url", "").startswith("http") and s.get("reachable", True)
+    ]
     if not urls:
         return {}
     results = await asyncio.gather(*(_fetch_snapshot(u) for u in urls), return_exceptions=False)

@@ -319,6 +319,10 @@ async def _dispatch(name: str, args: dict, ctx: _Ctx) -> Any:
                             "url":     str(src.get("url", "")),
                             "title":   _scrub(str(src.get("title", "") or "")),
                             "snippet": _scrub(str(src.get("snippet", "") or "")),
+                            # Preserve nimble's reachability verdict, otherwise
+                            # senso treats every source as reachable and tries
+                            # to cache Cloudflare-blocked pages.
+                            "reachable": bool(src.get("reachable", True)),
                         })
                 clean_secs.append({
                     "heading": _scrub(str(s.get("heading") or s.get("title") or "Section")),
