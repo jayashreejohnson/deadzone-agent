@@ -29,9 +29,10 @@ _GROQ_MODEL       = os.getenv("GROQ_MODEL",         "llama-3.3-70b-versatile").s
 _CEREBRAS_KEY     = os.getenv("CEREBRAS_API_KEY",   "").strip()
 _CEREBRAS_MODEL   = os.getenv("CEREBRAS_MODEL",     "llama-3.3-70b").strip()
 
-# Short per-request timeout so a dead provider doesn't burn 30s before
-# we try the next one in the chain.
-_LLM_TIMEOUT_SEC  = float(os.getenv("LLM_TIMEOUT_SEC", "8"))
+# Short per-request timeout so a dead/queued provider doesn't drag.
+# 5s is aggressive enough to catch queued Cerebras free-tier calls while
+# being generous for healthy Gemini/Llama (typically 1-3s).
+_LLM_TIMEOUT_SEC  = float(os.getenv("LLM_TIMEOUT_SEC", "5"))
 
 # ORCHESTRATOR_MODE controls whether we use the LLM tool-calling loop or the
 # deterministic scripted flow.
@@ -573,43 +574,66 @@ async def run(signal: dict) -> None:
 
 # ---------- LLM-driven path ----------
 
-SYSTEM_PROMPT = """You build offline content packs for drivers about to lose cell signal. Speed matters — the user has minutes. Be terse, no commentary between tool calls.
+# Base system prompt — common to every provider.
+_PROMPT_CORE = """You build offline content packs for drivers about to lose cell signal. Speed matters.
 
-INPUTS: signal contains route, zone_description, duration_minutes, severity, lat, lng, user_id, route_id, deadzone_id.
+INPUTS in signal: route, zone_description, duration_minutes, severity, lat, lng, user_id, route_id, deadzone_id.
 
-THE ONE RULE: every run MUST end with a `deliver_pack` call. No deliver_pack = the user gets nothing. There is no other way to mark success.
+THE ONE RULE: every run MUST end with deliver_pack. Without it the pack is lost.
 
-ROUTE TYPE (one of):
-- transit: contains train / subway / BART / metro / tube
-- mountain: contains pass / Vail / Big Sur / Million Dollar / PCH / US-550
-- rural: contains US-50 / Nevada / "loneliest" / duration_minutes >= 15
-- tunnel: contains tunnel / Lincoln / Holland / Midtown
-- default: anything else
+ROUTE TYPE: transit (train/subway/BART/metro) | mountain (pass/Vail/Big Sur/Million Dollar/PCH/US-550) | rural (US-50/Nevada/loneliest/duration>=15) | tunnel (tunnel/Lincoln/Holland) | default.
 
-STEP 1. In ONE parallel batch, call `clickhouse_find_recent_pack` AND the appropriate nimble_searches. Don't wait for the cache result before kicking off searches — if it hits, you'll ignore the searches.
+STEP 1 — IN ONE PARALLEL BATCH, call clickhouse_find_recent_pack AND 2-4 nimble_search.
+Queries (use zone_description and route in each):
+  transit:  road="<zone> <route> service alerts delays", news="commuter news <zone>", poi="nearby exits <zone>", weather="weather <zone>"
+  mountain: weather="mountain weather <zone> forecast", road="road conditions closures <zone>", poi="emergency contacts sheriff <zone>", news="local mountain news <zone>"
+  rural:    weather="weather next 4h <zone>", road="road conditions gas stations <zone>", poi="last gas station <zone>", news="local news <zone>"
+  tunnel:   road="traffic <zone> <route>", news="local news <zone>", weather="weather <route>", poi="rest stops <zone>"
+Counts: duration>=5 → 4 topics; duration 2-4 → weather+road+news; duration<2 → road+news.
 
-Nimble query templates (pick 2-4 by route type; use shorter queries for shorter zones):
-  transit:  road="{zone} {route} service alerts delays", news="commuter news {zone}", poi="nearby exits {zone}", weather="weather {zone}"
-  mountain: weather="mountain weather {zone} {route} forecast", road="road conditions closures {zone} {route}", poi="emergency contacts sheriff {zone}", news="local mountain news {zone}"
-  rural:    weather="weather next 4h {zone}", road="road conditions gas stations {zone}", poi="last gas station {zone} services", news="local news {zone}"
-  tunnel:   road="traffic {zone} {route}", news="local news {zone}", weather="weather {route}", poi="rest stops {zone}"
-Counts: duration >= 5 → all 4 topics. duration 2-4 → weather+road+news. duration < 2 → road+news.
+STEP 2 — Cache HIT: in parallel call payments_pay (from=agent_<last char of user_id>, to=agent_<last char of cached.owner_user_id>, amount_usd=0.02, memo="buy cached pack") AND clickhouse_log_event (action="bought", pack_id=cached.pack_id, build_ms=0) AND deliver_pack (url=cached.url, cached=true, pack_id=cached.pack_id). STOP.
 
-STEP 2. After searches return:
-  • Cache HIT: call payments_pay (from=agent_<last char of user_id>, to=agent_<last char of cached.owner_user_id>, amount_usd=0.02, memo="buy cached pack") AND clickhouse_log_event (action="bought", pack_id=cached.pack_id, build_ms=0) AND deliver_pack (url=cached.url, cached=true, pack_id=cached.pack_id) — all 3 IN PARALLEL. STOP.
-  • Cache MISS: call senso_publish.
+STEP 3 — Cache MISS path: call senso_publish.
+senso_publish args (EXACT shape, no exceptions):
+  title: "Offline pack: <zone_description>"
+  route_id: signal.route_id
+  sections: [
+    {"heading": "Weather", "summary": "<2-3 sentences from the weather search>", "sources": [{"url":"...","title":"...","snippet":"..."}]},
+    {"heading": "Road conditions", "summary": "<...>", "sources": [...]},
+    ...one object per topic returned...
+  ]
+Each section is an OBJECT. Never a string. Never markdown.
 
-STEP 3 (miss path). senso_publish args MUST be EXACTLY this shape:
-  title: string, e.g. "Offline pack: <zone_description>"
-  route_id: string, taken from signal.route_id
-  sections: ARRAY OF OBJECTS. Each object: {"heading": "<string>", "summary": "<2-3 sentences>", "sources": [{"url": "...", "title": "...", "snippet": "..."}, ...]}
-  NEVER pass markdown or strings inside sections. Always objects.
+STEP 4 — Call clickhouse_save_pack(route_id, deadzone_id, url=<published url>, owner_user_id=signal.user_id, source_count=<total sources across sections>).
 
-STEP 4. After senso_publish, call clickhouse_save_pack with the published url, owner_user_id=signal.user_id, and source_count=<total source count across sections>.
+STEP 5 — MANDATORY: call deliver_pack(url=<published url>, cached=false, pack_id=<pack_id from save_pack>).
 
-STEP 5 (FINAL, MANDATORY). Call deliver_pack with url=<published url>, cached=false, pack_id=<pack_id from save_pack>. Then stop, reply with one short sentence.
+Parallel calls are cheap. Sequential calls cost a full round-trip — minimize them. No commentary between tool calls."""
 
-Parallel calls are cheap. Sequential calls cost a full round-trip — minimize them. Never narrate; the tools speak for you."""
+
+# Per-provider system prompt variants. Different models have different
+# strengths and quirks; tailor the wrapper around the shared core.
+def _system_prompt_for(provider: str) -> str:
+    if provider == "groq":
+        # Llama 3.3 70B follows numbered imperatives well but can be sloppy
+        # with required JSON fields. Drill the schema and the "must call
+        # every step" rule extra hard.
+        return (
+            "You are a precise tool-calling agent. Follow every numbered step. "
+            "Skipping a step means the user gets nothing — that's a critical failure. "
+            "Always include every required argument. JSON shape matters.\n\n"
+            + _PROMPT_CORE
+        )
+    if provider == "cerebras":
+        # gpt-oss-120b / zai-glm-4.7 on Cerebras. Smaller prompts get faster
+        # responses on their hardware. Strip the "you are" framing.
+        return _PROMPT_CORE
+    # OpenRouter / Gemini: handles natural language well, takes the core as-is.
+    return _PROMPT_CORE
+
+
+# Back-compat — some other module imports SYSTEM_PROMPT directly.
+SYSTEM_PROMPT = _PROMPT_CORE
 
 
 async def _call_llm_with_fallback(
@@ -617,27 +641,45 @@ async def _call_llm_with_fallback(
     tools: list[dict] | None = None,
     tool_choice: object = "auto",
 ):
-    """Try OpenRouter, then Groq, then Cerebras. tool_choice can be 'auto',
-    'required', or a specific {type:function, function:{name:...}} dict to
-    force a single tool — used to guarantee deliver_pack on the final hop."""
+    """Try OpenRouter, then Groq, then Cerebras. Each provider gets its own
+    system prompt (different models follow instructions differently) and
+    its own per-call kwargs (parallel_tool_calls, max_tokens, etc.)."""
     from openai import AsyncOpenAI
     last_error: Exception | None = None
+
+    def _msgs_for(provider: str) -> list[dict]:
+        """Swap the system prompt for the provider-specific variant."""
+        sys_prompt = _system_prompt_for(provider)
+        out = list(messages)
+        if out and out[0].get("role") == "system":
+            out[0] = {"role": "system", "content": sys_prompt}
+        else:
+            out.insert(0, {"role": "system", "content": sys_prompt})
+        return out
 
     def _tool_kwargs(provider: str) -> dict:
         if not tools:
             return {}
         kw: dict = {"tools": tools, "tool_choice": tool_choice}
-        # parallel_tool_calls is helpful on OpenRouter (Gemini, etc.) and
-        # Groq's Llama; some Cerebras models don't accept it, so omit there.
+        # Gemini (OpenRouter) and Llama (Groq) both handle parallel
+        # tool calls well. Cerebras's gpt-oss / GLM-4 do not — passing the
+        # flag returns 400 on some models, so we omit it there.
         if provider != "cerebras":
             kw["parallel_tool_calls"] = True
         return kw
 
+    def _max_tokens_for(provider: str) -> int:
+        # Smaller token budget on Cerebras's queued free tier so the
+        # response comes back sooner. Groq and OpenRouter can afford more
+        # headroom for richer pack summaries.
+        return 1024 if provider == "cerebras" else 2048
+
     if _OPENROUTER_KEY and not llm_circuit.is_open("openrouter"):
         try:
             c = AsyncOpenAI(api_key=_OPENROUTER_KEY, base_url="https://openrouter.ai/api/v1", timeout=_LLM_TIMEOUT_SEC)
-            kwargs = {"model": _OPENROUTER_MODEL, "messages": messages,
-                      "temperature": 0, "max_tokens": 2048, **_tool_kwargs("openrouter")}
+            kwargs = {"model": _OPENROUTER_MODEL, "messages": _msgs_for("openrouter"),
+                      "temperature": 0, "max_tokens": _max_tokens_for("openrouter"),
+                      **_tool_kwargs("openrouter")}
             resp = await c.chat.completions.create(**kwargs)
             llm_circuit.reset("openrouter")
             return resp, "openrouter"
@@ -651,8 +693,9 @@ async def _call_llm_with_fallback(
     if _GROQ_KEY and not llm_circuit.is_open("groq"):
         try:
             c = AsyncOpenAI(api_key=_GROQ_KEY, base_url="https://api.groq.com/openai/v1", timeout=_LLM_TIMEOUT_SEC)
-            kwargs = {"model": _GROQ_MODEL, "messages": messages,
-                      "temperature": 0, "max_tokens": 2048, **_tool_kwargs("groq")}
+            kwargs = {"model": _GROQ_MODEL, "messages": _msgs_for("groq"),
+                      "temperature": 0, "max_tokens": _max_tokens_for("groq"),
+                      **_tool_kwargs("groq")}
             resp = await c.chat.completions.create(**kwargs)
             llm_circuit.reset("groq")
             return resp, "groq"
@@ -666,8 +709,9 @@ async def _call_llm_with_fallback(
     if _CEREBRAS_KEY and not llm_circuit.is_open("cerebras"):
         try:
             c = AsyncOpenAI(api_key=_CEREBRAS_KEY, base_url="https://api.cerebras.ai/v1", timeout=_LLM_TIMEOUT_SEC)
-            kwargs = {"model": _CEREBRAS_MODEL, "messages": messages,
-                      "temperature": 0, "max_tokens": 2048, **_tool_kwargs("cerebras")}
+            kwargs = {"model": _CEREBRAS_MODEL, "messages": _msgs_for("cerebras"),
+                      "temperature": 0, "max_tokens": _max_tokens_for("cerebras"),
+                      **_tool_kwargs("cerebras")}
             resp = await c.chat.completions.create(**kwargs)
             llm_circuit.reset("cerebras")
             return resp, "cerebras"
