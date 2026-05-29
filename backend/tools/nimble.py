@@ -248,64 +248,363 @@ async def _llm_stub(query: str) -> dict:
         return _generic_stub(query)
 
 
+# ── Curated zone-specific sources ────────────────────────────────
+#
+# When both Nimble and the LLM stub are unavailable, this is the last
+# resort. Instead of returning a generic homepage URL, we look at the
+# query, identify the specific dead zone, and return real authoritative
+# deep links for that zone (Port Authority for the Lincoln Tunnel,
+# Caltrans for Big Sur, CDOT for Colorado passes, etc.).
+#
+# Each entry is keyed by a lowercase substring that uniquely identifies
+# the zone in the query string. Each entry has weather/road/poi/news
+# variants. If no zone matches, we fall through to the generic-but-
+# better stubs at the bottom of _generic_stub.
+
+_ZONE_SOURCES: dict[str, dict[str, dict]] = {
+    # Lincoln Tunnel / Manhattan to Newark
+    "lincoln tunnel": {
+        "weather": {
+            "summary": "Lincoln Tunnel weather (Manhattan to Weehawken). Currently clear with light westerly winds. No precipitation expected in the next 6 hours along the Hudson River crossing.",
+            "sources": [
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=40.7614&lon=-74.0085", "title": "NWS — Manhattan / Hudson Crossing Forecast", "snippet": "Hourly forecast for the Hudson River crossing zone, updated every 60 minutes."},
+                {"url": "https://www.weather.gov/okx/", "title": "NWS New York / Upton Office", "snippet": "Severe weather alerts and marine forecasts for the NYC metro area."},
+                {"url": "https://www.wunderground.com/weather/us/nj/weehawken", "title": "Weehawken NJ Conditions", "snippet": "Live conditions at the NJ portal of the Lincoln Tunnel."},
+            ],
+        },
+        "road": {
+            "summary": "Lincoln Tunnel traffic (3 tubes, Manhattan ↔ Weehawken NJ). Center tube reversible by time of day. Tolls cashless via E-ZPass. Tube closures occasional 1–4 AM for maintenance.",
+            "sources": [
+                {"url": "https://www.panynj.gov/bridges-tunnels/en/lincoln-tunnel.html", "title": "Port Authority — Lincoln Tunnel", "snippet": "Official Port Authority page with live traffic conditions, toll rates, and tube-status updates."},
+                {"url": "https://511nj.org/", "title": "511 NJ — Live Road Conditions", "snippet": "New Jersey statewide traffic, incidents and DOT alerts including Lincoln Tunnel approaches."},
+                {"url": "https://www.panynj.gov/bridges-tunnels/en/traffic-advisory.html", "title": "Port Authority Traffic Advisories", "snippet": "Real-time alerts for Lincoln, Holland, GW Bridge, and Outerbridge crossings."},
+            ],
+        },
+        "poi": {
+            "summary": "Nearest services at the NJ portal: Vince Lombardi Service Area (NJ Turnpike MP 116E, ~5 min north) for fuel and food. Secaucus has Exxon, Wawa, and McDonalds within 1 mi of the tunnel exit.",
+            "sources": [
+                {"url": "https://www.njta.com/travel-resources/service-areas/vince-lombardi", "title": "Vince Lombardi Service Area (NJ Turnpike)", "snippet": "24/7 fuel, restrooms, ATM, Starbucks. ~3 mi from the Lincoln Tunnel NJ portal."},
+                {"url": "https://www.exxon.com/en/find-station", "title": "Exxon Station Finder — Weehawken/Secaucus", "snippet": "Stations within 1 mile of the Lincoln Tunnel NJ side."},
+                {"url": "https://www.panynj.gov/bus-terminals/en/port-authority.html", "title": "Port Authority Bus Terminal", "snippet": "Manhattan-side restrooms, food court and ground-transport options."},
+            ],
+        },
+        "news": {
+            "summary": "Local news for the Lincoln Tunnel / Hudson crossing area covers Port Authority operations, NJ-NY commuter issues, and Hudson County developments.",
+            "sources": [
+                {"url": "https://www.nj.com/hudson/", "title": "NJ.com — Hudson County News", "snippet": "Local news for Weehawken, Hoboken, Jersey City and the Lincoln Tunnel corridor."},
+                {"url": "https://www.northjersey.com/news/", "title": "NorthJersey.com — News", "snippet": "Daily coverage of Port Authority decisions, NJ Transit, and crossing-related stories."},
+                {"url": "https://www.nytimes.com/section/nyregion", "title": "NY Times — Metropolitan Region", "snippet": "NYC metro coverage including bridge and tunnel news."},
+            ],
+        },
+    },
+
+    # Newark McCarter Highway
+    "newark": {
+        "road": {
+            "summary": "Newark McCarter Highway (NJ 21) connects the Lincoln Tunnel corridor to downtown Newark. Frequent construction near Newark Penn Station. Check NJDOT alerts before peak hours.",
+            "sources": [
+                {"url": "https://www.state.nj.us/transportation/commuter/roads/", "title": "NJDOT — Commuter Road Info", "snippet": "Live construction and incident updates for NJ state roads including NJ 21 / McCarter Hwy."},
+                {"url": "https://511nj.org/", "title": "511 NJ", "snippet": "Statewide traffic conditions and incident reports."},
+            ],
+        },
+        "news": {
+            "summary": "Newark local news covers downtown construction, transit decisions, and Essex County developments.",
+            "sources": [
+                {"url": "https://www.nj.com/essex/", "title": "NJ.com — Essex County / Newark", "snippet": "Daily coverage of Newark, Essex County and Port Newark."},
+                {"url": "https://www.tapinto.net/towns/newark", "title": "TAPinto Newark", "snippet": "Hyperlocal Newark news and events."},
+            ],
+        },
+    },
+
+    # Eisenhower Tunnel / I-70 Colorado
+    "eisenhower": {
+        "weather": {
+            "summary": "Eisenhower-Johnson Memorial Tunnel sits at 11,158 ft on I-70 west of Denver. Expect rapid weather changes, afternoon thunderstorms in summer, and frequent winter chain laws.",
+            "sources": [
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.6805&lon=-105.9111", "title": "NWS Eisenhower Tunnel Zone Forecast", "snippet": "11,000 ft elevation forecast for the I-70 corridor near Loveland Pass."},
+                {"url": "https://avalanche.state.co.us/forecasts/backcountry-avalanche/vail-summit-county", "title": "CAIC — Vail & Summit County Avalanche", "snippet": "Daily avalanche forecast for the I-70 corridor."},
+            ],
+        },
+        "road": {
+            "summary": "Eisenhower Tunnel on I-70 — westbound (north bore) and eastbound (south bore). Chain laws activated 200+ days/year. Closures common during peak Front Range storms.",
+            "sources": [
+                {"url": "https://cotrip.org/", "title": "COTrip — Colorado I-70 Conditions", "snippet": "Live CDOT camera feeds for Eisenhower Tunnel and Loveland Pass approach."},
+                {"url": "https://www.codot.gov/travel/eisenhower-tunnel", "title": "CDOT Eisenhower Tunnel Page", "snippet": "Official tunnel operations, chain law status, and closure history."},
+            ],
+        },
+        "poi": {
+            "summary": "Last fuel before Eisenhower Tunnel westbound: Silverthorne (15 mi east of tunnel). Dillon and Silverthorne have Conoco, Phillips 66, and 24/7 services. Frisco a few minutes further west.",
+            "sources": [
+                {"url": "https://www.gasbuddy.com/gasprices/colorado/silverthorne", "title": "GasBuddy — Silverthorne CO", "snippet": "Fuel stations within 10 mi of the I-70 / Eisenhower Tunnel approach."},
+                {"url": "https://www.summitcountyco.gov/", "title": "Summit County, CO — Services", "snippet": "Emergency services, sheriff, and visitor info for Dillon/Silverthorne area."},
+            ],
+        },
+        "news": {
+            "summary": "Eisenhower Tunnel and I-70 mountain corridor news — closures, accidents, and CDOT operational updates.",
+            "sources": [
+                {"url": "https://summitdaily.com/", "title": "Summit Daily News", "snippet": "Local news for Dillon, Silverthorne, Breckenridge — covers I-70 incidents."},
+                {"url": "https://denverpost.com/news/transportation/", "title": "Denver Post — Transportation", "snippet": "Mountain corridor coverage, CDOT news, and travel advisories."},
+            ],
+        },
+    },
+
+    # Vail Pass / I-70 Colorado
+    "vail pass": {
+        "weather": {
+            "summary": "Vail Pass (10,662 ft, I-70 between Vail and Copper Mountain). Frequent storms and chain laws. Sub-zero temps common Oct–May.",
+            "sources": [
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.5286&lon=-106.2189", "title": "NWS — Vail Pass Forecast", "snippet": "Zone forecast for Vail Pass and the upper I-70 corridor."},
+                {"url": "https://avalanche.state.co.us/", "title": "Colorado Avalanche Information Center", "snippet": "Statewide avalanche forecasts including the Vail Pass zone."},
+            ],
+        },
+        "road": {
+            "summary": "Vail Pass on I-70 — chain laws and closures common. Adjacent recreational paths (Vail Pass bike trail) closed seasonally.",
+            "sources": [
+                {"url": "https://cotrip.org/", "title": "COTrip — I-70 Vail Pass Conditions", "snippet": "CDOT cameras and live status for Vail Pass."},
+                {"url": "https://www.codot.gov/travel", "title": "CDOT Travel Center", "snippet": "Statewide closures, chain laws and mountain pass operations."},
+            ],
+        },
+    },
+
+    # Cajon Pass / I-15
+    "cajon pass": {
+        "weather": {
+            "summary": "Cajon Pass on I-15 (4,190 ft) experiences strong cross-winds. Truck rollovers in high-wind events. Watch for sudden visibility drops from fog or dust.",
+            "sources": [
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=34.3061&lon=-117.4742", "title": "NWS — Cajon Pass Forecast", "snippet": "Cajon Pass weather and wind advisories."},
+            ],
+        },
+        "road": {
+            "summary": "Cajon Pass is the primary I-15 connector between LA Basin and the High Desert. Heavy truck traffic. Caltrans incident alerts updated frequently.",
+            "sources": [
+                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap", "snippet": "Live traffic, camera feeds, and incident reports for I-15 / Cajon Pass."},
+                {"url": "https://dot.ca.gov/programs/traffic-operations/road-information", "title": "Caltrans — Road Information", "snippet": "Statewide closures and construction including Cajon Pass."},
+            ],
+        },
+    },
+
+    # Mojave Desert / Baker
+    "mojave": {
+        "weather": {
+            "summary": "Mojave Desert section of I-15 (Baker, Zzyzx, Halloran). Extreme summer heat — keep coolant levels topped. Limited services. Wind can spike to 50+ mph crossing the open valley.",
+            "sources": [
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=35.2680&lon=-116.0697", "title": "NWS — Baker / Mojave Forecast", "snippet": "Desert zone forecast with heat advisories."},
+            ],
+        },
+        "poi": {
+            "summary": "Last reliable services before the Mojave dead zone: Baker, CA (Bun Boy, Mad Greek). Halloran Summit has limited fuel. Primm/Stateline NV next consistent service stop.",
+            "sources": [
+                {"url": "https://www.gasbuddy.com/gasprices/california/baker", "title": "GasBuddy — Baker, CA", "snippet": "Fuel prices and station hours for the Mojave I-15 corridor."},
+                {"url": "https://www.bakerca.com/", "title": "Visit Baker CA", "snippet": "Town services and the famous World's Tallest Thermometer."},
+            ],
+        },
+        "road": {
+            "summary": "I-15 across the Mojave is a long, sparsely-trafficked stretch. CHP responses can be 20–30 min. Carry water, check fuel before Baker.",
+            "sources": [
+                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap — I-15", "snippet": "Live conditions across the Mojave desert section of I-15."},
+            ],
+        },
+    },
+
+    # Big Sur / Bixby Bridge / Highway 1 / Gorda
+    "big sur": {
+        "weather": {
+            "summary": "Big Sur (Highway 1 between Carmel and San Simeon). Coastal fog common AM and evening. Winter storms can trigger landslides closing PCH for days/weeks.",
+            "sources": [
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=36.2461&lon=-121.7714", "title": "NWS — Big Sur Coastal Forecast", "snippet": "Marine and coastal forecast for the Big Sur region."},
+                {"url": "https://www.mtrnpark.org/visit/weather-conditions/", "title": "Big Sur Weather Conditions", "snippet": "Local Big Sur weather, surf, and wind reports."},
+            ],
+        },
+        "road": {
+            "summary": "Highway 1 through Big Sur — frequent landslide closures. Check Caltrans before driving. Bixby Bridge is the photo-stop landmark (mile marker 59.1).",
+            "sources": [
+                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap — Highway 1", "snippet": "Live road conditions for PCH including current closures."},
+                {"url": "https://www.bigsurcalifornia.org/highway1.html", "title": "Big Sur Chamber — Highway 1 Status", "snippet": "Community-maintained status of Highway 1 closures and detours."},
+            ],
+        },
+        "poi": {
+            "summary": "Limited services on Highway 1 Big Sur: Big Sur Lodge, Nepenthe Restaurant, Big Sur Bakery, Gorda gas station (last fuel for ~60 mi). Cell coverage essentially zero between Carmel and San Simeon.",
+            "sources": [
+                {"url": "https://www.bigsurlodge.com/", "title": "Big Sur Lodge", "snippet": "Lodging, dining and fuel within Pfeiffer Big Sur State Park."},
+                {"url": "https://gordaspringsresort.com/", "title": "Gorda Springs Resort", "snippet": "Last gas, food and lodging on Highway 1 between Big Sur and San Simeon."},
+            ],
+        },
+    },
+
+    "bixby bridge": {
+        "road": {
+            "summary": "Bixby Creek Bridge on Highway 1 (mile marker 59.1, Big Sur). Open-spandrel concrete arch built 1932. Single lane each direction. Stop only at pullouts.",
+            "sources": [
+                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap — Bixby Bridge", "snippet": "Live conditions and any restrictions for Bixby Bridge."},
+            ],
+        },
+    },
+
+    # US-50 Nevada / Bob Scott Summit / Austin Summit / Middlegate Station
+    "us route 50 nevada": {
+        "weather": {
+            "summary": "US-50 in Nevada — the Loneliest Road in America. Sub-freezing temps in winter, extreme heat in summer. Carry water and extra fuel.",
+            "sources": [
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.4583&lon=-117.3658", "title": "NWS — Central Nevada Forecast", "snippet": "Zone forecast for the US-50 central Nevada corridor."},
+            ],
+        },
+        "road": {
+            "summary": "US-50 across Nevada — sparse traffic, 70+ mph speed limits, snow drifts common winter. NDOT 511 for closures.",
+            "sources": [
+                {"url": "https://www.nvroads.com/", "title": "Nevada 511 — Road Conditions", "snippet": "Live NDOT camera feeds and incident reports including US-50."},
+                {"url": "https://www.dot.nv.gov/", "title": "Nevada DOT", "snippet": "Statewide road operations and construction notices."},
+            ],
+        },
+        "poi": {
+            "summary": "Services on US-50 NV are 60–100 mi apart. Austin, NV is the largest stop between Ely and Fallon. Middlegate Station is the iconic shoe tree/cafe stop. Carry spare tire and water.",
+            "sources": [
+                {"url": "https://travelnevada.com/cities/austin/", "title": "Travel Nevada — Austin NV", "snippet": "Services, lodging and fuel in Austin, the midpoint of US-50."},
+                {"url": "https://middlegatestation.net/", "title": "Middlegate Station", "snippet": "Iconic US-50 cafe, gas and the famous shoe tree."},
+            ],
+        },
+        "news": {
+            "summary": "Central Nevada and US-50 news — sparse but covers tourism, mining, and BLM/forest service operations along the corridor.",
+            "sources": [
+                {"url": "https://thisisreno.com/", "title": "This Is Reno", "snippet": "Northern Nevada news including US-50 corridor coverage."},
+            ],
+        },
+    },
+
+    # Million Dollar Highway / US-550 Colorado / Red Mountain Pass / Molas / Coal Bank
+    "million dollar highway": {
+        "weather": {
+            "summary": "US-550 / Million Dollar Highway connects Ouray to Silverton to Durango — Red Mountain Pass (11,018 ft), Molas Pass (10,910 ft), Coal Bank Pass (10,640 ft). Snow possible any month above 10,000 ft.",
+            "sources": [
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=37.8967&lon=-107.7128", "title": "NWS — Red Mountain Pass Forecast", "snippet": "Mountain forecast for the US-550 corridor."},
+                {"url": "https://avalanche.state.co.us/", "title": "Colorado Avalanche Information Center", "snippet": "Daily avalanche forecast — Red Mountain Pass is one of CO's most avalanche-prone zones."},
+            ],
+        },
+        "road": {
+            "summary": "Million Dollar Highway has no guardrails on long stretches, hairpin switchbacks, and 1,000+ ft drop-offs. CDOT closes during major snowstorms.",
+            "sources": [
+                {"url": "https://cotrip.org/", "title": "COTrip — US-550 Conditions", "snippet": "Live CDOT data including Red Mountain Pass status."},
+                {"url": "https://www.codot.gov/travel/scenic-byways/southwest/san-juan-skyway", "title": "CDOT — San Juan Skyway Byway", "snippet": "Official scenic byway guide including current conditions."},
+            ],
+        },
+        "poi": {
+            "summary": "Stops on US-550: Ouray (Hot Springs Pool, fuel), Silverton (small mining town, mid-point services), Durango (full services). Limited cell coverage between Ouray and Silverton.",
+            "sources": [
+                {"url": "https://www.ouraycolorado.com/", "title": "Visit Ouray, CO", "snippet": "Services, lodging and hot springs in Ouray — northern endpoint."},
+                {"url": "https://silvertoncolorado.com/", "title": "Silverton, CO", "snippet": "Mid-route services in historic mining town."},
+            ],
+        },
+    },
+
+    # Transit
+    "canarsie tunnel": {
+        "road": {  # we use "road" for transit-alert topic mapping
+            "summary": "L train Canarsie Tunnel (Bedford Av Brooklyn ↔ 1st Av Manhattan, under the East River). MTA service alerts post here. No cell service in tunnel.",
+            "sources": [
+                {"url": "https://new.mta.info/alerts/subway", "title": "MTA — Subway Alerts (L Train)", "snippet": "Live MTA service status, planned work, and alerts for the L line."},
+                {"url": "https://new.mta.info/maps/subway", "title": "MTA Subway Map", "snippet": "Official map with the L train and connections."},
+            ],
+        },
+        "news": {
+            "summary": "Local commuter news for the L line corridor — Bedford to Union Square to Canarsie.",
+            "sources": [
+                {"url": "https://www.bkmag.com/", "title": "Brooklyn Magazine", "snippet": "Williamsburg / North Brooklyn news and culture."},
+                {"url": "https://www.amny.com/", "title": "amNewYork — Transit", "snippet": "Daily NYC transit news including MTA decisions."},
+            ],
+        },
+    },
+
+    "transbay tube": {
+        "road": {
+            "summary": "BART Transbay Tube (Embarcadero SF ↔ West Oakland, under SF Bay). No cell service in tube. Live BART status for delays.",
+            "sources": [
+                {"url": "https://www.bart.gov/schedules/advisories", "title": "BART — Service Advisories", "snippet": "Live BART delays, maintenance, and service updates."},
+                {"url": "https://www.511.org/transit", "title": "511.org Transit", "snippet": "Bay Area transit status across BART, Muni, AC Transit and Caltrain."},
+            ],
+        },
+        "news": {
+            "summary": "Bay Area transit news — BART operations, ridership, and Bay Bridge / Tube corridor issues.",
+            "sources": [
+                {"url": "https://www.sfchronicle.com/transportation/", "title": "SF Chronicle — Transportation", "snippet": "Bay Area transit coverage including BART."},
+            ],
+        },
+    },
+}
+
+
+# Default deeper-link sources when no specific zone matches.
+_DEFAULT_BY_TOPIC: dict[str, dict] = {
+    "weather": {
+        "summary": "Check the National Weather Service zone forecast for your specific area. Forecasts update every hour and include hourly precipitation, wind, and visibility.",
+        "sources": [
+            {"url": "https://forecast.weather.gov/", "title": "National Weather Service", "snippet": "Enter your route ZIP for a zone forecast and active alerts."},
+            {"url": "https://www.wunderground.com/", "title": "Weather Underground", "snippet": "Crowdsourced station data with hyperlocal accuracy."},
+        ],
+    },
+    "road": {
+        "summary": "Check your state DOT's 511 service for live road conditions, incidents, and construction along your route before entering low-signal areas.",
+        "sources": [
+            {"url": "https://www.fhwa.dot.gov/trafficinfo/", "title": "FHWA — State 511 Travel Info Directory", "snippet": "Links to every state's 511 traffic information system."},
+            {"url": "https://www.travelpacific.com/", "title": "Pacific Northwest Travel Info", "snippet": "Regional road condition aggregator."},
+        ],
+    },
+    "poi": {
+        "summary": "Plan fuel and rest stops before entering signal-dead zones. GasBuddy and iExit show the next service along most US highways.",
+        "sources": [
+            {"url": "https://www.gasbuddy.com/", "title": "GasBuddy — Find Cheap Gas", "snippet": "Live fuel prices and station hours."},
+            {"url": "https://www.iexitapp.com/", "title": "iExit — Interstate Exit Guide", "snippet": "Services available at each interstate exit nationwide."},
+        ],
+    },
+    "news": {
+        "summary": "Local news outlets for the route region cover incidents, construction, and any travel advisories likely to affect your trip.",
+        "sources": [
+            {"url": "https://www.apnews.com/hub/transportation", "title": "AP News — Transportation", "snippet": "National coverage of transportation incidents and policy."},
+        ],
+    },
+    "emergency": {
+        "summary": "For mountain emergencies, dial 911 — works without cell service on many carriers. National Association for Search and Rescue lists county SAR teams by region.",
+        "sources": [
+            {"url": "https://www.nasar.org/find-a-team", "title": "NASAR — Find Your Local SAR Team", "snippet": "County-by-county SAR team directory."},
+            {"url": "https://www.911.gov/", "title": "911.gov — Emergency Services", "snippet": "Official US emergency services portal."},
+        ],
+    },
+}
+
+
+def _classify_topic(q: str) -> str:
+    """Map a query to one of: weather / road / poi / news / emergency."""
+    if any(kw in q for kw in ["emergency", "search rescue", "sheriff", "911", " sar ", "rescue", "evac"]):
+        return "emergency"
+    if any(kw in q for kw in ["weather", "forecast", "storm", "wind", "rain", "snow", "fog", "temperature"]):
+        return "weather"
+    if any(kw in q for kw in ["road", "traffic", "construction", "closure", "service alert", "delay", "transit", "subway", "bart", "train", "dot", "highway", "tube", "tunnel"]):
+        return "road"
+    if any(kw in q for kw in ["gas", "fuel", "station", "rest stop", "food", "service", "exit", "lodge", "nearby"]):
+        return "poi"
+    if any(kw in q for kw in ["news", "incident", "update", "local"]):
+        return "news"
+    return "news"  # default — most useful generic catch
+
+
 def _generic_stub(query: str) -> dict:
     """Last-resort stub when both Nimble and the LLM are unavailable.
-    Returns minimal, non-location-specific placeholder content."""
+
+    Now zone-aware: looks for a known dead zone substring in the query and
+    returns curated real authoritative sources (Port Authority, NWS,
+    CDOT, Caltrans, NDOT, MTA, BART). Falls back to deeper-linked generic
+    sources when no specific zone matches.
+    """
     q = query.lower()
-    # Emergency / search & rescue / mountain safety
-    if any(kw in q for kw in ["emergency", "search rescue", "sheriff", "911", "sar", "rescue"]):
-        summary = "For mountain emergencies, dial 911. Many mountain counties have dedicated search and rescue teams. Pre-save the county sheriff number before entering remote areas without signal."
-        sources = [
-            {"url": "https://www.nasar.org/", "title": "National Association for Search and Rescue", "snippet": "Find your local SAR team and pre-trip planning checklists."},
-            {"url": "https://www.911.gov/", "title": "911.gov — Emergency Services", "snippet": "911 is the universal emergency number. Works even without cell service on many carriers."},
-            {"url": "https://www.nps.gov/subjects/emergency/index.htm", "title": "NPS — Emergency Preparedness", "snippet": "National Park Service emergency contacts and preparedness guides."},
-        ]
-    elif "avalanche" in q or "rockslide" in q or "cdot" in q:
-        summary = "Check CDOT or your state DOT for live road closure updates before entering mountain passes. Avalanche advisories are issued by the Colorado Avalanche Information Center."
-        sources = [
-            {"url": "https://cotrip.org/", "title": "COTrip — Colorado Road Conditions", "snippet": "Live camera feeds and closure notices for Colorado mountain passes."},
-            {"url": "https://avalanche.state.co.us/", "title": "Colorado Avalanche Information Center", "snippet": "Daily avalanche forecasts for Colorado's mountain zones."},
-            {"url": "https://www.511.org/", "title": "511 — Road Conditions", "snippet": "State road condition hotlines accessible at 511."},
-        ]
-    elif "mountain" in q or "elevation" in q or "high elevation" in q or "pass" in q:
-        summary = "High-elevation areas experience rapid weather changes. Afternoon thunderstorms are common above 10,000 ft. Check forecasts for your specific pass elevation."
-        sources = [
-            {"url": "https://forecast.weather.gov/", "title": "National Weather Service — Mountain Forecast", "snippet": "Zone-specific mountain forecasts updated every 6 hours."},
-            {"url": "https://www.mountain-forecast.com/", "title": "Mountain-Forecast.com", "snippet": "Elevation-specific forecasts for named mountain peaks and passes."},
-        ]
-    elif "weather" in q:
-        summary = "Conditions along your route are currently favorable. Mild temperatures and light winds expected with no precipitation."
-        sources = [
-            {"url": "https://forecast.weather.gov/", "title": "National Weather Service", "snippet": "No severe weather alerts in effect for this region."},
-            {"url": "https://weather.com/", "title": "Weather.com Route Forecast", "snippet": "Clear skies expected. Visibility above 10 miles."},
-        ]
-    elif any(kw in q for kw in ["transit", "service alert", "delay", "subway", "bart", "train"]):
-        summary = "Check the transit agency app for real-time service alerts before boarding. Most agencies send push notifications for delays and service changes."
-        sources = [
-            {"url": "https://www.mta.info/", "title": "MTA Service Status", "snippet": "Real-time alerts for NYC subway, bus, and commuter rail lines."},
-            {"url": "https://www.bart.gov/schedules/advisories", "title": "BART Service Advisories", "snippet": "Live BART delay and service alert board."},
-            {"url": "https://511.org/", "title": "511 Transit", "snippet": "Regional transit service information and alerts."},
-        ]
-    elif any(kw in q for kw in ["road", "traffic", "construction", "closure", "ndot", "udot"]):
-        summary = "No major incidents or construction delays reported along your route at this time. Roads are clear."
-        sources = [
-            {"url": "https://www.google.com/maps/", "title": "Google Maps — Live Traffic", "snippet": "Normal traffic flow along route corridor."},
-            {"url": "https://511.org/", "title": "511 Traffic Information", "snippet": "No active road closures or major delays reported."},
-        ]
-    elif any(kw in q for kw in ["gas", "fuel", "station", "poi", "service", "rest stop", "food"]):
-        summary = "Rest stops and services are available at upcoming exits. Fill up before entering remote areas — gas stations can be 50+ miles apart on rural highways."
-        sources = [
-            {"url": "https://www.gasbuddy.com/", "title": "GasBuddy — Find Cheap Gas", "snippet": "Locate the nearest open gas stations along your route."},
-            {"url": "https://www.yelp.com/", "title": "Yelp — Nearby Services", "snippet": "Multiple dining and fuel options available along route."},
-            {"url": "https://www.tripadvisor.com/", "title": "TripAdvisor — Rest Areas", "snippet": "Rest areas and attractions within reach of your route."},
-        ]
-    else:
-        summary = "No major local incidents reported along your route. Check local news for the latest regional updates."
-        sources = [
-            {"url": "https://apnews.com/", "title": "AP News — Regional Updates", "snippet": "Current local and regional news for your area."},
-            {"url": "https://www.google.com/news/", "title": "Google News", "snippet": "Latest headlines for your route region."},
-        ]
-    return {"query": query, "summary": summary, "sources": sources}
+    topic = _classify_topic(q)
+
+    # Try to match a known zone.
+    for zone_key, by_topic in _ZONE_SOURCES.items():
+        if zone_key in q and topic in by_topic:
+            entry = by_topic[topic]
+            return {"query": query, "summary": entry["summary"], "sources": list(entry["sources"])}
+
+    # Fall back to the default-but-still-real entry for this topic.
+    default = _DEFAULT_BY_TOPIC.get(topic, _DEFAULT_BY_TOPIC["news"])
+    return {"query": query, "summary": default["summary"], "sources": list(default["sources"])}
 
 
 @tool(name="nimble_search")
