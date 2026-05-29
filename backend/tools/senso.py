@@ -34,6 +34,52 @@ def _section_icon(heading: str) -> str:
     return "📋"
 
 
+def _render_summary(summary: str) -> str:
+    """Convert a plain-text summary to readable HTML.
+
+    Preserves paragraph breaks (blank lines), bullet markers (lines
+    starting with "• ", "- ", "* "), and bolded headings (all-caps
+    or terminated with a colon) that appear at the start of paragraphs.
+    Everything else gets html.escape so we don't inject anything weird.
+    """
+    if not summary:
+        return ""
+    s = summary.replace("\r\n", "\n").replace("\r", "\n")
+    paragraphs = [p.strip("\n") for p in s.split("\n\n") if p.strip()]
+    out_parts: list[str] = []
+    for para in paragraphs:
+        lines = para.split("\n")
+        # Detect bullet-list paragraphs.
+        if all(l.lstrip().startswith(("• ", "- ", "* ")) for l in lines if l.strip()):
+            items = []
+            for l in lines:
+                stripped = l.lstrip()
+                if not stripped:
+                    continue
+                # Drop the bullet marker
+                for marker in ("• ", "- ", "* "):
+                    if stripped.startswith(marker):
+                        stripped = stripped[len(marker):]
+                        break
+                items.append(f"<li>{html.escape(stripped)}</li>")
+            out_parts.append(f'<ul class="sec-ul">{"".join(items)}</ul>')
+            continue
+        # Mixed paragraph: render with <br> for line breaks, and emphasize
+        # a leading ALL-CAPS / "Heading:" line as a strong tag.
+        rendered_lines = []
+        for i, l in enumerate(lines):
+            esc = html.escape(l)
+            if i == 0 and (l.isupper() or l.endswith(":")):
+                esc = f"<strong>{esc}</strong>"
+            elif l.lstrip().startswith(("• ", "- ", "* ")):
+                # Mid-paragraph bullet — treat as its own line
+                content = l.lstrip()[2:]
+                esc = f"&nbsp;&nbsp;&bull;&nbsp;{html.escape(content)}"
+            rendered_lines.append(esc)
+        out_parts.append("<p>" + "<br>".join(rendered_lines) + "</p>")
+    return "".join(out_parts)
+
+
 def _render_html(title: str, route_id: str, sections: list[dict]) -> str:
     from datetime import datetime, timezone
     ts = datetime.now(timezone.utc).strftime("%b %d, %Y at %H:%M UTC")
@@ -68,12 +114,20 @@ def _render_html(title: str, route_id: str, sections: list[dict]) -> str:
                     f'</div>'
                 )
 
-        sources_block = f'<div class="sources">{sources_inner}</div>' if srcs else ""
+        sources_block = (
+            f'<div class="src-lbl">When back online</div>'
+            f'<div class="sources">{sources_inner}</div>'
+        ) if srcs else ""
+        # Preserve newlines and basic bullet formatting from the summary.
+        # The curated content uses \n for paragraph breaks and "• " for
+        # bullets — we render those as proper HTML so the pack is
+        # readable as a document, not a wall of text.
+        summary_html = _render_summary(summary)
         sections_html_parts.append(
             f'<div class="sec">'
             f'<div class="sec-head"><span class="sec-icon">{icon}</span>'
             f'<span>{html.escape(heading)}</span></div>'
-            f'<div class="sec-summary">{html.escape(summary)}</div>'
+            f'<div class="sec-summary">{summary_html}</div>'
             f'{sources_block}</div>'
         )
 
@@ -114,9 +168,22 @@ a{{color:inherit;text-decoration:none}}
 .sec-head{{display:flex;align-items:center;gap:.45rem;font-size:.62rem;font-weight:600;
            text-transform:uppercase;letter-spacing:.18em;color:#00d4ff;margin-bottom:.6rem}}
 .sec-icon{{font-size:.95rem;line-height:1}}
-.sec-summary{{font-size:.855rem;color:#94a3b8;line-height:1.68;margin-bottom:.55rem}}
+.sec-summary{{font-size:.855rem;color:#cbd5e1;line-height:1.65;margin-bottom:.55rem}}
+.sec-summary p{{margin-bottom:.55rem}}
+.sec-summary p:last-child{{margin-bottom:0}}
+.sec-summary strong{{color:#e2e8f0;font-weight:600;display:block;
+                     font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;
+                     color:#7dd3fc;margin-bottom:.3rem}}
+.sec-summary ul.sec-ul{{list-style:none;padding-left:0;margin:.3rem 0 .55rem 0}}
+.sec-summary ul.sec-ul li{{padding-left:1rem;position:relative;margin-bottom:.28rem;color:#94a3b8}}
+.sec-summary ul.sec-ul li::before{{content:"•";position:absolute;left:.25rem;
+                                    color:#00d4ff;font-weight:700}}
 
-.sources{{display:flex;flex-direction:column;gap:.3rem;margin-top:.45rem}}
+.src-lbl{{font-size:.55rem;text-transform:uppercase;letter-spacing:.16em;
+          color:#475569;margin:.95rem 0 .35rem 0;font-weight:600;
+          padding-top:.55rem;border-top:1px dashed rgba(255,255,255,.05)}}
+
+.sources{{display:flex;flex-direction:column;gap:.3rem;margin-top:.1rem}}
 .src-row{{display:flex;align-items:flex-start;gap:.55rem;padding:.5rem .65rem;
           border-radius:8px;background:rgba(255,255,255,.02);
           border:1px solid rgba(255,255,255,.05);transition:border-color .15s,background .15s}}
@@ -148,7 +215,7 @@ a.src-row:hover{{border-color:rgba(0,212,255,.28);background:rgba(0,212,255,.05)
   <span class="logo">📡&nbsp;DeadZone</span>
   <div class="hdr-body">
     <div class="hdr-title">{html.escape(title)}</div>
-    <div class="hdr-meta">Generated {ts} &middot; {total_sources} cited sources &middot; works without signal</div>
+    <div class="hdr-meta">Generated {ts} &middot; Content reads offline &middot; Links require signal</div>
   </div>
   <span class="badge">&#10003; offline ready</span>
 </div>

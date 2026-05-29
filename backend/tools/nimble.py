@@ -265,35 +265,66 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
     # Lincoln Tunnel / Manhattan to Newark
     "lincoln tunnel": {
         "weather": {
-            "summary": "Lincoln Tunnel weather (Manhattan to Weehawken). Currently clear with light westerly winds. No precipitation expected in the next 6 hours along the Hudson River crossing.",
+            "summary": (
+                "LINCOLN TUNNEL WEATHER (Manhattan → Weehawken NJ).\n"
+                "Tunnel is fully enclosed — no precipitation impact inside. "
+                "Watch for: low visibility at NJ portal (frequent fog Oct–Mar), "
+                "strong cross-winds on the helix approach (sustained 25+ mph closes high-profile vehicles).\n"
+                "Typical conditions this time of year: 45–65°F, NW winds 8–15 mph.\n"
+                "Emergency closure alerts: tune AM 1630 (Port Authority radio) inside tunnel."
+            ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=40.7614&lon=-74.0085", "title": "NWS — Manhattan / Hudson Crossing Forecast", "snippet": "Hourly forecast for the Hudson River crossing zone, updated every 60 minutes."},
-                {"url": "https://www.weather.gov/okx/", "title": "NWS New York / Upton Office", "snippet": "Severe weather alerts and marine forecasts for the NYC metro area."},
-                {"url": "https://www.wunderground.com/weather/us/nj/weehawken", "title": "Weehawken NJ Conditions", "snippet": "Live conditions at the NJ portal of the Lincoln Tunnel."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=40.7614&lon=-74.0085", "title": "NWS — Manhattan Forecast (online)", "snippet": "Reference when back online: hourly forecast updated every 60 min."},
+                {"url": "https://www.weather.gov/okx/", "title": "NWS NY/Upton Office (online)", "snippet": "Severe weather alerts for the NYC metro area."},
             ],
         },
         "road": {
-            "summary": "Lincoln Tunnel traffic (3 tubes, Manhattan ↔ Weehawken NJ). Center tube reversible by time of day. Tolls cashless via E-ZPass. Tube closures occasional 1–4 AM for maintenance.",
+            "summary": (
+                "LINCOLN TUNNEL TRAFFIC — 3 tubes, ~1.5 mi each, Manhattan ↔ Weehawken NJ.\n"
+                "• Tolls: $16.00 peak / $13.75 off-peak (E-ZPass) — cashless, no toll booths\n"
+                "• Center tube REVERSIBLE: NB mornings, SB evenings (XBL bus lane mornings)\n"
+                "• Tube closures common 1–4 AM weeknights for maintenance\n"
+                "• Inside-tunnel emergencies: pull to right shoulder, use white emergency phones every 300 ft\n"
+                "• Port Authority Police: (855) 447-2255 (works from emergency phones)\n"
+                "• Tunnel radio: AM 1630 for live status (works inside tunnel)\n"
+                "• NJ approach: NJ-495 → tunnel helix (3 right-curving levels)\n"
+                "• Manhattan exit: 40th St / 39th St (3 lanes each direction)"
+            ),
             "sources": [
-                {"url": "https://www.panynj.gov/bridges-tunnels/en/lincoln-tunnel.html", "title": "Port Authority — Lincoln Tunnel", "snippet": "Official Port Authority page with live traffic conditions, toll rates, and tube-status updates."},
-                {"url": "https://511nj.org/", "title": "511 NJ — Live Road Conditions", "snippet": "New Jersey statewide traffic, incidents and DOT alerts including Lincoln Tunnel approaches."},
-                {"url": "https://www.panynj.gov/bridges-tunnels/en/traffic-advisory.html", "title": "Port Authority Traffic Advisories", "snippet": "Real-time alerts for Lincoln, Holland, GW Bridge, and Outerbridge crossings."},
+                {"url": "https://www.panynj.gov/bridges-tunnels/en/lincoln-tunnel.html", "title": "Port Authority — Lincoln Tunnel (online)", "snippet": "Reference when back online: live traffic and toll updates."},
+                {"url": "https://511nj.org/", "title": "511 NJ — Live Road Conditions (online)", "snippet": "Statewide NJ traffic and DOT alerts."},
             ],
         },
         "poi": {
-            "summary": "Nearest services at the NJ portal: Vince Lombardi Service Area (NJ Turnpike MP 116E, ~5 min north) for fuel and food. Secaucus has Exxon, Wawa, and McDonalds within 1 mi of the tunnel exit.",
+            "summary": (
+                "SERVICES NEAR THE LINCOLN TUNNEL\n\n"
+                "NJ side (Weehawken / Secaucus):\n"
+                "• Vince Lombardi Service Area — NJ Turnpike MP 116E, 24/7. Sunoco fuel, Starbucks, Burger King, restrooms, ATM. ~3 mi north of tunnel via NJ-495 → NJTP\n"
+                "• Exxon Weehawken — 700 Park Ave, 24/7. ~0.4 mi from NJ portal\n"
+                "• Wawa Secaucus — 1300 Paterson Plank Rd, 24/7. Fuel + food, ~1 mi from tunnel\n"
+                "• Hoboken/JC fuel: limited, mostly closed overnight\n\n"
+                "Manhattan side:\n"
+                "• Port Authority Bus Terminal — 8th Ave & 42nd St. Restrooms, food court (Au Bon Pain, Pret, McDonald's). Open ~5 AM – 1 AM\n"
+                "• Times Square subway: 42nd St (1/2/3, N/Q/R/W, 7, S) — 1 block from tunnel exit"
+            ),
             "sources": [
-                {"url": "https://www.njta.com/travel-resources/service-areas/vince-lombardi", "title": "Vince Lombardi Service Area (NJ Turnpike)", "snippet": "24/7 fuel, restrooms, ATM, Starbucks. ~3 mi from the Lincoln Tunnel NJ portal."},
-                {"url": "https://www.exxon.com/en/find-station", "title": "Exxon Station Finder — Weehawken/Secaucus", "snippet": "Stations within 1 mile of the Lincoln Tunnel NJ side."},
-                {"url": "https://www.panynj.gov/bus-terminals/en/port-authority.html", "title": "Port Authority Bus Terminal", "snippet": "Manhattan-side restrooms, food court and ground-transport options."},
+                {"url": "https://www.njta.com/travel-resources/service-areas/vince-lombardi", "title": "Vince Lombardi Service Area page (online)", "snippet": "Hours, amenities, exact NJTP milepost."},
             ],
         },
         "news": {
-            "summary": "Local news for the Lincoln Tunnel / Hudson crossing area covers Port Authority operations, NJ-NY commuter issues, and Hudson County developments.",
+            "summary": (
+                "LINCOLN TUNNEL / HUDSON CROSSING CONTEXT\n\n"
+                "Coverage area: Weehawken, Hoboken, Jersey City, Hudson County NJ + West Side Manhattan.\n"
+                "Common recurring issues to expect:\n"
+                "• AM peak (7–10 AM): NJ→NYC backups extend to NJ-495 and NJ-3 merge — 15–30 min delay typical\n"
+                "• PM peak (4–7 PM): NYC→NJ backups extend through Manhattan to 9th Ave\n"
+                "• Friday afternoons: heaviest week — XBL (bus lane) helps westbound\n"
+                "• Major events at MetLife Stadium add 20–40 min to NJ-bound trips\n"
+                "When back online: NJ.com Hudson County, NorthJersey.com, ABC7 Eyewitness News for live updates."
+            ),
             "sources": [
-                {"url": "https://www.nj.com/hudson/", "title": "NJ.com — Hudson County News", "snippet": "Local news for Weehawken, Hoboken, Jersey City and the Lincoln Tunnel corridor."},
-                {"url": "https://www.northjersey.com/news/", "title": "NorthJersey.com — News", "snippet": "Daily coverage of Port Authority decisions, NJ Transit, and crossing-related stories."},
-                {"url": "https://www.nytimes.com/section/nyregion", "title": "NY Times — Metropolitan Region", "snippet": "NYC metro coverage including bridge and tunnel news."},
+                {"url": "https://www.nj.com/hudson/", "title": "NJ.com Hudson County (online)", "snippet": "Local Weehawken/Hoboken/JC news."},
+                {"url": "https://www.northjersey.com/news/", "title": "NorthJersey.com (online)", "snippet": "Daily Port Authority coverage."},
             ],
         },
     },
@@ -319,31 +350,70 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
     # Eisenhower Tunnel / I-70 Colorado
     "eisenhower": {
         "weather": {
-            "summary": "Eisenhower-Johnson Memorial Tunnel sits at 11,158 ft on I-70 west of Denver. Expect rapid weather changes, afternoon thunderstorms in summer, and frequent winter chain laws.",
+            "summary": (
+                "EISENHOWER TUNNEL WEATHER — 11,158 ft elevation on I-70 west of Denver.\n"
+                "• Tunnel interior fully enclosed and climate-controlled — no weather impact inside\n"
+                "• APPROACH zones above 11,000 ft: weather changes minute-to-minute\n"
+                "• Summer (Jun–Aug): afternoon thunderstorms most days 1–5 PM, hail possible\n"
+                "• Winter (Oct–May): chain laws activate ~200 days/yr; closures during heavy snow\n"
+                "• Tunnel itself stays open in nearly all conditions; bottleneck is the APPROACH\n"
+                "• Carry blankets and water Oct–April — closure can strand you 2–8 hours\n"
+                "• Tune AM 1610 inside tunnel for live closure updates"
+            ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.6805&lon=-105.9111", "title": "NWS Eisenhower Tunnel Zone Forecast", "snippet": "11,000 ft elevation forecast for the I-70 corridor near Loveland Pass."},
-                {"url": "https://avalanche.state.co.us/forecasts/backcountry-avalanche/vail-summit-county", "title": "CAIC — Vail & Summit County Avalanche", "snippet": "Daily avalanche forecast for the I-70 corridor."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=39.6805&lon=-105.9111", "title": "NWS Loveland Pass Forecast (online)", "snippet": "Reference: 11,000 ft elevation zone forecast."},
+                {"url": "https://avalanche.state.co.us/forecasts/backcountry-avalanche/vail-summit-county", "title": "CAIC Vail/Summit Avalanche (online)", "snippet": "Daily backcountry avalanche advisory."},
             ],
         },
         "road": {
-            "summary": "Eisenhower Tunnel on I-70 — westbound (north bore) and eastbound (south bore). Chain laws activated 200+ days/year. Closures common during peak Front Range storms.",
+            "summary": (
+                "EISENHOWER-JOHNSON MEMORIAL TUNNEL on I-70.\n"
+                "• Westbound: north bore (Eisenhower). Eastbound: south bore (Johnson). Two lanes each direction.\n"
+                "• Length: 1.7 mi. Speed limit 50 mph (heavily enforced).\n"
+                "• Vehicle restrictions: NO oversized loads (>13'6\" height, >13'6\" width). HAZMAT permitted with restrictions.\n"
+                "• Chain laws activate ~200 days/year. Code 18 = passenger chains required. Code 16 = traction only.\n"
+                "• Inside tunnel: pull to right shoulder for emergencies. Emergency phones every 300 ft.\n"
+                "• Tunnel control: (303) 569-2118 (CDOT)\n"
+                "• Inside-tunnel radio: AM 1610 — auto-tunes for closure/chain announcements\n"
+                "• Common closure trigger: I-70 corridor accidents, not the tunnel itself"
+            ),
             "sources": [
-                {"url": "https://cotrip.org/", "title": "COTrip — Colorado I-70 Conditions", "snippet": "Live CDOT camera feeds for Eisenhower Tunnel and Loveland Pass approach."},
-                {"url": "https://www.codot.gov/travel/eisenhower-tunnel", "title": "CDOT Eisenhower Tunnel Page", "snippet": "Official tunnel operations, chain law status, and closure history."},
+                {"url": "https://www.codot.gov/travel/eisenhower-tunnel", "title": "CDOT Eisenhower Tunnel Page (online)", "snippet": "Reference: live tunnel status when reconnected."},
+                {"url": "https://cotrip.org/", "title": "COTrip Live I-70 Cameras (online)", "snippet": "CDOT cameras for Eisenhower and Loveland Pass approaches."},
             ],
         },
         "poi": {
-            "summary": "Last fuel before Eisenhower Tunnel westbound: Silverthorne (15 mi east of tunnel). Dillon and Silverthorne have Conoco, Phillips 66, and 24/7 services. Frisco a few minutes further west.",
+            "summary": (
+                "SERVICES ON I-70 NEAR EISENHOWER TUNNEL\n\n"
+                "Westbound (Denver → Vail), LAST FUEL BEFORE TUNNEL:\n"
+                "• Silverthorne (exit 205, 15 mi east of tunnel) — Conoco, Shell, Phillips 66 all 24/7\n"
+                "• Dillon (exit 205) — Conoco at 800 Anemone Trail, City Market grocery, McDonald's\n\n"
+                "Westbound AFTER tunnel:\n"
+                "• Frisco (exit 201) — Conoco, 7-Eleven, multiple restaurants\n"
+                "• Copper Mountain (exit 195) — limited (resort only)\n"
+                "• Vail Pass summit (exit 190) — rest area, no fuel\n"
+                "• Vail (exit 173) — full services\n\n"
+                "Emergency contacts:\n"
+                "• Summit County Sheriff: (970) 453-2232\n"
+                "• Frisco/Copper SAR (Search & Rescue): dial 911 — Summit County SAR dispatched\n"
+                "• Vail Mountain Rescue: (970) 569-2191"
+            ),
             "sources": [
-                {"url": "https://www.gasbuddy.com/gasprices/colorado/silverthorne", "title": "GasBuddy — Silverthorne CO", "snippet": "Fuel stations within 10 mi of the I-70 / Eisenhower Tunnel approach."},
-                {"url": "https://www.summitcountyco.gov/", "title": "Summit County, CO — Services", "snippet": "Emergency services, sheriff, and visitor info for Dillon/Silverthorne area."},
+                {"url": "https://www.summitcountyco.gov/", "title": "Summit County, CO Services (online)", "snippet": "Reference: county services and emergency contacts."},
             ],
         },
         "news": {
-            "summary": "Eisenhower Tunnel and I-70 mountain corridor news — closures, accidents, and CDOT operational updates.",
+            "summary": (
+                "I-70 MOUNTAIN CORRIDOR — EXPECTED CONDITIONS\n\n"
+                "• Sunday returns (3–8 PM): heaviest week — \"the Sunday slog\". EB I-70 can crawl from Vail Pass to Denver\n"
+                "• Friday departures (3–9 PM): heavy WB Denver → ski country\n"
+                "• Eisenhower closures usually run 30 min – 3 hours; weather-induced can be longer\n"
+                "• When tunnel closes, US-6 over Loveland Pass becomes the alternate (10,990 ft, switchbacks, no commercial vehicles)\n\n"
+                "When back online: Summit Daily News (Frisco/Dillon area), Denver Post Transportation."
+            ),
             "sources": [
-                {"url": "https://summitdaily.com/", "title": "Summit Daily News", "snippet": "Local news for Dillon, Silverthorne, Breckenridge — covers I-70 incidents."},
-                {"url": "https://denverpost.com/news/transportation/", "title": "Denver Post — Transportation", "snippet": "Mountain corridor coverage, CDOT news, and travel advisories."},
+                {"url": "https://summitdaily.com/", "title": "Summit Daily News (online)", "snippet": "Local news Frisco/Dillon/Breckenridge."},
+                {"url": "https://denverpost.com/news/transportation/", "title": "Denver Post Transportation (online)", "snippet": "Daily I-70 corridor coverage."},
             ],
         },
     },
@@ -409,24 +479,61 @@ _ZONE_SOURCES: dict[str, dict[str, dict]] = {
     # Big Sur / Bixby Bridge / Highway 1 / Gorda
     "big sur": {
         "weather": {
-            "summary": "Big Sur (Highway 1 between Carmel and San Simeon). Coastal fog common AM and evening. Winter storms can trigger landslides closing PCH for days/weeks.",
+            "summary": (
+                "BIG SUR WEATHER — Highway 1 (Carmel → San Simeon, ~90 mi)\n"
+                "• Coastal fog: forms most mornings May–Sep, burns off ~10 AM–noon\n"
+                "• Winter storms: landslides above mile marker 36 (Mud Creek) close PCH for weeks at a time\n"
+                "• Year-round: bring layers — temps drop 15–20°F entering fog\n"
+                "• High wind advisory thresholds: 35+ mph sustained closes Bixby Bridge to high-profile vehicles\n"
+                "• Tsunami warning zone — if you feel a strong earthquake, drive INLAND immediately"
+            ),
             "sources": [
-                {"url": "https://forecast.weather.gov/MapClick.php?lat=36.2461&lon=-121.7714", "title": "NWS — Big Sur Coastal Forecast", "snippet": "Marine and coastal forecast for the Big Sur region."},
-                {"url": "https://www.mtrnpark.org/visit/weather-conditions/", "title": "Big Sur Weather Conditions", "snippet": "Local Big Sur weather, surf, and wind reports."},
+                {"url": "https://forecast.weather.gov/MapClick.php?lat=36.2461&lon=-121.7714", "title": "NWS Big Sur Coastal Forecast (online)", "snippet": "Reference: marine and coastal hourly forecast."},
             ],
         },
         "road": {
-            "summary": "Highway 1 through Big Sur — frequent landslide closures. Check Caltrans before driving. Bixby Bridge is the photo-stop landmark (mile marker 59.1).",
+            "summary": (
+                "HIGHWAY 1 (PCH) THROUGH BIG SUR\n"
+                "• Single lane each direction, 25–55 mph zones, no passing in most sections\n"
+                "• Landmarks (north to south):\n"
+                "  - Bixby Creek Bridge — MM 59.1 (photo stop, pullouts only)\n"
+                "  - Pfeiffer Big Sur State Park — MM 47\n"
+                "  - McWay Falls (Julia Pfeiffer Burns SP) — MM 35.8\n"
+                "  - Lucia — MM 25 (lodging)\n"
+                "  - Gorda — MM 13 (LAST FUEL going south for ~60 mi)\n"
+                "  - Ragged Point — MM 2 (lodging + fuel)\n"
+                "  - San Simeon (Hearst Castle) — MM -0\n"
+                "• Closures: ALWAYS verify before committing past Carmel — landslide closures can require 100+ mi detour via US-101\n"
+                "• Emergency: Monterey Co Sheriff (831) 755-3700; CHP Monterey (831) 770-8112\n"
+                "• Cell coverage essentially ZERO between Carmel and San Simeon"
+            ),
             "sources": [
-                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap — Highway 1", "snippet": "Live road conditions for PCH including current closures."},
-                {"url": "https://www.bigsurcalifornia.org/highway1.html", "title": "Big Sur Chamber — Highway 1 Status", "snippet": "Community-maintained status of Highway 1 closures and detours."},
+                {"url": "https://www.bigsurcalifornia.org/highway1.html", "title": "Big Sur Chamber Hwy 1 Status (online)", "snippet": "Community-maintained closure status."},
+                {"url": "https://quickmap.dot.ca.gov/", "title": "Caltrans QuickMap (online)", "snippet": "Live state-route conditions when back online."},
             ],
         },
         "poi": {
-            "summary": "Limited services on Highway 1 Big Sur: Big Sur Lodge, Nepenthe Restaurant, Big Sur Bakery, Gorda gas station (last fuel for ~60 mi). Cell coverage essentially zero between Carmel and San Simeon.",
+            "summary": (
+                "BIG SUR SERVICES — Hwy 1, north to south\n\n"
+                "• Carmel Highlands: full services (last full grocery before Big Sur)\n"
+                "• Rocky Point Restaurant — MM 60, ocean views, lunch + dinner\n"
+                "• Big Sur Lodge — MM 47, in Pfeiffer Big Sur SP. Rooms + restaurant + small store. (831) 667-3100\n"
+                "• Big Sur Bakery — MM 45, breakfast + lunch + bakery\n"
+                "• Nepenthe — MM 44, iconic clifftop restaurant\n"
+                "• Deetjen's Big Sur Inn — MM 44, rustic lodging\n"
+                "• Post Ranch Inn / Ventana — MM 44, luxury\n"
+                "• Lucia Lodge — MM 25, ocean cabins + restaurant\n"
+                "• Gorda Springs Resort — MM 13, LAST FUEL going south, small store + cafe + rooms\n"
+                "• Ragged Point Inn — MM 2, fuel + restaurant + rooms\n\n"
+                "EMERGENCIES (no cell):\n"
+                "• Use CHP emergency call boxes — yellow, every ~5 mi on Hwy 1\n"
+                "• Monterey Co Sheriff: (831) 755-3700\n"
+                "• Big Sur Volunteer Fire: (831) 667-2113\n"
+                "• Coast Guard (Monterey): (831) 647-7300"
+            ),
             "sources": [
-                {"url": "https://www.bigsurlodge.com/", "title": "Big Sur Lodge", "snippet": "Lodging, dining and fuel within Pfeiffer Big Sur State Park."},
-                {"url": "https://gordaspringsresort.com/", "title": "Gorda Springs Resort", "snippet": "Last gas, food and lodging on Highway 1 between Big Sur and San Simeon."},
+                {"url": "https://www.bigsurlodge.com/", "title": "Big Sur Lodge (online)", "snippet": "Reservations and current status."},
+                {"url": "https://gordaspringsresort.com/", "title": "Gorda Springs Resort (online)", "snippet": "Last fuel for ~60 mi heading south."},
             ],
         },
     },
