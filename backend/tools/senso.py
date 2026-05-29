@@ -195,17 +195,42 @@ def _extract_main_content(html_text: str) -> str:
 # page next to a "Read cached page" button, which is the bug the user
 # is seeing right now.
 _BLOCKED_BODY_PATTERNS = (
-    "just a moment", "checking your browser", "enable javascript",
+    # Cloudflare challenge / managed-challenge pages
+    "just a moment", "checking your browser", "checking if the site connection",
+    "cf-browser-verification", "cf-challenge-running", "challenge-platform",
+    "challenge-form", "cf-mitigated", "cf-please-wait",
+    "performance & security by cloudflare", "ray id:",
+    "attention required", "ddos protection by cloudflare",
+    # Generic JS-required / Are-you-human
+    "enable javascript", "please enable javascript", "javascript is required",
     "please verify you are human", "please verify you are a human",
-    "verify you are a human", "are you a robot", "are you human",
+    "verify you are a human", "verify that you are not a robot",
+    "are you a robot", "are you human", "complete the security check",
+    "please complete the security check",
+    # Access denied / WAF blocks
     "access denied", "access to this page has been denied",
-    "forbidden", "403 forbidden",
+    "access to this resource", "you don't have permission",
+    "you do not have permission", "forbidden", "403 forbidden", "error 403",
     "sorry, you have been blocked", "your access has been blocked",
-    "captcha", "recaptcha", "hcaptcha",
-    "cf-browser-verification", "cf-challenge-running",
+    "your ip has been blocked", "why have i been blocked",
+    "this website is using a security service",
+    "we are sorry, you are not allowed",
+    # CAPTCHA
+    "captcha", "recaptcha", "hcaptcha", "turnstile",
+    # Commercial WAF / bot mitigation vendors
     "perimeterx", "datadome", "sucuri website firewall",
-    "incapsula incident id", "akamai reference",
-    "subscribe to continue", "sign in to continue", "login to view",
+    "incapsula incident id", "request unsuccessful. incapsula",
+    "akamai reference", "akamai bot manager",
+    "imperva incident", "f5 networks",
+    # Paywall / login walls
+    "subscribe to continue", "subscribe to keep reading",
+    "sign in to continue", "log in to continue", "login to view",
+    "create a free account to continue", "create a free account to read",
+    "you've reached your monthly limit", "you've reached your free article limit",
+    "register to continue reading", "to continue reading, log in",
+    # Generic error / maintenance
+    "site maintenance", "service unavailable",
+    "we'll be right back", "we are currently performing maintenance",
 )
 
 
@@ -259,8 +284,13 @@ async def _fetch_snapshot(url: str) -> tuple[str | None, str | None]:
     sanitized = _extract_main_content(text)
     # Reject snapshots with so little extracted content that the accordion
     # would look broken (often happens on JS-only sites where bs4 sees the
-    # shell page with no article body).
-    if not sanitized or len(sanitized.strip()) < 200:
+    # shell page with no article body). 500 chars is roughly a couple of
+    # paragraphs, enough to be useful and to weed out empty shells.
+    if not sanitized or len(sanitized.strip()) < 500:
+        return None, None
+    # Final scan of the extracted content itself, just in case a block
+    # phrase only shows up in the article block (not the page shell).
+    if _looks_blocked(sanitized):
         return None, None
     return sanitized, title
 
@@ -292,19 +322,25 @@ def _render_html(title: str, route_id: str, sections: list[dict], snapshots: dic
     snapshots = snapshots or {}
     ts = datetime.now(timezone.utc).strftime("%b %d, %Y at %H:%M UTC")
 
-    # Drop sources we know don't work (blocked / 404 / paywall) BEFORE
-    # we render anything. The user shouldn't see dead rows in the pack;
-    # if a source can't be cached or visited offline, it shouldn't be
-    # listed at all.
+    # Strict source filter: only keep sources where we actually have a
+    # successful cached snapshot. If our scraper got a clean read, the
+    # user's browser will too. If we couldn't get clean content (block
+    # page, JS-only shell, paywall, timeout), hide the source entirely
+    # so the user never taps into a Cloudflare challenge.
+    #
+    # The curated summary at the top of each section already carries the
+    # actionable offline content (mile markers, phone numbers, procedures).
+    # An empty source list is fine for sections where every source got
+    # filtered out, the summary is the real value.
     for s in sections:
         srcs = s.get("sources") or []
-        s["sources"] = [src for src in srcs if src.get("reachable", True)]
+        s["sources"] = [
+            src for src in srcs
+            if src.get("reachable", True) and snapshots.get(src.get("url", ""))
+        ]
 
     total_sources = sum(len(s.get("sources") or []) for s in sections)
-    total_cached  = sum(
-        1 for s in sections for src in (s.get("sources") or [])
-        if snapshots.get(src.get("url", ""))
-    )
+    total_cached  = total_sources  # all kept sources are cached by definition now
 
     sections_html_parts = []
     for sec_idx, s in enumerate(sections):
@@ -507,7 +543,7 @@ a.src-row:hover{{border-color:rgba(0,212,255,.28);background:rgba(0,212,255,.05)
   <span class="logo">📡&nbsp;DeadZone</span>
   <div class="hdr-body">
     <div class="hdr-title">{html.escape(title)}</div>
-    <div class="hdr-meta">Generated {ts} &middot; {total_cached} of {total_sources} sources cached for offline reading</div>
+    <div class="hdr-meta">Generated {ts} &middot; {total_sources} sources cached for offline reading</div>
   </div>
   <span class="badge">&#10003; offline ready</span>
 </div>
