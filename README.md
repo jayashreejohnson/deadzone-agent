@@ -1,503 +1,563 @@
+<div align="center">
+
 # DeadZone
 
-> An AI agent that builds you a cited offline content pack right before you lose signal, and sells it to the next person who hits the same dead zone.
+### Your signal dies in four minutes. Your agent already has the pack.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](backend/requirements.txt)
+[![Next.js 14](https://img.shields.io/badge/Next.js-14-000000?logo=next.js)](frontend/package.json)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](backend/requirements.txt)
+[![Datadog LLM Observability](https://img.shields.io/badge/Datadog-LLM%20Observability-632CA6?logo=datadog&logoColor=white)](backend/tools/datadog.py)
+[![Deployed on Railway](https://img.shields.io/badge/Deployed-Railway-0B0D0E?logo=railway&logoColor=white)](backend/railway.toml)
+
+**Built at the [Datadog NYC Agentic Engineering Hackathon](https://www.datadoghq.com/) · May 2026**
+
+[Live Demo](https://deadzone-production-df6d.up.railway.app) · [Mobile Vision](https://deadzone-production-df6d.up.railway.app/mobile) · [Quick Start](#quick-start)
+
+</div>
+
+---
+
+## One-liner
+
+**DeadZone is an autonomous continuity agent that detects upcoming cellular dead zones, builds a cited offline content pack before you lose signal, caches it for the next traveler, and settles micropayments between agents when a pack is reused.**
 
 ---
 
 ## The problem
 
-You're driving through the Million Dollar Highway. Or riding BART from Embarcadero to SFO. Or taking the L train under the East River. Every time, the same thing happens: by the time the bars drop you've already lost the weather, the road conditions, the news, the directions, all of it. You only notice once it's too late.
+You are on the Million Dollar Highway, the L train under the East River, or BART through the Transbay Tube. The bars drop. Weather, road conditions, transit alerts, directions, and emergency contacts vanish with them. You only notice once it is too late.
 
-DeadZone fixes that. It detects the dead zone before you reach it, builds a complete cited offline pack, and delivers it to every screen you have before you lose signal.
-
----
-
-## What it does
-
-When a user is about 4 minutes from a known dead zone, the agent wakes up and:
-
-```
-detect dead zone  ->  LLM reasons about what you'll need
-       |
-       searches the web (weather, roads, POIs, local news)
-       |
-       publishes a cited offline-readable pack to a public URL
-       |
-       caches each source page inline so the pack reads with no signal
-       |
-       delivers it to your device before you lose signal
-```
-
-The UI shows a banner transition: alert, preparing, ready. A live log panel streams every tool call the agent makes. Tap the banner to open the pack.
+Dead zones are predictable. Losing context inside them is not inevitable.
 
 ---
 
-## Routes
+## Why DeadZone exists
 
-DeadZone ships with **8 pre-built routes**, 6 driving and 2 transit, selectable from the trip planner:
+Connectivity gaps are geographic and repeatable. The same tunnel, pass, and desert corridor goes dark for every traveler who follows you. Today each person hits that gap alone and rebuilds the same research from scratch.
 
-**Driving**
-- Manhattan to Newark (Lincoln Tunnel)
-- Denver to Vail (Eisenhower Tunnel, Vail Pass)
-- Los Angeles to Las Vegas (Cajon Pass, Mojave Desert)
-- Carmel to San Luis Obispo via Highway 1 (Big Sur, Bixby Bridge)
-- Ely to Fallon via US-50 (the Loneliest Road in America)
-- Ouray to Durango via US-550 (Million Dollar Highway, Red Mountain Pass)
+DeadZone treats a dead zone as a **marketplace for pre-built continuity**:
 
-**Transit**
-- NYC L train (Canarsie Tunnel under the East River)
-- BART Embarcadero to West Oakland (Transbay Tube)
+1. **Agent 1** predicts where signal will drop along your route.
+2. **Agent 2 (pack builder)** researches, publishes, and caches a cited pack while you still have bars.
+3. **The next rider** buys that pack in about a second instead of waiting for a full rebuild.
 
-Each route type drives a different content strategy. See [How the agent works](#how-the-agent-works) below.
+The product ships as a **deployed web application** on Railway with a live map demo, real LLM orchestration, sponsor API integrations, and Datadog LLM Observability traces for every run.
 
 ---
 
-## Demo flow
+## Product overview
 
-### Step 1, plan a trip
+| Stage | What happens | What you see |
+|-------|----------------|--------------|
+| **Plan** | `POST /plan` runs route dead-zone prediction | Zones plotted on the map |
+| **Approach** | Dot nears a zone; `POST /signal` fires ~4 min before entry | Alert card: signal drops soon |
+| **Build** | Orchestrator searches, publishes, caches, delivers | Preparing card + live agent log waterfall |
+| **Ready** | Pack URL delivered over WebSocket | Open Continuity Pack |
+| **Reuse** | Second user hits same zone; cache hit + micropayment | Instant delivery card |
+| **Offline** | UI simulates no-signal window inside the zone | Overlay + `tel:` links still work for voice |
+| **Replay** | Full trace stored per run | Re-stream agent log at original timing |
 
-Open the app. The trip planner modal shows two tabs: **Driving** and **Transit**. Pick a route. The frontend calls `/plan`, which asks Agent 1 for dead zones along the route. Zones appear on the map.
-
-### Step 2, user A hits a dead zone
-
-Click **Start Trip**. The dot moves along the route. When it enters a dead zone radius, the banner lights up and the frontend fires `POST /signal`. The orchestrator runs:
-
-- Checks ClickHouse for a recent cached pack (cache hit, buy it, skip the build)
-- Runs 4 parallel web searches via Nimble (queries chosen by route type)
-- Publishes a cited offline pack via Senso
-- Fetches and caches every source page inline so the pack works without signal
-- Fires `deliver_pack` and the banner goes ready
-
-The agent log panel streams every tool call with millisecond timing.
-
-### Step 3, user B hits the same zone
-
-Switch to **Rider** in the top nav. Start their trip. Same route, same dead zone. This time the orchestrator finds the cached pack, fires a simulated agent-to-agent payment to User A, and delivers in about one second. The banner shows a "Saved pack found, instant delivery" card.
-
-### Step 4, read the pack
-
-Tap "Open Continuity Pack". The pack opens inline.
-
-Each section has:
-- A dense offline-readable summary with mile markers, exact addresses, phone numbers, in-tunnel radio frequencies, emergency procedures
-- Tappable phone links (cellular voice works without data, so the user can actually call the sheriff or tunnel control while offline)
-- A list of cited sources, each with a "Read cached page" accordion that expands to show the actual page content extracted at build time
-
-If a source could not be cached (blocked by Cloudflare, paywall, JavaScript-only shell), it is hidden entirely. Every source in the pack is guaranteed readable offline.
-
-### Step 5, offline simulation
-
-The countdown reaches zero and a brief "No Signal" overlay runs (about 30% of zone duration). When signal returns, a toast pops: "Back online, everything caught up".
-
-### Step 6, replay
-
-Every orchestration run is recorded as a full event trace. After a run completes, the **Replay** button re-streams the entire agent log at original timing, useful for demos and debugging.
+> **Drivers and transit riders.** Trip planner tabs cover six iconic driving corridors and three real transit lines (NYC E/L, BART). Route type drives search strategy, pack headings, and curated emergency content.
 
 ---
 
-## How the agent works
+## Architecture
 
-### Architecture
+```mermaid
+flowchart TB
+    subgraph Client["Next.js 14 · TypeScript"]
+        UI["/ — Map demo"]
+        MOB["/mobile — Product vision"]
+        WS_C["WebSocket client"]
+    end
 
-```
-[Frontend]  ->  POST /signal  ->  [FastAPI]  ->  orchestrator.run
-                                                       |
-                          mode = agentic / auto / scripted
-                                                       |
-                              _run_with_llm                _run_scripted
-                              (LLM tool-calling loop)     (no LLM hops)
-                                       |
-                              ┌────────┴─────────────────┐
-                              | iter 0: planning         |
-                              |   LLM picks cache_find + |
-                              |   nimble_search topics   |
-                              | step: senso_publish      |
-                              | step: clickhouse_save_pack|
-                              | step: deliver_pack       |
-                              └──────────────────────────┘
-                                       |
-                              if mid-flow LLM failure:
-                                _finalize_from_messages
-                                preserves LLM's iter-0 work
-                                       |
-                              [WebSocket /ws]  ->  Frontend log panel
-```
+    subgraph API["FastAPI · Python 3.12"]
+        MAIN["main.py"]
+        BUS["bus.py — event broadcast"]
+        A1["agent1.predict()"]
+        ORCH["orchestrator.run()"]
+    end
 
-### LLM-driven path
+    subgraph Agents["Agent layer"]
+        PRED["Agent 1 — zone prediction"]
+        BUILD["Agent 2 — pack_builder workflow"]
+    end
 
-The orchestrator is **not a hardcoded pipeline.** It's an OpenAI function-calling loop where the LLM is given 7 tools as JSON schemas and decides which to call, in what order, with what arguments.
+    subgraph Tools["Tool integrations"]
+        NIM["nimble.search"]
+        SEN["senso.publish + snapshots"]
+        CH["clickhouse_db"]
+        PAY["payments.pay"]
+        DD["Datadog LLMObs"]
+    end
 
-```python
-# iter 0: planning step, full _PROMPT_CORE, all tools, tool_choice="auto"
-resp = await _call_llm_with_fallback(plan_messages, tools=TOOLS, tool_choice="auto")
-# LLM batches clickhouse_find_recent_pack + 4 nimble_search calls in parallel
-
-# subsequent steps: tiny focused prompts + single forced tool
-await _step_publish(signal, search_results, ctx)   # tool_choice forces senso_publish
-await _step_save(signal, search_results, ctx)      # tool_choice forces clickhouse_save_pack
-await _step_deliver(ctx.pack_url, False, ctx.pack_id, ctx)  # forces deliver_pack
+    UI -->|POST /plan| MAIN
+    UI -->|POST /signal| MAIN
+    WS_C <-->|/ws| BUS
+    MAIN --> A1 --> PRED
+    MAIN --> ORCH --> BUILD
+    BUILD --> NIM & SEN & CH & PAY
+    BUILD --> DD
+    ORCH --> BUS
 ```
 
-Every tool wrapper emits `tool_start` and `tool_end` WebSocket events with millisecond timestamps. That's the waterfall you see in the log panel.
-
-### Per-provider LLM resilience
-
-The agent supports a 3-provider chain: OpenRouter (primary), Groq (fallback), Cerebras (final fallback). Each provider has its own circuit breaker with independent state.
-
-```python
-# Per-provider breaker state
-llm_circuit.is_open("openrouter")     # check
-llm_circuit.classify_and_trip(p, err) # trip with auto-classified cooldown
-llm_circuit.reset("openrouter")       # close on success
-```
-
-**Failure classification:**
-- Terminal (402 insufficient credits, 401 invalid key, no_credits, billing): tripped for `LLM_CIRCUIT_TERMINAL_COOLDOWN_SEC` (default 1 hour). These don't self-recover within a minute.
-- Transient (429, 5xx, timeout): tripped for `LLM_CIRCUIT_COOLDOWN_SEC` (default 60 seconds).
-
-**Per-provider tuning:**
-- Each provider gets its own system prompt variant. Llama 3.3 70B on Groq gets prefixed schema-discipline framing. Cerebras gets a bare prompt to ride the queued free tier faster.
-- `parallel_tool_calls` is enabled for Gemini and Llama, omitted for Cerebras's gpt-oss / GLM-4 (some Cerebras models reject the flag).
-- Per-request timeout is 5 seconds (configurable). `max_retries=0` on the OpenAI SDK client so the timeout is the real hard cap.
-- Forced `tool_choice` syntax is downgraded to `"required"` on Cerebras since `zai-glm-4.7` returns 400 on the granular `{type:function, function:{name:...}}` form.
-
-**Writing style enforcement (applies to every LLM-generated string):**
-- System prompts in every LLM caller (orchestrator planning, focused step prompts, nimble stub, agent1 prediction) include a hard rule: never use em dashes (U+2014) or en dashes (U+2013) in any output. Use commas, periods, colons, or hyphens. Plain ASCII punctuation only. No fancy quotes, no ellipsis character.
-- Belt-and-suspenders: the `senso_publish` dispatcher scrubs em / en dashes out of title, section heading, summary, source title, and source snippet before publishing. Catches whatever slips past the prompt rule.
-
-**Token budget management:**
-- Iter 0 (planning) uses the larger model (`GROQ_MODEL`, default `llama-3.3-70b-versatile`).
-- Per-step focused calls (publish, save, deliver) use the smaller model (`GROQ_MODEL_SMALL`, default `llama-3.1-8b-instant`) which has a separate daily quota bucket on Groq's free tier. This prevents iter 0 from starving the focused steps.
-- Each focused step ships a tiny prompt (about 200 tokens) plus only the data needed for that one tool call, so a full pack build stays under 6,000 TPM on Groq's free tier.
-
-### State-machine forcing
-
-Free-tier LLMs sometimes stop mid-flow without calling `deliver_pack`. To prevent that, the orchestrator uses `tool_choice` to guarantee call sequence progression:
+### Repository layout
 
 ```
-has searches but no pack_url   -> tool_choice forces senso_publish
-has pack_url but no pack_id    -> tool_choice forces clickhouse_save_pack
-has pack_id but not delivered  -> tool_choice forces deliver_pack
+deadzone-updated/
+├── backend/                    # Production API (uvicorn main:app)
+│   ├── main.py                 # /signal, /plan, /ws, /dashboard, /trace/*
+│   ├── bus.py                  # WebSocket broadcast bus
+│   ├── seed.py                 # Demo dashboard seed data
+│   ├── schema.sql              # ClickHouse DDL
+│   └── tools/
+│       ├── orchestrator.py     # LLM tool loop, scripted fallback, quality eval
+│       ├── agent1.py           # Dead-zone prediction + normalization
+│       ├── nimble.py           # Nimble SERP + curated zone stubs
+│       ├── senso.py            # Senso publish + inline page snapshots
+│       ├── clickhouse_db.py    # Packs, events, payments, traces
+│       ├── payments.py         # Simulated agent-to-agent settlement
+│       ├── llm_circuit.py      # Per-provider circuit breakers
+│       └── datadog.py          # LLMObs agentless init
+├── frontend/                   # Next.js App Router
+│   ├── app/page.tsx            # Main demo
+│   ├── app/mobile/page.tsx     # Six-feature product landing
+│   ├── lib/route.ts            # Polylines, haversine, zone geometry
+│   └── components/             # Map, TripPlanner, LiveLogs, overlays…
+└── (legacy root scripts)       # server.py, agent2_curation.py — not the live path
 ```
 
-The LLM still chooses content (queries, summaries, pack sections, sources). The orchestrator only constrains the call sequence.
+---
 
-### Mid-flow finalizer
+## How the agent system works
 
-When the LLM tool loop fails partway through (provider 400, all breakers open, etc), the orchestrator does NOT restart the scripted flow from a cold cache_find. Instead `_finalize_from_messages` walks forward through any remaining steps using the work the LLM already produced (search results from iter 0). The model's content decisions are preserved. The orchestrator only fills in the deterministic publish, save, deliver steps the model could not complete itself.
+### Two agents, one product loop
 
-### Route-type-aware content
+| Agent | Code | Responsibility |
+|-------|------|----------------|
+| **Agent 1** | `backend/tools/agent1.py` → `predict()` | Dead-zone prediction along a route. Chain: LLM → CoverageMap/Google (if keys set) → hardcoded transit/driving zones → generic stub. |
+| **Agent 2** | `backend/tools/orchestrator.py` → `run()` | Pack builder. OpenAI-style function calling with seven tools, or deterministic scripted mode. |
 
-The system prompt classifies each route into one of five types and instructs the LLM to use different Nimble queries accordingly:
+### Orchestrator flow
 
-| Route type | Example | Search focus |
-|---|---|---|
-| **Transit** | NYC L train, BART | Service alerts, delays, commuter news |
-| **Mountain** | US-550 Red Mountain Pass | High-elevation weather, CDOT closures, SAR emergency contacts, avalanche advisories |
-| **Long rural** | US-50 Nevada | 4-hour weather forecast, NDOT road conditions, last fuel services |
-| **Urban tunnel** | Lincoln Tunnel | Weather + road + POI + local news, depth scales with duration |
-| **Default highway** | any other | Standard 4-topic search |
+```
+POST /signal
+    → orchestrator.run()          [@workflow deadzone_signal]
+        → mode: agentic | auto | scripted
+        → _run_with_llm()         [@agent pack_builder]
+              iter 0: LLM plans (cache_find + parallel nimble_search)
+              forced steps: senso_publish → clickhouse_save_pack → deliver_pack
+        → on LLM failure: _finalize_from_messages() preserves iter-0 work
+        → _eval_pack()            async quality score
+    → WebSocket: tool_start / tool_end / pack_ready / payment / eval_complete
+```
+
+The orchestrator is **not a hardcoded pipeline**. In `agentic` mode the LLM receives seven tool schemas and decides queries and pack structure. The server **forces tool sequence** when prerequisites are met so free-tier models cannot stop before `deliver_pack`:
+
+| State | Forced tool |
+|-------|-------------|
+| Has searches, no `pack_url` | `senso_publish` |
+| Has `pack_url`, no `pack_id` | `clickhouse_save_pack` |
+| Has `pack_id`, not delivered | `deliver_pack` |
 
 ### Tools exposed to the LLM
 
-| Tool | Purpose |
-|---|---|
-| `clickhouse_find_recent_pack` | Cache lookup, called first, always |
-| `nimble_search(query, topic)` | Web search for one topic (weather / road / poi / news) |
-| `senso_publish(title, sections)` | Publish cited pack to public URL |
-| `clickhouse_save_pack` | Persist pack for future buyers |
-| `payments_pay` | Agent-to-agent settlement (cache-hit path) |
-| `clickhouse_log_event` | Telemetry (built, bought, delivered) |
-| `deliver_pack` | Final step, notifies the frontend |
+| Tool | Implementation | Purpose |
+|------|------------------|---------|
+| `clickhouse_find_recent_pack` | `db.find_recent_pack` | Cache lookup (always first) |
+| `nimble_search` | `nimble.search` | Web search per topic |
+| `senso_publish` | `senso.publish` | Cited pack to public URL |
+| `clickhouse_save_pack` | `db.save_pack` | Persist for future buyers |
+| `payments_pay` | `payments.pay` | Agent-to-agent settlement on cache hit |
+| `clickhouse_log_event` | `db.log_event` | Telemetry |
+| `deliver_pack` | emits `pack_ready` | Notify frontend |
 
-### Pack quality evaluation
+### Route-type-aware content
 
-After every delivery, an async scorer runs:
+The system prompt classifies routes so Nimble queries match context (`orchestrator.py`):
+
+| Type | Examples | Search focus |
+|------|----------|--------------|
+| **Transit** | E train, L train, BART | Service alerts, delays, commuter news |
+| **Mountain** | US-550, Big Sur, Vail | Elevation weather, closures, SAR contacts |
+| **Rural** | US-50 Nevada | Long-horizon forecast, fuel, NDOT conditions |
+| **Tunnel** | Lincoln Tunnel | Weather + road + POI scaled to duration |
+| **Default** | Other highways | Standard four-topic search |
+
+### LLM resilience
+
+Three-provider chain with **independent per-provider circuit breakers** (`llm_circuit.py`):
+
+1. **OpenRouter** (primary) — default `google/gemini-2.0-flash-001`
+2. **Groq** — `llama-3.3-70b-versatile` (planning), `llama-3.1-8b-instant` (focused steps)
+3. **Cerebras** — final fallback
+
+Terminal failures (402, 401, billing) trip for `LLM_CIRCUIT_TERMINAL_COOLDOWN_SEC` (default 1h). Transient failures (429, 5xx, timeout) trip for `LLM_CIRCUIT_COOLDOWN_SEC` (default 60s). Mid-flow LLM failure triggers `_finalize_from_messages()` so search results from iter 0 are not discarded.
+
+### Pack quality score
+
+After delivery, `_eval_pack()` emits `eval_complete`:
 
 ```
-score = coverage (40%) + SLA pass (40%) + completion (20%) - error penalty
+score = coverage(40%) + SLA pass(40%) + completion(20%) − error penalty (5 pts/error, max 30)
 ```
 
-- **Coverage:** which tool categories were called (search, publish, cache, deliver)
-- **SLA pass:** pack delivered in under 85% of the eta_seconds window
-- **Completion:** `deliver_pack` was called with no tool errors
-- **Error penalty:** -5 points per tool error, capped at -30
-
-The score appears as a small badge on the ReadyCard (green if 80 or above, amber if 60 or above, red below 60).
+SLA pass means build completed in under 85% of `eta_seconds`. The Ready card shows green (≥80), amber (≥60), or red.
 
 ### Agent-to-agent payments
 
-When User B hits a dead zone that User A's pack already covers:
+On cache hit, the orchestrator calls `payments_pay` from `user_b` to `user_a` for **$0.02** (`PRICE_USD` in `orchestrator.py`). Settlement is **simulated** (fake `tx_id`, no on-chain dependency), modeled on x402-style agent micropayments.
 
-1. The orchestrator finds the cached pack via ClickHouse
-2. Calls `payments_pay` from `agent_b` to `agent_a` for $0.02
-3. Delivers the cached pack in about one second
-4. Dashboard ticks: trips covered, instant packs, total paid
+<details>
+<summary><strong>Datadog LLM Observability trace shape</strong></summary>
 
-The payment is simulated (fake tx hash, no on-chain dependencies). The settlement mechanism is modelled on x402-style agent-to-agent micropayments: agents can transact for already-done work without rebuilding it.
-
----
-
-## Pack content strategy
-
-The pack is the offline copy of the web content, not a list of links to it. Three layers stack to make the pack actually useful in a dead zone:
-
-### Layer 1: curated offline-readable summary
-
-Each section leads with a dense plain-text summary that carries the actionable content the user needs without any network:
-
-- Mile markers and exit numbers for every service stop
-- Real phone numbers (CHP, county sheriff, search and rescue, hospital, tunnel control), auto-rendered as tappable `tel:` links so the user can call from inside a dead zone (cellular voice does not need data)
-- In-tunnel radio frequencies (AM 1630 Lincoln, AM 1610 Eisenhower) for live closure updates
-- Emergency procedure step-by-step (pull right, use white phones every 300 ft; use yellow CHP boxes every 5 mi; in summer heat stay WITH the vehicle)
-- Recurring traffic timing (Sunday slog 3 to 8 PM on I-70, Friday Vegas-bound at Primm)
-- Toll prices, speed limits, lane configs, chain laws
-
-The curated content is wrapped in a `_ZONE_SOURCES` lookup keyed by zone name or route alias, so "Manhattan to Newark" resolves to the Lincoln Tunnel curated entry even when the LLM query doesn't include the literal zone name.
-
-### Layer 2: cached webpage snapshots
-
-During `senso_publish`, every source URL is fetched in parallel and the main article content is extracted via BeautifulSoup. The sanitized HTML is embedded inline in the pack as a `<details>` accordion. The user taps "Read cached page" and the page content unfolds inline. No network required.
-
-Rejection criteria for cached snapshots:
-- HTTP non-2xx
-- Non-HTML content-type
-- Bot-block / WAF / paywall body patterns (about 70 phrases across categories: Cloudflare challenge, PerimeterX, DataDome, Sucuri, Incapsula, Akamai bot manager, F5 Networks, hCaptcha / reCAPTCHA / Turnstile, "Subscribe to continue", "Please verify you are human", "Performance and security by Cloudflare", "Attention required", "DDoS protection", "Ray ID", site maintenance / "we'll be right back", etc.)
-- Extracted main-content shorter than 500 characters (catches JavaScript-only shells where bs4 sees only the empty `<body>`)
-- Block phrases inside the extracted content itself (catches embedded "you've reached your free article limit" notices that only appear in the article block, not the page shell)
-
-The reachability check in `nimble.py` runs a parallel sweep with about 30 of the same patterns against the first 4 KB of every source URL before the LLM ever sees them, so a CF-challenged URL is marked `reachable: False` up front and skipped at fetch time too.
-
-### Layer 3: strict source rendering
-
-The renderer only shows sources where BOTH the reachability check passed AND a successful cached snapshot exists. If our scraper could not pull clean content, the source is hidden entirely. No dead rows, no fake "Read cached page" buttons that would open a Cloudflare challenge. Every source displayed in the pack is guaranteed to read offline.
-
-Sections whose entire source list got filtered out still render correctly: the curated offline-readable summary at the top of each section is the primary value, the source list is supplementary. An empty source list under a fully-formed section is the cleanest possible failure mode for a blocked authority page.
-
----
-
-## Observability via Datadog LLM Observability
-
-Every run appears in [Datadog LLM Observability](https://docs.datadoghq.com/llm_observability/) as a single trace:
+Every run appears as a single trace when `DD_API_KEY` is set:
 
 ```
 workflow: deadzone_signal
   agent: pack_builder
     llm: openai.chat.completions.create   (auto-instrumented)
     tool: clickhouse_find_recent_pack
-    llm: openai.chat.completions.create
-    tool: nimble_search x 4               (parallel)
+    tool: nimble_search × N               (often parallel)
     tool: senso_publish
     tool: clickhouse_save_pack
     tool: payments_pay                    (cache-hit path)
     tool: deliver_pack
 ```
 
-SDK usage:
-- `LLMObs.enable(agentless_enabled=True)` at startup, no Datadog Agent process needed
-- `@workflow`, `@agent`, `@tool` decorators on `orchestrator.run`, `_run_with_llm`, and each tool
-- Auto-instrumentation of the OpenAI SDK, every `chat.completions.create` becomes an LLM span with prompt, response, token counts, latency
-- `LLMObs.annotate(input_data=, output_data=, metadata=, tags=)` inside each tool so spans carry meaningful context
+- `LLMObs.enable(agentless_enabled=True)` in `datadog.py` — no Datadog Agent process
+- `@workflow`, `@agent`, `@tool` decorators; decorators no-op without API key
+- **Application:** `deadzone-agent` (configurable via `DD_LLMOBS_ML_APP`)
 
-If `DD_API_KEY` is absent, all decorators no-op and the demo runs identically.
-
-Where to look: **LLM Observability, Applications, `deadzone-agent`**
+</details>
 
 ---
 
-## Frontend
+## Key features
 
-### Main demo (`/`)
+| Feature | Status | Notes |
+|---------|--------|-------|
+| LLM function-calling orchestrator | ✅ Real | OpenRouter → Groq → Cerebras with circuit breakers |
+| Live agent log waterfall | ✅ Real | `tool_start` / `tool_end` with ms timing over `/ws` |
+| Web search | ✅ Real | Nimble SERP; falls back to LLM + zone-aware curated stubs |
+| Cited pack publishing | ✅ Real | Senso cited.md; local `/static/packs/` fallback |
+| Inline cached page snapshots | ✅ Real | httpx + BeautifulSoup; WAF/paywall rejection (~50 patterns) |
+| Curated offline summaries | ✅ Real | Mile markers, `tel:` links, tunnel radio, SAR contacts |
+| Pack cache + dashboard | ✅ Real | ClickHouse Cloud or in-memory fallback |
+| Trace replay | ✅ Real | Client replays via `GET /trace/{id}` |
+| Datadog LLM Observability | ✅ Real | Agentless `ddtrace`; silent no-op without key |
+| Agent-to-agent payment | ⚡ Simulated | $0.02, fake tx hash |
+| Offline “no signal” UI | ⚡ Simulated | ~30% of zone duration overlay |
+| Native iOS / Android | 📱 Vision only | `/mobile` product landing |
 
-Full-screen map with:
-- Animated user dot moving along the selected route
-- Dead zone circles plotted on the map
-- **Overlay cards:** Alert, Preparing, (Cached Found), Ready
-- **Countdown banner:** live timer + pack status
-- **Agent log panel** (right drawer): streams every tool_start / tool_end event with timing, can be hidden
-- **Offline simulation overlay:** plays when the dot enters a dead zone
-- **Pack modal:** opens the published pack inline
-- **Replay button:** re-streams the last trace at original timing
-- **Dashboard strip** (bottom): trips covered, instant packs, avg ready time, sponsor labels
-- **User switcher:** Driver (user_a) and Rider (user_b)
+### Three-layer pack model
 
-The map uses memoized static layers (route polyline + dead-zone circles) so the trip animation (which updates user position about three times per second) doesn't re-create Leaflet layers on every tick. Without this the whole map would flash on every dot movement.
+1. **Curated summary** — Dense plain-text with actionable offline content (`_ZONE_SOURCES` in `nimble.py` / `senso.py`).
+2. **Cached snapshots** — Source URLs fetched at publish time; accordion “Read cached page” in pack HTML.
+3. **Strict rendering** — Sources shown only if reachability check passed **and** snapshot extracted cleanly (≥500 chars, no bot-block phrases).
 
-### Mobile responsiveness
+### Demo routes (9)
 
-On viewports under 768px wide:
-- The 300px log drawer auto-collapses on first render and slides over the map rather than pushing content
-- AlertCard buttons stack vertically: Prepare Pack full-width on top, Reroute / Stay split underneath
-- StatTile grid drops to one column
-- PackModal uses 12px side padding and 92vh height instead of 48px and 88vh
+**Driving (6)**
 
-### Mobile features page (`/mobile`)
+| Route | Highlight |
+|-------|-----------|
+| Manhattan → Newark | Lincoln Tunnel |
+| Denver → Vail | Eisenhower Tunnel, Vail Pass |
+| Los Angeles → Las Vegas | Cajon Pass, Mojave Desert |
+| Big Sur, PCH | Highway 1, Bixby Bridge |
+| US-50 Nevada | The Loneliest Road |
+| Million Dollar Highway | Ouray → Durango, Red Mountain Pass |
 
-A scroll-snapped product landing page showing 6 features with phone mockups. Designed to show what the native iOS/Android app would look like.
+**Transit (3)**
 
-| # | Feature | What it shows |
-|---|---|---|
-| 01 | GPS Auto-Detection | Route detected silently (BART Embarcadero to SFO mockup) |
-| 02 | Dead Zone Countdown | Lock screen, CarPlay (Ouray to Durango), Watch |
-| 03 | Contact Alerts | iMessage / SMS / email before going dark, location pin |
-| 04 | Traffic Detection | BQE reroute for drivers; tunnel station mapping for transit riders |
-| 05 | AI Content Pre-fetch | 22 min staged for a 20-min tunnel; 1 hour for Nevada desert |
-| 06 | Seamless Return | Auto-sync on restore: messages, nav, podcast, articles |
-
-Desktop: phone + description side by side. Mobile: snap panels (phone first, then description).
-
----
-
-## Tech stack
-
-| Layer | Tech |
-|---|---|
-| **Backend** | Python 3.12, FastAPI, OpenAI SDK (function calling), httpx, WebSockets, BeautifulSoup4 |
-| **Frontend** | Next.js 14 (App Router), TypeScript, Tailwind, react-leaflet |
-| **Storage** | ClickHouse Cloud (free tier) with in-memory fallback |
-| **Observability** | Datadog LLM Observability (ddtrace) |
-| **Web search** | Nimble SERP API, falls back to LLM-generated route-specific stubs, falls back to curated zone-aware stubs |
-| **Publish** | Senso (cited.md), falls back to local static file server |
-| **LLM providers** | OpenRouter (`google/gemini-2.0-flash-001`) -> Groq (`llama-3.3-70b-versatile` + `llama-3.1-8b-instant`) -> Cerebras (`zai-glm-4.7` / `gpt-oss-120b`), with per-provider circuit breakers |
-| **Snapshot extraction** | BeautifulSoup4 with tag whitelist, plus a 50-phrase bot-block / WAF / paywall reject list |
+| Route | Highlight |
+|-------|-----------|
+| E: Jamaica → WTC | NYC Subway |
+| L: Canarsie → 8th Ave | Canarsie Tunnel / East River |
+| BART: Embarcadero → SFO | Transbay Tube |
 
 ---
 
-## Repo layout
+## Screenshots
+
+> Add assets to `/docs/screenshots/` and replace placeholders below.
+
+| | |
+|:---:|:---:|
+| **Trip planner & map** | **Agent log waterfall** |
+| `[screenshot-trip-planner.png]` | `[screenshot-agent-log.png]` |
+| *Route selector, dead zones on map* | *Live tool_start / tool_end timing* |
+| **Ready card & pack** | **Cache-hit instant delivery** |
+| `[screenshot-pack-ready.png]` | `[screenshot-cache-hit.png]` |
+| *Open Continuity Pack inline* | *Rider reuses Driver's pack* |
+| **Datadog LLM Observability** | **Mobile vision (`/mobile`)** |
+| `[screenshot-datadog-trace.png]` | `[screenshot-mobile-vision.png]` |
+| *`deadzone-agent` workflow trace* | *Six scroll-snapped feature panels* |
+
+---
+
+## Technology stack
+
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS 3, react-leaflet |
+| **Backend** | Python 3.12, FastAPI, uvicorn, httpx, WebSockets, Pydantic |
+| **Agents** | OpenAI SDK function calling, multi-provider fallback, per-provider circuit breakers |
+| **Search** | [Nimble](https://nimbleway.com/) SERP API |
+| **Publish** | [Senso](https://senso.ai/) cited.md |
+| **Storage** | ClickHouse Cloud (`schema.sql`) + in-memory fallback |
+| **Observability** | [Datadog LLM Observability](https://docs.datadoghq.com/llm_observability/) (`ddtrace`, agentless) |
+| **Extraction** | BeautifulSoup4, tag whitelist, bot-block / paywall phrase rejection |
+| **Hosting** | Railway (Nixpacks) |
+
+---
+
+## Deployment architecture
+
+```mermaid
+flowchart LR
+    subgraph Railway["Railway"]
+        FE["Frontend service\nnpm run build && npm start"]
+        BE["Backend service\nuvicorn main:app --port $PORT"]
+    end
+
+    USER["Browser"] --> FE
+    FE -->|NEXT_PUBLIC_API_BASE| BE
+    BE --> CH[("ClickHouse Cloud")]
+    BE --> NIM["Nimble API"]
+    BE --> SEN["Senso API"]
+    BE --> DD["Datadog intake\n(agentless)"]
+    BE --> OR["OpenRouter / Groq / Cerebras"]
+```
+
+| Service | Config | Start command |
+|---------|--------|---------------|
+| **Backend** | `backend/railway.toml` | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| **Frontend** | `frontend/railway.toml` | `npm install && npm run build` → `npm start` |
+
+Production CORS allows `https://deadzone-production-df6d.up.railway.app` (`backend/main.py`). Set `PUBLIC_BASE_URL` to your backend Railway URL so fallback pack links resolve correctly.
+
+<details>
+<summary><strong>Environment variables</strong></summary>
+
+| Variable | Required | Fallback |
+|----------|----------|----------|
+| `OPENROUTER_API_KEY` | No | Groq → Cerebras → scripted |
+| `OPENAI_MODEL` | No | `google/gemini-2.0-flash-001` |
+| `GROQ_API_KEY` / `GROQ_MODEL` / `GROQ_MODEL_SMALL` | No | Provider chain |
+| `CEREBRAS_API_KEY` / `CEREBRAS_MODEL` | No | Provider chain |
+| `NIMBLE_API_KEY` | No | LLM stub → curated zone stubs |
+| `SENSO_API_KEY` | No | Local `/static/packs/` |
+| `CLICKHOUSE_HOST` / `USER` / `PASSWORD` | No | In-memory dict |
+| `DD_API_KEY` / `DD_SITE` / `DD_LLMOBS_ML_APP` | No | Observability no-op |
+| `PUBLIC_BASE_URL` | No | `http://localhost:8000` |
+| `ORCHESTRATOR_MODE` | No | `agentic` (`agentic` / `auto` / `scripted`) |
+| `LLM_TIMEOUT_SEC` | No | `5` |
+| `LLM_CIRCUIT_COOLDOWN_SEC` | No | `60` |
+| `LLM_CIRCUIT_TERMINAL_COOLDOWN_SEC` | No | `3600` |
+| `PACK_SNAPSHOT_TIMEOUT_SEC` | No | `6` |
+| `PACK_SNAPSHOT_MAX_CHARS` | No | `6000` |
+| `NEXT_PUBLIC_API_BASE` | No | `http://localhost:8000` |
+
+**Zero keys required.** The full demo flow runs end-to-end with an empty `.env` thanks to stubs and scripted fallback.
+
+</details>
+
+---
+
+## Example workflow
+
+### 1 · Plan a trip
+
+Open the app → **Trip Planner** → Driving or Transit tab → pick a route → **Plan Trip**.
+
+`POST /plan` → Agent 1 returns zones → map draws circles → `zones_ready` on WebSocket.
+
+### 2 · Driver builds a pack
+
+**Start Trip** as **Driver** (`user_a`). When the dot enters a dead-zone radius:
 
 ```
-deadzone/
-|- backend/
-|  |- main.py                    # FastAPI app: /signal, /plan, /ws, /dashboard, /trace/*, /llm-check, /llm-circuit/reset
-|  |- bus.py                     # WebSocket broadcast bus
-|  |- seed.py                    # Pre-seed packs/events so the dashboard isn't empty on first load
-|  |- schema.sql                 # ClickHouse DDL
-|  |- requirements.txt
-|  |- tools/
-|     |- orchestrator.py         # LLM tool-calling loop, per-step focused calls, mid-flow finalizer, scripted fallback, quality evaluator
-|     |- agent1.py               # Route dead-zone prediction with shared circuit breaker
-|     |- nimble.py               # Web search: Nimble API, LLM stub, curated zone-aware stubs with bot-block-aware reachability check
-|     |- senso.py                # Pack publish: Senso API, static fallback, cached snapshot fetcher with WAF detection
-|     |- clickhouse_db.py        # Cache + telemetry + trace storage
-|     |- payments.py             # Simulated agent-to-agent payment
-|     |- llm_circuit.py          # Per-provider circuit breaker (terminal vs transient cooldowns)
-|     |- datadog.py              # LLMObs initialisation
-|- frontend/
-   |- app/
-   |  |- page.tsx                # Main demo: map, log panel, overlays, trip planner
-   |  |- mobile/page.tsx         # Product landing: 6 features with phone mockups
-   |- lib/route.ts               # Route types, polylines, dead zone definitions, haversine
-   |- components/
-      |- TripPlanner.tsx         # Route selector (Driving / Transit tabs), plan to start flow
-      |- Map.tsx                 # react-leaflet map with memoized static layers
-      |- LiveLogs.tsx            # Agent event stream with waterfall timing
-      |- OverlayCard.tsx         # Alert / Preparing / CachedFound / Ready cards
-      |- Dashboard.tsx           # Bottom stats strip
-      |- CountdownBanner.tsx     # Live countdown to dead zone entry
-      |- PackModal.tsx           # Inline iframe for the published pack
-      |- OfflineOverlay.tsx      # No Signal simulation during zone traversal
-      |- OfflinePill.tsx         # Persistent offline pill during zone
-      |- Toast.tsx               # Payment / synced / reconnecting toasts
+POST /signal
+  → cache miss
+  → 4× nimble_search (parallel)
+  → senso_publish (with inline snapshots)
+  → clickhouse_save_pack
+  → deliver_pack
 ```
+
+Banner: Alert → Preparing → Ready. Agent log streams every tool call.
+
+### 3 · Rider buys the cache
+
+Switch to **Rider** (`user_b`), same route. On the same zone:
+
+```
+POST /signal
+  → clickhouse_find_recent_pack (hit)
+  → payments_pay ($0.02)
+  → deliver_pack (~1s)
+```
+
+Banner shows instant delivery. Dashboard increments trips covered and total paid.
+
+### 4 · Read offline
+
+**Open Continuity Pack** → sections with curated summaries, `tel:` links, cited sources with cached accordions. Blocked sources are hidden entirely.
+
+### 5 · Replay
+
+After a run, **Replay** re-streams the stored trace at original timing (`GET /trace/{trace_id}`).
 
 ---
 
 ## Quick start
 
 ```bash
-# 1. Backend
+# Backend
 cd backend
-cp .env.example .env
-# Fill in whichever keys you have; everything has a fallback (see below)
+cp .env.example .env   # optional — everything has fallbacks
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 
-# 2. Frontend (new terminal)
+# Frontend (new terminal)
 cd frontend
 npm install
 npm run dev
 
-# 3. Open http://localhost:3000
+# → http://localhost:3000
 ```
 
-### Environment variables
-
-| Variable | Required | Default / Fallback |
-|---|---|---|
-| `OPENROUTER_API_KEY` | No | Falls through to Groq, then Cerebras, then scripted |
-| `OPENAI_MODEL` | No | `google/gemini-2.0-flash-001` |
-| `GROQ_API_KEY` | No | Same fallthrough |
-| `GROQ_MODEL` | No | `llama-3.3-70b-versatile` (used for planning) |
-| `GROQ_MODEL_SMALL` | No | `llama-3.1-8b-instant` (used for focused steps, separate quota bucket) |
-| `CEREBRAS_API_KEY` | No | Same fallthrough |
-| `CEREBRAS_MODEL` | No | `llama-3.3-70b` |
-| `NIMBLE_API_KEY` | No | LLM-generated route-specific stubs, then curated zone-aware stubs |
-| `SENSO_API_KEY` | No | Pack published to local `/static/packs/` directory |
-| `CLICKHOUSE_HOST/USER/PASSWORD` | No | In-memory dict (resets on restart) |
-| `DD_API_KEY` | No | All `@workflow`, `@agent`, `@tool` decorators no-op silently |
-| `AGENT1_URL` | No | Built-in route prediction stub |
-| `PUBLIC_BASE_URL` | No | `http://localhost:8000` |
-| `ORCHESTRATOR_MODE` | No | `agentic`, options: `agentic` / `auto` / `scripted` |
-| `LLM_TIMEOUT_SEC` | No | `5` |
-| `LLM_CIRCUIT_COOLDOWN_SEC` | No | `60` (transient failures) |
-| `LLM_CIRCUIT_TERMINAL_COOLDOWN_SEC` | No | `3600` (402, 401, billing) |
-| `PACK_SNAPSHOT_TIMEOUT_SEC` | No | `6` |
-| `PACK_SNAPSHOT_MAX_CHARS` | No | `6000` |
-
-**Zero keys required.** Every component has a deterministic fallback so the full demo flow runs end-to-end with an empty `.env`.
-
----
-
-## API reference
+<details>
+<summary><strong>API reference</strong></summary>
 
 | Method | Path | Description |
-|---|---|---|
-| `POST` | `/signal` | Frontend reports user approaching dead zone, spawns orchestrator in background |
-| `POST` | `/plan` | Predict dead zones for a route (Agent 1), returns zone list and emits `zones_ready` via WS |
-| `POST` | `/run_pipeline` | Full Agent 1 to Agent 2 chain, builds packs for all zones in parallel |
-| `GET` | `/dashboard` | Aggregate stats: trips covered, instant packs, avg build time, total paid |
-| `GET` | `/traces` | List all trace IDs (most recent first) |
-| `GET` | `/trace/{trace_id}` | Full event list for one trace (for replay UI) |
-| `GET` | `/replay/{trace_id}` | SSE stream of trace events at original timing |
-| `GET` | `/llm-check` | Ping each configured LLM provider and report per-provider circuit breaker state |
-| `GET` | `/llm-models` | List the actual model IDs each configured provider exposes for our API key (useful when a 404 model_not_found suggests we're guessing wrong IDs) |
-| `POST` | `/llm-circuit/reset` | Manually close all per-provider breakers (e.g. after refilling Groq tokens) |
-| `WS` | `/ws` | Real-time event stream: tool_start, tool_end, payment, pack_ready, eval_complete |
+|--------|------|-------------|
+| `POST` | `/signal` | User approaching dead zone; spawns orchestrator |
+| `POST` | `/plan` | Predict zones for route |
+| `POST` | `/run_pipeline` | Predict all zones + orchestrate each |
+| `GET` | `/dashboard` | Aggregate stats |
+| `GET` | `/traces` | List trace IDs |
+| `GET` | `/trace/{trace_id}` | Events for replay UI |
+| `GET` | `/replay/{trace_id}` | SSE replay at original timing |
+| `GET` | `/llm-check` | Provider health + circuit state |
+| `GET` | `/llm-models` | Models exposed per provider key |
+| `POST` | `/llm-circuit/reset` | Close all breakers |
+| `WS` | `/ws` | Real-time agent events |
+
+</details>
 
 ---
 
-## What's real vs simulated
+## Future roadmap
 
-| Feature | Status |
-|---|---|
-| LLM function-calling loop | Real, with OpenRouter, Groq, Cerebras chain and per-provider circuit breakers |
-| Web search | Real (Nimble SERP API), falls back to LLM stub, falls back to curated zone-aware stubs |
-| Pack publishing | Real (Senso cited.md), local static fallback |
-| Cached page snapshots | Real (httpx + BeautifulSoup4 extraction, embedded inline in the pack HTML) |
-| Cache and telemetry | Real (ClickHouse Cloud), in-memory fallback |
-| Datadog LLM Observability | Real (ddtrace agentless), no-ops if key absent |
-| Agent-to-agent payment | Simulated, fake tx hash, no on-chain dependencies |
-| Route dead-zone prediction | LLM stub (Agent 1 integration point present) with shared circuit breaker |
-| Offline simulation | Simulated UI overlay (about 30% of zone duration) |
-| Native iOS / Android app | Not built, `/mobile` shows what it would look like |
+| Priority | Initiative |
+|----------|------------|
+| **P0** | Native iOS / Android apps (GPS auto-detect, CarPlay, lock-screen countdown) |
+| **P0** | Real agent-to-agent settlement (x402 or similar) replacing simulated `payments.pay` |
+| **P1** | Production auth, rate limits, and multi-tenant pack ownership |
+| **P1** | Wire `AGENT1_URL` or retire stub; optional CoverageMap + Google Maps enrichment |
+| **P2** | Push notifications and contact alerts before dead zones |
+| **P2** | Docker images and CI pipeline |
+| **P3** | Automatic route detection without manual trip planner selection |
 
----
-
-## UX decisions
-
-This project went through an **18-reviewer study** (9 routes by 2 personas, desktop driver and mobile transit rider). Key findings and fixes:
-
-- **Transit riders were not represented.** Every default example (GPS mockup, CarPlay, traffic screen) assumed a car. All 6 feature descriptions now explicitly address both drivers and transit riders. Phone mockups updated to BART and BQE examples.
-- **Technical jargon removed throughout.** "Nimble Network" became "Signal Guard". "Autonomous agents" was removed. "x402 pay" hidden from all user-facing surfaces. "Awaiting agent activity" became "ready to scan your route". "Weak connectivity predicted" became "Signal drops soon, we're preparing your pack".
-- **Scale mismatch.** Feature 05 copy now distinguishes a 20-min subway tunnel from an 80-min Nevada dead zone, the content staging amount is different and that needed to be said explicitly.
-- **Emergency content for mountain routes.** US-550 and PCH reviewers flagged that generic content was useless at altitude. Mountain routes now always include SAR emergency contacts, county sheriff numbers, CDOT / CAIC advisories, and elevation-specific weather.
-- **Pack content rebuilt from scratch.** Reviewers said the old packs were "kinda trash": generic homepage URLs (google.com/maps, weather.com), boilerplate summaries ("no major incidents reported"), nothing zone-specific. Rebuilt as curated offline-readable text with mile markers, real phone numbers, in-tunnel radio frequencies, exact service stops, emergency procedure, plus inline cached snapshots of each source page.
-- **Empty log state.** The `??` emoji in the empty agent log looked broken to most reviewers. Replaced with a signal icon and plain-language idle copy.
+The `/mobile` page already prototypes six product pillars: GPS detection, countdown surfaces, contact alerts, traffic reroute, staged pre-fetch, and seamless return sync.
 
 ---
 
-## Status
+## Lessons learned
 
-Hackathon project, Agentic Engineering Hack, Datadog NYC, May 2026.
+### Product & UX
 
-No production hardening, no auth, no Docker. The point is to show a real LLM-driven agent loop using sponsor APIs (Nimble, Senso, Datadog) with per-provider circuit breakers, agent-to-agent payments, and packs that actually work offline in under three minutes.
+An **18-reviewer study** (9 routes × 2 personas: desktop driver, mobile transit rider) drove major changes:
+
+- **Transit was invisible** in early copy and mockups. Every surface now speaks to drivers *and* riders; BART and subway examples ship in `/mobile`.
+- **Jargon kills trust.** User-facing strings say “Signal Guard” and “continuity pack,” not sponsor codenames or “x402 pay.”
+- **Scale matters in copy.** A 20-minute subway tunnel and an 80-minute Nevada gap need different staging expectations.
+- **Mountain routes need safety-first content.** SAR numbers, sheriff contacts, CDOT/CAIC advisories, and elevation weather are non-negotiable for US-550 and PCH.
+
+### Engineering
+
+- **Force tool sequence, let the LLM own content.** Free-tier models stop early; `tool_choice` guarantees publish → save → deliver while preserving query and summary creativity.
+- **Split model sizes by step.** Planning on 70B, focused steps on 8B, keeps Groq free-tier TPM under control.
+- **Mid-flow finalizer beats cold restart.** `_finalize_from_messages()` reuses iter-0 searches when the LLM provider fails mid-pipeline.
+- **Offline means offline.** Curated text is the product; links are supplementary. Hide any source that cannot be fully cached.
+- **Memoize map layers.** Static route polylines and zone circles must not re-render on every position tick (~3 Hz).
+- **Observability is a sponsor deliverable.** Agentless Datadog LLMObs makes every tool call and LLM hop visible without running a sidecar agent.
+
+---
+
+## My contributions
+
+This repository is my maintained fork of DeadZone. I own the product direction, user-facing experience, and how the project is presented end to end. My work sits at the intersection of product strategy, UX, technical collaboration, and shipping, not documentation alone.
+
+### Product strategy & problem framing
+
+- Defined the core user problem: predictable connectivity loss should not mean unpredictable loss of context.
+- Framed DeadZone as a continuity product (detect → prepare → deliver → reuse), not a generic “AI demo.”
+- Identified the real pain point behind dead zones: travelers lose weather, transit alerts, road conditions, and emergency information at the moment they need it most.
+- Asked product, technical, and operational questions that shaped what we built, what we deferred, and what had to work in a live demo.
+- Contributed to feature prioritization and roadmap thinking (driver vs rider flows, cache reuse, offline-readable packs, mobile vision).
+
+### User experience & interaction design
+
+- Designed the end-to-end journey: plan trip → approach zone → build or buy pack → read offline → return online → replay.
+- Mapped user behavior **before, during, and after** entering a dead zone (countdown, alert/preparing/ready states, offline overlay, post-reconnect feedback).
+- Shaped UX/UI flow and information hierarchy: what surfaces when (banner cards, agent log, dashboard strip, pack modal).
+- Determined what information users need in each phase and in what format (actionable summaries first, cited sources second, hidden when not offline-safe).
+- Drove inclusivity for **drivers and transit riders** in copy, route examples, and `/mobile` mockups.
+- Participated in structured usability feedback (18-reviewer study across routes and personas) and translated findings into concrete UX fixes.
+- Tested assumptions from a workflow and adoption lens, not only a technical one.
+
+### Systems thinking & agent experience
+
+- Defined how users should understand autonomous behavior without jargon (live agent log, timing waterfall, replay).
+- Collaborated on how Agent 1 (prediction) and Agent 2 (pack builder) should feel as a single product loop.
+- Helped specify cache-hit vs build paths, instant delivery messaging, and payment/settlement storytelling for demos.
+- Bridged engineering capabilities (tool calls, cache, publish, deliver) with understandable user-facing states.
+
+### Technical collaboration & implementation support
+
+- Collaborated on technical decisions where product requirements met system constraints (orchestrator modes, fallbacks, route-type content strategies).
+- Identified edge cases and real-world scenarios (mountain safety content, tunnel vs desert staging, unreachable sources, empty log states).
+- Brainstormed and proposed product enhancements aligned with sponsor integrations and hackathon scope.
+- Supported testing and validation of flows across local and deployed environments.
+
+### Repository modernization, deployment & presentation
+
+- Led repository modernization and clearer separation of the live demo path (`backend/` + `frontend/`) from legacy scripts.
+- Supported Railway deployment and production-readiness efforts (frontend/backend services, environment configuration, demo reliability).
+- Authored agent-system and architecture documentation so engineers can trace `/signal` → orchestrator → tools → WebSocket events.
+- Redesigned this README for portfolio and production presentation: problem narrative, architecture diagrams, honest feature matrix, deployment guide.
+- Translated a hackathon agent stack into a coherent, recruiter- and engineer-friendly product story.
+
+### How I work on this project
+
+| Lens | Focus |
+|------|--------|
+| **Product strategy** | Problem definition, positioning, prioritization |
+| **User experience design** | Journeys, IA, overlays, copy, accessibility of agent behavior |
+| **Technical collaboration** | Requirements for agents, packs, cache, and observability |
+| **Deployment support** | Railway, env fallbacks, live demo stability |
+| **Cross-functional problem solving** | Connecting user needs, demo constraints, and implementation tradeoffs |
+
+I did not single-handedly implement the full backend agent stack; I partnered on engineering while owning product framing, UX direction, documentation quality, and how DeadZone is experienced and explained.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE). See `LICENSE` for copyright and terms.
+
+---
+
+<div align="center">
+
+**DeadZone** · Agentic Engineering Hack · Datadog NYC · May 2026
+
+*Connectivity gaps are predictable. Losing context inside them is not.*
+
+</div>
